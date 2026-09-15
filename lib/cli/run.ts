@@ -1,5 +1,7 @@
 // CLI command bodies. Thin: parse options, call the library, print.
 
+import type { CheckResult } from "../format.ts";
+
 export interface CliOpts {
   format: "text" | "json" | "markdown";
   output?: string;
@@ -41,29 +43,87 @@ export async function runCheck(token: string, opts: CliOpts): Promise<void> {
     address = matches[0]!.token;
   }
 
-  const snap = await tokenSnapshot(provider, cache, address as `0x${string}`);
-  const [hdr] = await Promise.all([header(provider, snap)]);
-  const groups = findGroups(
-    snap.holders
-      .filter((h) => h.position.pnlPct !== null)
-      .map((h) => ({ pnlPct: h.position.pnlPct as number, supplyShare: h.supplyShare })),
-  );
-  const aggs = aggregate(snap.holders);
-  const s = provider.stats();
-  const result = {
-    snapshot: snap,
-    header: hdr,
-    groups,
-    aggregates: aggs,
-    top: snap.holders.slice(0, opts.top),
-    source: { label: s.label, requests: s.requests, seconds: (Date.now() - t0) / 1000 },
-  };
-  writeOutput(formatCheck(result, opts.format), opts.output);
+  const { check } = await import("../check.ts");
+  let result: CheckResult | null = null;
+  for await (const phase of check(provider, cache, address as `0x${string}`, {
+    profiles: opts.profiles,
+  })) {
+    const s = provider.stats();
+    const source = { label: s.label, requests: s.requests, seconds: (Date.now() - t0) / 1000 };
+    if (phase.phase === 1) {
+      result = {
+        snapshot: phase.snapshot,
+        header: phase.header,
+        groups: phase.groups,
+        aggregates: phase.aggregates,
+        top: phase.snapshot.holders.slice(0, opts.top),
+        source,
+      };
+      // phase 1 goes to the terminal immediately; if writing to a file,
+      // wait for the final phase instead of printing twice
+      if (!opts.output) console.log(formatCheck(result, opts.format));
+    } else {
+      if (!result) continue;
+      const prev: CheckResult = result;
+      result = {
+        ...prev,
+        aggregates: phase.aggregates,
+        topExtras: new Map(
+          prev.top.map((t) => {
+            const p = phase.profiles.get(t.wallet);
+            return [
+              t.wallet,
+              {
+                avgPnlPerTrade: p?.avgPnlPerTrade ?? null,
+                winrate: p?.winrate ?? null,
+                trades: p ? p.trades : null,
+                badges: p?.badges ?? [],
+                notRead: p?.notRead,
+              },
+            ];
+          }),
+        ),
+        source,
+      };
+      if (!opts.output) {
+        console.log("\n--- profiles ---\n");
+        console.log(formatCheck(result, opts.format));
+      }
+    }
+  }
+  if (opts.output && result !== null) {
+    writeOutput(formatCheck(result, opts.format), opts.output);
+  }
   cache.close();
 }
 
 export async function runWallet(address: string, opts: CliOpts): Promise<void> {
-  throw new Error("wallet: not implemented yet");
+  const { pickProvider } = await import("../providers/rpc.ts");
+  const provider = await pickProvider(opts.provider);
+  if (!provider.supportsProfiles) {
+    throw new Error("wallet profiles need mode B: set BITQUERY_TOKEN (plans from $49/mo at bitquery.io)");
+  }
+  const { BitqueryProvider } = await import("../providers/bitquery.ts");
+  if (!(provider instanceof BitqueryProvider)) throw new Error("wallet profiles need the bitquery provider");
+  const { Cache } = await import("../cache.ts");
+  const { walletProfile } = await import("../read/wallet.ts");
+  const { writeOutput } = await import("../format.ts");
+  const cache = new Cache();
+  const p = await walletProfile(provider, cache, address.toLowerCase());
+  const text =
+    opts.format === "json"
+      ? JSON.stringify(p, null, 2)
+      : [
+          `wallet ${p.wallet}`,
+          `trades   ${p.trades} closed` + (p.wins ? `   wins ${p.wins}` : ""),
+          `avg pnl  ${p.avgPnlPerTrade === null ? "-" : `${p.avgPnlPerTrade >= 0 ? "+" : ""}${p.avgPnlPerTrade.toFixed(1)}%/trade`}`,
+          `winrate  ${p.winrate === null ? "- (needs 2+ trades)" : `${p.winrate.toFixed(1)}%`}`,
+          `realized ${p.realizedTotalEth.toFixed(4)} ETH`,
+          `balance  ${p.balanceEth.toFixed(4)} ETH`,
+          `badges   ${p.badges.length ? p.badges.map((b) => `[${b}]`).join("") : "none"}`,
+        ].join("\n");
+  writeOutput(text, opts.output);
+  cache.close();
 }
 
 export async function runDoctor(_opts: CliOpts): Promise<void> {

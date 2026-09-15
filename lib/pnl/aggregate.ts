@@ -12,6 +12,7 @@ import type { HolderRow } from "../read/token.ts";
 export interface ProfileLite {
   trades: number;
   winrate: number | null;
+  notRead?: boolean; // missed the profile deadline; never counted anywhere
 }
 
 export interface Aggregates {
@@ -38,7 +39,7 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
     let ftSupply = 0;
     for (const r of rows) {
       const p = profiles.get(r.wallet);
-      if (!p) continue;
+      if (!p || p.notRead) continue;
       if (p.trades >= 2 && p.winrate !== null) wrs.push(p.winrate);
       if (p.trades === 0) {
         ftWallets++;
@@ -56,7 +57,7 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
   if (profiles) {
     const wrs = exitedRows
       .map((r) => profiles.get(r.wallet))
-      .filter((p): p is ProfileLite => !!p && p.trades >= 2 && p.winrate !== null)
+      .filter((p): p is ProfileLite => !!p && !p.notRead && p.trades >= 2 && p.winrate !== null)
       .map((p) => p.winrate as number);
     exitedWr = mean(wrs);
   }
