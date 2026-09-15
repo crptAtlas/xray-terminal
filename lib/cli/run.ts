@@ -16,8 +16,10 @@ export async function runWallet(address: string, opts: CliOpts): Promise<void> {
   throw new Error("wallet: not implemented yet");
 }
 
-export async function runDoctor(opts: CliOpts): Promise<void> {
-  throw new Error("doctor: not implemented yet");
+export async function runDoctor(_opts: CliOpts): Promise<void> {
+  const { doctor } = await import("../doctor.ts");
+  const { ok } = await doctor();
+  if (!ok) process.exitCode = 1;
 }
 
 export async function runDemo(opts: CliOpts): Promise<void> {
