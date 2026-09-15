@@ -1,0 +1,19 @@
+{
+  "address": "0x9cfb9dfab144e143750c5ff1cea55202a65d4365",
+  "symbol": "JOYSTICK",
+  "name": "JOYSTICK",
+  "decimals": 18,
+  "totalSupply": "1000000000000000000000000000",
+  "curve": "0x3a7894aafb917f83bbe4355e05f4479f779809d0",
+  "deployer": "0x7bb2ca9212bca890ec55db3a9501861d148911f1",
+  "creatorFeeRecipient": "0x7bb2ca9212bca890ec55db3a9501861d148911f1",
+  "createdBlock": "64023011",
+  "createdAt": 1789512838,
+  "phase": {
+    "kind": "curve",
+    "fillPct": 1.48
+  },
+  "snappedAt": 1789514140798,
+  "priceEth": 1.80716569784734e-9,
+  "liquidityWei": "62423132417476524"
+}

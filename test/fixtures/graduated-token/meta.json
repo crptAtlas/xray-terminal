@@ -1,0 +1,19 @@
+{
+  "address": "0x443522ecf6780a507ead5cdad37bc58b42acf82f",
+  "symbol": "CAPITOL",
+  "name": "Capitol Assets",
+  "decimals": 18,
+  "totalSupply": "1000000000000000000000000000",
+  "curve": "0x2b30489b1a365a7c2c133778e2675e28e0103893",
+  "pool": "0xf1d0886453f876a8bea29e63db773478b7d1cd0ae348c11587722133c3cb9b6c",
+  "deployer": "0xab97b33d673ee8be980fd07996c44ce328de5348",
+  "creatorFeeRecipient": "0xab97b33d673ee8be980fd07996c44ce328de5348",
+  "createdBlock": "64026658",
+  "createdAt": 1789513204,
+  "phase": {
+    "kind": "graduated"
+  },
+  "snappedAt": 1789514157706,
+  "priceEth": 4.0478062876913795e-8,
+  "liquidityWei": "5890287129327917156"
+}

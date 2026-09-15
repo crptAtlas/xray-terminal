@@ -1,0 +1,19 @@
+{
+  "address": "0xa28b53eaf5b06445cc15ddb1f47328fa55e887d3",
+  "symbol": "JOYSTICK",
+  "name": "Joystick",
+  "decimals": 18,
+  "totalSupply": "1000000000000000000000000000",
+  "curve": "0x73b4c45618c53a9ac936ecad0d86b3edd8fd4585",
+  "deployer": "0xca11bde05977b3631167028862be2a173976ca11",
+  "creatorFeeRecipient": "0x1942c2e168d771685558e515a3a8564a974b680f",
+  "createdBlock": "58069902",
+  "createdAt": 1788908790,
+  "phase": {
+    "kind": "curve",
+    "fillPct": 0
+  },
+  "snappedAt": 1789514168115,
+  "priceEth": 1.04e-8,
+  "liquidityWei": "6"
+}

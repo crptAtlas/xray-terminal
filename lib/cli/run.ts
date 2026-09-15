@@ -133,5 +133,34 @@ export async function runDoctor(_opts: CliOpts): Promise<void> {
 }
 
 export async function runDemo(opts: CliOpts): Promise<void> {
-  throw new Error("demo: not implemented yet");
+  const { FixtureProvider, DEMO_FIXTURE, DEMO_ETH_USD } = await import("../demo.ts");
+  const { Cache } = await import("../cache.ts");
+  const { check } = await import("../check.ts");
+  const { formatCheck, writeOutput } = await import("../format.ts");
+
+  process.env.ETH_USD ??= DEMO_ETH_USD; // fully offline
+  const provider = new FixtureProvider(DEMO_FIXTURE);
+  const cache = new Cache(":memory:");
+  const t0 = Date.now();
+  const meta = await provider.tokenMeta("0x0" as `0x${string}`);
+  for await (const phase of check(provider, cache, meta.address)) {
+    if (phase.phase !== 1) continue;
+    const s = provider.stats();
+    writeOutput(
+      formatCheck(
+        {
+          snapshot: phase.snapshot,
+          header: phase.header,
+          groups: phase.groups,
+          aggregates: phase.aggregates,
+          top: phase.snapshot.holders.slice(0, opts.top),
+          source: { label: s.label, requests: s.requests, seconds: (Date.now() - t0) / 1000 },
+          demo: true,
+        },
+        opts.format,
+      ),
+      opts.output,
+    );
+  }
+  cache.close();
 }
