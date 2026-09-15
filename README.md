@@ -18,13 +18,13 @@ $ appname wallet <addr> # wallet profile (mode B only)
 $ appname doctor        # verify addresses, topics and limits on the live chain
 ```
 
-**This tool only reads.** It holds no keys, signs nothing, and sends no
-transactions — CI greps the source for signing code and fails the build if
+**This tool only reads.** It holds no keys, signs nothing and sends no
+transactions - CI greps the source for signing code and fails the build if
 any ever appears.
 
 ## Two ways to run it
 
-### Mode A — free and slow (default)
+### Mode A - free and slow (default)
 
 Data source: the public RPC `https://rpc.mainnet.chain.robinhood.com`. No
 keys, no registration. The limits are real: responses truncate at 10,000
@@ -39,7 +39,7 @@ across all of a wallet's trades), `[smart]`/`[rich]` badges, token winrate.
 Finding every trade of a wallet across the chain would mean scanning the
 whole chain, so the CLI prints a warning and skips profiles.
 
-### Mode B — paid and fast
+### Mode B - paid and fast
 
 Data source: [Bitquery](https://bitquery.io) (GraphQL, network
 `robinhood`, plans from $49/mo). They index Pons: `CurveBuy`/`CurveSell`
@@ -64,7 +64,7 @@ verification is pending an account token.
 - **Transfers break cost basis.** If tokens arrived by transfer rather
   than purchase, the wallet's PnL cannot be computed honestly. Such
   wallets are flagged `unknown basis` and shown as a counter (wallets +
-  supply share) — never guessed, never mixed into groups or averages.
+  supply share) - never guessed, never mixed into groups or averages.
 - **Opening tax is not part of cost basis.** Wallets that bought in the
   first seconds of a launch paid the snipe tax; their PnL reads higher
   than their real outcome.
@@ -107,7 +107,7 @@ incrementally (seconds).
 
 `lib/check.ts` is the entry: an async iterator that yields phase 1
 (header, holder PnL, groups, aggregates) as soon as it is ready and phase
-2 (profiles, badges) when the wallet reads finish — a site or bot renders
+2 (profiles, badges) when the wallet reads finish - a site or bot renders
 progressively, same as the CLI. Data sources sit behind one interface
 (`lib/providers/provider.ts`) with rpc and bitquery implementations; the
 math in `lib/pnl/` and `lib/profile/` is pure functions covered by tests.
@@ -116,5 +116,5 @@ math in `lib/pnl/` and `lib/profile/` is pure functions covered by tests.
 
 SQLite at `~/.appname/cache.db`: per-token trade ledger with the last
 synced block (repeats fetch only new blocks), the launch index for ticker
-lookup, and a global wallet-profile cache with a 24h TTL shared across
+lookup and a global wallet-profile cache with a 24h TTL shared across
 tokens.

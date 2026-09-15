@@ -1,5 +1,5 @@
 /**
- * Winrate (spec 3.5): one virtual losing trade in the denominator —
+ * Winrate (spec 3.5): one virtual losing trade in the denominator -
  * winrate = wins / (trades + 1). It cuts a newcomer's percentage and
  * dissolves for a veteran. Not shown at all below two closed trades.
  */

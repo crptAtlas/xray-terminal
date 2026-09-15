@@ -7,7 +7,7 @@ import { getLogsAdaptive } from "./providers/logs.ts";
 
 // Verifies every hardcoded address and topic against the live chain instead
 // of taking them on faith: chain id, bytecode at each contract, a real
-// CurveBuy decoded from a recent block, and the practical getLogs limits.
+// CurveBuy decoded from a recent block and the practical getLogs limits.
 
 interface Check {
   label: string;

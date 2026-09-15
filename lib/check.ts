@@ -8,9 +8,9 @@ import { header, type Header } from "./read/header.ts";
 import { tokenSnapshot, type TokenSnapshot } from "./read/token.ts";
 
 /**
- * The library entry: progressive two-phase check (spec 4.1). Phase 1 —
- * header, holder PnL, groups, aggregates — yields as soon as it is ready.
- * Phase 2 — wallet profiles and badges (mode B only) — follows, under a
+ * The library entry: progressive two-phase check (spec 4.1). Phase 1 -
+ * header, holder PnL, groups, aggregates - yields as soon as it is ready.
+ * Phase 2 - wallet profiles and badges (mode B only) - follows, under a
  * hard deadline; wallets that miss it come back marked notRead. Surfaces
  * (CLI today, a site or bot later) consume the same iterator.
  */

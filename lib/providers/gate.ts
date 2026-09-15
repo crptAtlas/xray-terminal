@@ -6,12 +6,12 @@ import { RPC_DEFAULTS } from "../chain.ts";
  *
  * The public endpoints behave differently: the official Robinhood RPC
  * answers HTTP 429 above roughly eight concurrent calls, meters
- * eth_getLogs much more tightly than eth_call, and dislikes JSON-RPC
+ * eth_getLogs much more tightly than eth_call and dislikes JSON-RPC
  * batching; publicnode is fast for state reads but refuses eth_getLogs.
  *
  * So: single requests (no batching), bounded concurrency, minimum spacing
  * (tighter for eth_getLogs), a process-wide cooldown after a 429, a penalty
- * box per endpoint, and routing by method capability. Set RPC_URL to a
+ * box per endpoint and routing by method capability. Set RPC_URL to a
  * comma-separated list to replace the defaults ("#nologs" suffix marks an
  * endpoint that cannot serve eth_getLogs).
  */
@@ -141,7 +141,7 @@ async function send(st: GateState, method: string, params: unknown): Promise<unk
       }
       const body = (await res.json()) as { result?: unknown; error?: { code: number; message: string } };
       if (body.error) {
-        // JSON-RPC level errors (bad range, limits) belong to the caller —
+        // JSON-RPC level errors (bad range, limits) belong to the caller -
         // adaptive windowing reacts to them. Do not penalize the endpoint.
         const err = new Error(body.error.message) as Error & { code?: number };
         err.code = body.error.code;

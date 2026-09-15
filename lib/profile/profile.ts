@@ -6,7 +6,7 @@ import { badges } from "./badges.ts";
 /**
  * Wallet profile (spec 3.5): every trade of the wallet across every token,
  * positions per token by the 3.1 formula, closed when the remaining balance
- * is zero. Pure — the caller supplies trades and balances.
+ * is zero. Pure - the caller supplies trades and balances.
  *
  * A win is a closed position with pnl > 0. balance is the wallet's worth:
  * native ETH plus open token positions valued at the token's last trade

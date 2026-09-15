@@ -10,7 +10,7 @@ import type { PublicClient } from "viem";
  * Ticker lookup (mode A): an incremental SQLite index of factory launches.
  * The first ticker query scans TokenLaunched logs from the last indexed
  * block to the tip; later queries only extend it. Address queries never
- * touch this. Tickers are not unique — the caller gets every match.
+ * touch this. Tickers are not unique - the caller gets every match.
  */
 
 const tokenLaunchedTopic = toEventSelector(

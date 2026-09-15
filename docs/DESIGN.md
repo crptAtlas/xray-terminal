@@ -8,7 +8,7 @@ with measured chain behavior. Everything else follows the spec verbatim.
 - Private repo, placeholder name `APPNAME` throughout code and CLI per
   the spec; the binary is `appname` until the product name lands. A
   single rename commit swaps it later.
-- Language: code, comments, docs, commits — English.
+- Language: code, comments, docs, commits - English.
 - Stack: TypeScript, Node >= 20, ESM. Runtime deps: `viem`, `commander`,
   `better-sqlite3`. Dev deps: `tsx`, `typescript`, `@types/node`,
   `@types/better-sqlite3`. Tests: `node --test`, no frameworks.
@@ -17,7 +17,7 @@ with measured chain behavior. Everything else follows the spec verbatim.
 
 The official RPC (`rpc.mainnet.chain.robinhood.com`) rate-limits above
 roughly eight concurrent calls (HTTP 429), meters `eth_getLogs` more
-tightly than `eth_call`, and dislikes JSON-RPC batching. Therefore:
+tightly than `eth_call` and dislikes JSON-RPC batching. Therefore:
 
 - All requests go through a single gate: bounded concurrency, minimum
   spacing (tighter for `eth_getLogs`), process-wide cooldown after a
@@ -85,7 +85,7 @@ ever; env only.
 
 ## CI
 
-GitHub Actions: `typecheck`, `test`, and `no-signer` — greps `lib/` and
+GitHub Actions: `typecheck`, `test` and `no-signer` - greps `lib/` and
 `bin/` for `PRIVATE_KEY`, `privateKeyToAccount`, `signTransaction`,
 `sendTransaction`, `writeContract`, `walletClient`, `signMessage`; any
 match fails the build.

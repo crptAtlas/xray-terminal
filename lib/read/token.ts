@@ -117,7 +117,7 @@ export async function tokenSnapshot(
       continue;
     }
     // dust: remaining balance worth less than $50; fully exited wallets
-    // (balance zero) stay — their realized pnl is part of the story
+    // (balance zero) stay - their realized pnl is part of the story
     if (bal > 0n && balFloat < dustTokens) {
       dust++;
       continue;

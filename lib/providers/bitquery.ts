@@ -11,13 +11,13 @@ import type { Trade } from "../pnl/classify.ts";
  * add-on, so a wallet's averages are month-scoped.
  *
  * Cheap point reads (token meta, current price, reserves) still go through
- * the public RPC — they are single eth_calls and free. Bitquery carries
- * everything bulky: token trade history, balances, and the wallet-wide
+ * the public RPC - they are single eth_calls and free. Bitquery carries
+ * everything bulky: token trade history, balances and the wallet-wide
  * trade history that the RPC cannot answer at all.
  *
  * Live verification of this provider is pending a Bitquery account; the
  * response mapping is pinned by tests on canned responses. The token comes
- * only from the BITQUERY_TOKEN env var — never from the repo.
+ * only from the BITQUERY_TOKEN env var - never from the repo.
  */
 
 export const BITQUERY_URL = "https://streaming.bitquery.io/graphql";

@@ -51,7 +51,7 @@ token winrate.
 `https://streaming.bitquery.io/graphql`, network `robinhood`. Plans start
 at $49/month. They index Pons: `CurveBuy` and `CurveSell` events arrive
 decoded, the same trades are available in the DEX trades cube as
-`pons_v2` with USD prices, and there are separate holder and balance
+`pons_v2` with USD prices and there are separate holder and balance
 APIs.
 
 Works in mode B: everything.
@@ -107,7 +107,7 @@ Both curve trades and post-graduation pool trades count.
 
 **Transfers.** If tokens arrived via transfer rather than purchase,
 `bought_cost` does not cover them and PnL inflates. Such a wallet is
-flagged `unknown_basis`, excluded from groups and averages, and shown as
+flagged `unknown_basis`, excluded from groups and averages and shown as
 a counter: how many such wallets and how much supply they hold.
 
 ### 3.2 Who counts as a holder
@@ -158,7 +158,7 @@ Rule: let `market` = the token's curve plus the pool plus the routers.
 - both sides outside `market`: a transfer, not a trade
 
 The ETH amount comes from the `CurveBuy` / `CurveSell` event for the
-curve, and from the Uniswap v4 swap event for the pool. In the v4 swap,
+curve and from the Uniswap v4 swap event for the pool. In the v4 swap,
 match the token side to the transfer amount and take the opposite side as
 the quote. Fallback if the swap does not decode: the largest WETH
 transfer in the same transaction.
@@ -351,7 +351,7 @@ TypeScript, Node 20+, ESM. Minimal dependencies: `viem`, `commander`, an
 SQLite driver. Tests on `node --test`, no frameworks.
 
 **Prohibition:** the repository contains no private keys, no signing, no
-transaction sending — ever. A dedicated CI job greps `lib/` and `bin/`
+transaction sending - ever. A dedicated CI job greps `lib/` and `bin/`
 for `PRIVATE_KEY`, `privateKeyToAccount`, `signTransaction`,
 `sendTransaction`, `writeContract`, `walletClient`, `signMessage` and
 fails the build on a match.

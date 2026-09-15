@@ -3,7 +3,7 @@ import type { HolderRow } from "../read/token.ts";
 /**
  * Token aggregates (spec 3.6). avg_pnl over every holder that survived the
  * filters (dust, infra and unknown_basis never reach HolderRow). avg_winrate
- * only over wallets whose chain-wide history has 2+ trades — that needs
+ * only over wallets whose chain-wide history has 2+ trades - that needs
  * wallet profiles, so in rpc mode the winrate side stays null.
  */
 

@@ -3,7 +3,7 @@ import { GETLOGS_MAX } from "../chain.ts";
 
 /**
  * eth_getLogs with adaptive windowing. The public RPC truncates responses at
- * 10,000 logs without an error, and rejects some wide ranges outright. So:
+ * 10,000 logs without an error and rejects some wide ranges outright. So:
  * split the range in half recursively when the node complains OR when a
  * window comes back suspiciously full (>= GETLOGS_MAX means truncation).
  */

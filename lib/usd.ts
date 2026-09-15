@@ -2,7 +2,7 @@
  * ETH/USD spot rate. The chain has no reliable USD oracle, so dollar figures
  * (dust filter, mcap, liquidity, volume) use one keyless GET to a public
  * spot API, cached in memory for 5 minutes. The ETH_USD env var overrides it
- * entirely — that is also the offline/demo path. This is the only external
+ * entirely - that is also the offline/demo path. This is the only external
  * call besides the chain RPC.
  */
 

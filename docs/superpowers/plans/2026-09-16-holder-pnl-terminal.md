@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** CLI + library that, given a Pons V2 token on Robinhood Chain, reports every holder's PnL, holder groups, token aggregates, wallet profiles with badges, and a token header.
+**Goal:** CLI + library that, given a Pons V2 token on Robinhood Chain, reports every holder's PnL, holder groups, token aggregates, wallet profiles with badges and a token header.
 
-**Architecture:** A provider interface (`lib/providers/provider.ts`) with two implementations — public RPC (mode A) and Bitquery (mode B). Pure math in `lib/pnl/` and `lib/profile/` with zero network access, tested on fixtures. SQLite incremental cache. Progressive two-phase output via async iterator.
+**Architecture:** A provider interface (`lib/providers/provider.ts`) with two implementations - public RPC (mode A) and Bitquery (mode B). Pure math in `lib/pnl/` and `lib/profile/` with zero network access, tested on fixtures. SQLite incremental cache. Progressive two-phase output via async iterator.
 
 **Tech Stack:** TypeScript, Node >= 20, ESM. Runtime: `viem`, `commander`, `better-sqlite3`. Dev: `tsx`, `typescript`, `@types/node`. Tests: `node --test`.
 
@@ -32,8 +32,8 @@
 - Produces: `npm run typecheck`, `npm test`, `npm run cli -- <args>` (tsx-driven dev entry); CI with jobs `check` (typecheck+test) and `no-signer`.
 
 - [x] Step 1: `npm init`, install deps (`viem commander better-sqlite3`, dev `tsx typescript @types/node @types/better-sqlite3`), write `tsconfig.json` (strict, NodeNext, noEmit for typecheck), scripts: `typecheck`, `test` (`node --test --import tsx test/`), `cli` (`tsx bin/appname.mjs`).
-- [x] Step 2: `bin/appname.mjs` — commander program with stub subcommands `check`, `wallet`, `doctor`, `demo` and global flags `--format`, `--output`, `--provider`, `--top`, `--no-profiles`.
-- [x] Step 3: `.github/workflows/ci.yml` — job `check`: npm ci, typecheck, test; job `no-signer`: grep -rEn the seven forbidden identifiers over `lib/ bin/`, exit 1 on match.
+- [x] Step 2: `bin/appname.mjs` - commander program with stub subcommands `check`, `wallet`, `doctor`, `demo` and global flags `--format`, `--output`, `--provider`, `--top`, `--no-profiles`.
+- [x] Step 3: `.github/workflows/ci.yml` - job `check`: npm ci, typecheck, test; job `no-signer`: grep -rEn the seven forbidden identifiers over `lib/ bin/`, exit 1 on match.
 - [x] Step 4: verify `npm run typecheck && npm test` green locally; run the no-signer grep locally.
 - [x] Step 5: commit `scaffold: cli skeleton, ci, no-signer job`.
 
@@ -53,7 +53,7 @@ export const TOPIC: { transfer; curveBuy; curveSell }; // from spec §3.2
 export const INFRA: ReadonlySet<string>; // ADDR values + zero + 0xdead, lowercase
 export const GETLOGS_MAX = 10_000;
 ```
-- [x] Step 1: write `chain.ts` with the exact addresses/topics from SPEC §3.2 (lowercased) and `abi/` files: erc20 (Transfer, balanceOf, totalSupply, symbol, name, decimals), curve (CurveBuy/CurveSell events — infer arg layout in doctor task), factory (launch event placeholder refined in Task 11), pool manager Swap event, multicall3 aggregate3.
+- [x] Step 1: write `chain.ts` with the exact addresses/topics from SPEC §3.2 (lowercased) and `abi/` files: erc20 (Transfer, balanceOf, totalSupply, symbol, name, decimals), curve (CurveBuy/CurveSell events - infer arg layout in doctor task), factory (launch event placeholder refined in Task 11), pool manager Swap event, multicall3 aggregate3.
 - [x] Step 2: unit test: every ADDR is lowercase and 42 chars, every TOPIC 66 chars, INFRA contains zero and dead addresses.
 - [x] Step 3: commit `chain: addresses, topics, abis`.
 
@@ -66,7 +66,7 @@ export const GETLOGS_MAX = 10_000;
 **Interfaces:**
 - Produces:
 ```ts
-// gate.ts — every JSON-RPC request goes through here
+// gate.ts - every JSON-RPC request goes through here
 export interface Endpoint { url: string; logs: boolean; badUntil: number; label: string }
 export function makeTransport(): Transport;           // viem custom transport
 export function rpcStats(): { requests: number };     // for the "source rpc 34 requests" footer
@@ -76,9 +76,9 @@ export async function getLogsAdaptive(client, params: {address?, topics?, fromBl
 ```
 - Behavior: bounded concurrency (default 3 in flight), min spacing 40ms (150ms for eth_getLogs), process-wide cooldown after HTTP 429, per-endpoint penalty box, route by method capability (`logs: false` endpoints never see eth_getLogs), `RPC_URL` env override (comma list, `#nologs` suffix).
 
-- [x] Step 1: failing tests — gate routes eth_getLogs only to logs-capable endpoint; retries next endpoint on 429; counts requests. Mock fetch.
+- [x] Step 1: failing tests - gate routes eth_getLogs only to logs-capable endpoint; retries next endpoint on 429; counts requests. Mock fetch.
 - [x] Step 2: implement gate. Run tests green.
-- [x] Step 3: failing test — getLogsAdaptive splits on limit error (mock client returning error then halves succeed) and merges results ordered.
+- [x] Step 3: failing test - getLogsAdaptive splits on limit error (mock client returning error then halves succeed) and merges results ordered.
 - [x] Step 4: implement, tests green, commit `rpc: request gate and adaptive getlogs`.
 
 ### Task 4: Provider interface + doctor (M0)
@@ -107,10 +107,10 @@ export interface Provider {
 }
 export function pickProvider(flag?: "rpc" | "bitquery"): Provider; // env BITQUERY_TOKEN decides default
 ```
-- `doctor`: against live chain — chain id == 4663, code exists at factory/router/hook/locker/poolManager/WETH, finds a recent CurveBuy log by topic and prints its curve address, measures getLogs limit behavior and request latency, prints verdict lines.
+- `doctor`: against live chain - chain id == 4663, code exists at factory/router/hook/locker/poolManager/WETH, finds a recent CurveBuy log by topic and prints its curve address, measures getLogs limit behavior and request latency, prints verdict lines.
 
 - [x] Step 1: write provider.ts types. Write doctor with checks above; wire `appname doctor`.
-- [x] Step 2: run `npm run cli -- doctor` against the live chain; iterate until all checks print OK (this validates topics/addresses empirically, including CurveBuy/CurveSell arg layout — decode a real event and record the layout as a comment in `lib/abi/curve.ts`).
+- [x] Step 2: run `npm run cli -- doctor` against the live chain; iterate until all checks print OK (this validates topics/addresses empirically, including CurveBuy/CurveSell arg layout - decode a real event and record the layout as a comment in `lib/abi/curve.ts`).
 - [x] Step 3: commit `doctor: live chain verification`. **M0 done.**
 
 ### Task 5: classify (M1)
@@ -128,7 +128,7 @@ export function classify(transfers: RawTransfer[], quotes: QuoteEvent[], market:
 ```
 - Rules (SPEC §3.3): market = curve + pool + router(+hook, poolManager). from∈market, to∉market ⇒ buy(to); from∉market, to∈market ⇒ sell(from); both outside ⇒ transfer. ETH quote per tx: prefer curveBuy/curveSell event in same tx, else swap, else largest weth transfer; a tx's quote is consumed by the matching trade.
 
-- [x] Step 1: failing tests — buy via curve event; sell; wallet-to-wallet transfer produces TransferIn not Trade; relayed tx (tx.from irrelevant — classify never sees tx.from, assert trader = token recipient); pool swap quote; weth fallback.
+- [x] Step 1: failing tests - buy via curve event; sell; wallet-to-wallet transfer produces TransferIn not Trade; relayed tx (tx.from irrelevant - classify never sees tx.from, assert trader = token recipient); pool swap quote; weth fallback.
 - [x] Step 2: implement; green; commit `pnl: classify buys and sells by token movement`.
 
 ### Task 6: position (M1)
@@ -146,7 +146,7 @@ export function position(trades: Trade[], transfersInTokens: bigint, remaining: 
 // unknownBasis when transfersInTokens > 0 or (remaining+sold > bought); pnlPct null when boughtCost == 0
 // closed when remaining == 0n
 ```
-- [x] Step 1: failing tests — buy only (unrealized); buy+sell full (realized, closed); partial sell; re-buy after sell; ETH top-up between trades does not change pnl (trades list identical ⇒ same result); inbound transfer ⇒ unknownBasis; zero cost ⇒ pnlPct null + unknownBasis.
+- [x] Step 1: failing tests - buy only (unrealized); buy+sell full (realized, closed); partial sell; re-buy after sell; ETH top-up between trades does not change pnl (trades list identical ⇒ same result); inbound transfer ⇒ unknownBasis; zero cost ⇒ pnlPct null + unknownBasis.
 - [x] Step 2: implement; green; commit `pnl: position formula`.
 
 ### Task 7: SQLite cache (M1)
@@ -170,7 +170,7 @@ export class Cache {
 ```
 - Schema from DESIGN.md; bigints stored as TEXT; WAL mode.
 
-- [x] Step 1: failing tests — roundtrip trades, incremental syncedBlock, profile TTL semantics, ticker index query case-insensitive.
+- [x] Step 1: failing tests - roundtrip trades, incremental syncedBlock, profile TTL semantics, ticker index query case-insensitive.
 - [x] Step 2: implement; green; commit `cache: sqlite incremental token and profile store`.
 
 ### Task 8: read/token + check phase 1 wiring (M1)
@@ -208,7 +208,7 @@ export interface Group { minPct: number; maxPct: number; supplyShare: number; ho
 export function findGroups(rows: { pnlPct: number; supplyShare: number }[], maxGroups = 3, widthPct = 5): Group[]
 // sort by pnlPct; two-pointer sliding window of width <= 5; score = supply share; greedily pick up to 3 non-overlapping windows with >= 2 wallets, by descending score
 ```
-- [x] Step 1: failing tests — never more than 3 groups; every group width <= 5; fewer than three clusters when data has fewer; a dominant dense cluster wins over a wide sparse one; singleton not a group.
+- [x] Step 1: failing tests - never more than 3 groups; every group width <= 5; fewer than three clusters when data has fewer; a dominant dense cluster wins over a wide sparse one; singleton not a group.
 - [x] Step 2: implement; green; commit `pnl: holder groups clustering`.
 
 ### Task 10: aggregates + header (M2)
@@ -228,7 +228,7 @@ export interface Header { mcapUsd: number; liquidityUsd: number; volume24hUsd: n
 export async function header(provider, snap: TokenSnapshot): Promise<Header>
 // volume24h = sum of |eth| over trades in last 838k blocks; holders = nonzero balances pre-dust-filter
 ```
-- [x] Step 1: failing tests for aggregate on synthetic rows (avg excludes dust/infra/unknownBasis — they never reach rows; winrate only trades>=2 wallets; exited line).
+- [x] Step 1: failing tests for aggregate on synthetic rows (avg excludes dust/infra/unknownBasis - they never reach rows; winrate only trades>=2 wallets; exited line).
 - [x] Step 2: implement both; green; commit `pnl: aggregates and token header`.
 
 ### Task 11: ticker index + format + CLI (M2)
@@ -248,7 +248,7 @@ export function writeOutput(text: string, file?: string): void; // refuses exist
 // launches.ts
 export async function resolveTicker(provider, cache, symbol): Promise<{ token: string } | { candidates: {token; symbol; ageMs; mcapUsd; holders}[] }>
 ```
-- [x] Step 1: failing tests — text format matches §6 sample shape on fixture data; json roundtrips; markdown table present; writeOutput refuses existing file.
+- [x] Step 1: failing tests - text format matches §6 sample shape on fixture data; json roundtrips; markdown table present; writeOutput refuses existing file.
 - [x] Step 2: implement format.ts; wire `--format/--output/--top`; green.
 - [x] Step 3: launches index: doctor-verified factory launch event scan → cache.appendLaunches; ambiguous ticker prints candidate list.
 - [x] Step 4: compare `check` output to §6 sample on live token; commit `cli: formats, ticker lookup, output`. **M2 done.**
@@ -279,7 +279,7 @@ export function winrate(trades: number, wins: number): number | null; // null wh
 export const BADGE_CONFIG = { smart: { avgPnlPct: 25, winrate: 55, trades: 30 }, rich: { realizedEth: 5, balanceEth: 10 } };
 export function badges(p: { trades; avgPnlPerTrade; winrate; realizedTotalEth; balanceEth }): ("smart" | "rich")[];
 ```
-- [x] Step 1: failing tests — all six §3.5 examples to one decimal (33.3, 25.0, 50.0, 20.0, 40.0, 59.4); trades 0/1 → null; badge boundaries (>= semantics, trades=29 never smart).
+- [x] Step 1: failing tests - all six §3.5 examples to one decimal (33.3, 25.0, 50.0, 20.0, 40.0, 59.4); trades 0/1 → null; badge boundaries (>= semantics, trades=29 never smart).
 - [x] Step 2: implement; green; commit `profile: winrate and badges`.
 
 ### Task 14: wallet profile + progressive check (M4)
@@ -295,7 +295,7 @@ export function badges(p: { trades; avgPnlPerTrade; winrate; realizedTotalEth; b
 export interface Profile { wallet; trades: number; wins: number; avgPnlPerTrade: number | null; winrate: number | null; realizedTotalEth: number; balanceEth: number; badges: string[]; notRead?: boolean }
 export function buildProfile(byToken: Map<string, Trade[]>, balances, prices): Profile  // pure
 // read/wallet.ts: fetch via provider.walletTrades + cache.profile (24h TTL)
-// check.ts — THE library entry
+// check.ts - THE library entry
 export type Phase = { phase: 1; snapshot; groups; aggregates; header } | { phase: 2; profiles: Map<string, Profile>; aggregates: Aggregates };
 export async function* check(provider, cache, query, opts: { top: number; profiles: boolean; profileDeadlineMs: 60_000 }): AsyncIterable<Phase>
 // phase 2: top-N + aggregate wallets concurrently through profile cache; deadline → notRead
@@ -310,8 +310,8 @@ export async function* check(provider, cache, query, opts: { top: number; profil
 - Create: `scripts/snapshot-fixture.mjs`, `test/fixtures/<three tokens>/*.json`, `lib/demo.ts`
 - Test: `test/demo.test.mjs`, extend `test/cli.test.mjs`
 
-- [x] Step 1: snapshot script — for a token address, dump meta + transfers + quotes + balances to JSON. Run on three real tokens (one on curve, one graduated, one with transfers/unknown_basis if findable).
-- [x] Step 2: `demo` command — run the full pipeline on fixture data offline, output marked `DEMO`; test asserts DEMO marker and offline run.
+- [x] Step 1: snapshot script - for a token address, dump meta + transfers + quotes + balances to JSON. Run on three real tokens (one on curve, one graduated, one with transfers/unknown_basis if findable).
+- [x] Step 2: `demo` command - run the full pipeline on fixture data offline, output marked `DEMO`; test asserts DEMO marker and offline run.
 - [x] Step 3: full-pipeline test on fixtures: groups/aggregates deterministic. Commit `demo: offline fixtures pipeline`.
 
 ### Task 16: README + polish (M5)
@@ -321,7 +321,7 @@ export async function* check(provider, cache, query, opts: { top: number; profil
 - Modify: docs as needed
 
 - [x] Step 1: README with all nine mandatory bullets from SPEC §9 + quickstart for modes A/B + honest limits table + `demo` first. `.env.example` with `BITQUERY_TOKEN=`, `RPC_URL=`, `ETH_USD=`.
-- [x] Step 2: final sweep — `npm run typecheck && npm test` green, no-signer grep clean, `doctor` green live, push. Commit `docs: readme`. **M5 done.**
+- [x] Step 2: final sweep - `npm run typecheck && npm test` green, no-signer grep clean, `doctor` green live, push. Commit `docs: readme`. **M5 done.**
 
 ## Self-Review
 

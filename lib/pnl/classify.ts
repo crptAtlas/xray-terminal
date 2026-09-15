@@ -9,7 +9,7 @@ import type { QuoteEvent, RawTransfer } from "../providers/provider.ts";
  * sides outside market -> plain transfer, not a trade.
  *
  * The ETH quote comes from CurveBuy/CurveSell for curve trades, from the v4
- * swap for pool trades, and as a fallback from the largest WETH transfer in
+ * swap for pool trades and as a fallback from the largest WETH transfer in
  * the same transaction. Quotes are matched per transaction; when one tx
  * carries several trades, quotes are consumed in order by kind and token
  * amount proximity.
