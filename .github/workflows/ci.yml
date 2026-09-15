@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  no-signer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: forbid signing code
+        run: |
+          if grep -rEn "PRIVATE_KEY|privateKeyToAccount|signTransaction|sendTransaction|writeContract|walletClient|signMessage" lib/ bin/; then
+            echo "signing-related identifiers found; this tool must stay read-only"
+            exit 1
+          fi
+          echo "clean: no signing code"

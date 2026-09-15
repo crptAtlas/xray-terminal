@@ -1,0 +1,42 @@
+{
+  "name": "appname",
+  "version": "0.1.0",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node --test --import tsx \"test/*.test.mjs\"",
+    "typecheck": "tsc",
+    "cli": "tsx bin/appname.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Skynet-inisghts/holder-pnl.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Skynet-inisghts/holder-pnl/issues"
+  },
+  "homepage": "https://github.com/Skynet-inisghts/holder-pnl#readme",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "commander": "^15.0.0",
+    "viem": "^2.56.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "appname": "bin/appname.mjs"
+  }
+}
