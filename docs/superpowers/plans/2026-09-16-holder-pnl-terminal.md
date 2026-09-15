@@ -1,6 +1,6 @@
 # Holder PnL Terminal Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** CLI + library that, given a Pons V2 token on Robinhood Chain, reports every holder's PnL, holder groups, token aggregates, wallet profiles with badges, and a token header.
 
