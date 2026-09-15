@@ -18,7 +18,7 @@ export async function runCheck(token: string, opts: CliOpts): Promise<void> {
   const { formatCheck, writeOutput, fmtAge } = await import("../format.ts");
   const { resolveTicker, looksLikeAddress } = await import("../read/launches.ts");
 
-  const provider = pickProvider(opts.provider);
+  const provider = await pickProvider(opts.provider);
   if (!provider.supportsProfiles && opts.profiles) {
     console.error("note: wallet profiles are disabled in rpc mode (set BITQUERY_TOKEN to enable)");
   }

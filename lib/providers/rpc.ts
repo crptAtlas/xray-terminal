@@ -301,10 +301,11 @@ export class RpcProvider implements Provider {
   }
 }
 
-export function pickProvider(flag?: "rpc" | "bitquery"): Provider {
+export async function pickProvider(flag?: "rpc" | "bitquery"): Promise<Provider> {
   const wanted = flag ?? (process.env.BITQUERY_TOKEN ? "bitquery" : "rpc");
   if (wanted === "bitquery") {
-    throw new Error("bitquery provider not implemented yet");
+    const { BitqueryProvider } = await import("./bitquery.ts");
+    return new BitqueryProvider();
   }
   return new RpcProvider();
 }
