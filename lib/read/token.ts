@@ -27,6 +27,7 @@ export interface TokenSnapshot {
     infra: number;
   };
   trades: Trade[]; // all classified trades (volume, exited stats)
+  syncedBlock: bigint;
   priceEth: number;
   usdRate: number;
 }
@@ -134,6 +135,7 @@ export async function tokenSnapshot(
     holdersTotal,
     excluded: { dust, unknownBasis: { wallets: ubWallets, supplyShare: ubSupply }, infra: infraCount },
     trades,
+    syncedBlock: activity.toBlock,
     priceEth,
     usdRate,
   };
