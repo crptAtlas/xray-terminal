@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Renders assets/brand/banner.png for the README header: pixel wordmark,
-// tagline, bottom line, the ribcage sprite with a soft glow on the right.
-// Refresh with: npm run render:banner
+// Renders the static base of the README banner: pixel wordmark, tagline,
+// bottom line. scripts/render-banner-gif.py lays the animated logo frames
+// on top and writes banner.gif. Refresh both with: npm run render:banner
 import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import { writeFile } from "node:fs/promises";
 
@@ -9,7 +9,7 @@ const W = 2172;
 const H = 724;
 
 const C = {
-  bg: "#05070a",
+  bg: "#040a12", // matches the gif frames exactly, no visible seam
   bone: "#cfe4f0",
   glow: "#9fd9ff",
   shadow: "#16222e",
@@ -56,26 +56,12 @@ for (const ch of "XRAY") {
 // tagline
 ctx.font = "500 44px 'JetBrains Mono'";
 ctx.fillStyle = C.dim;
-ctx.fillText("shows who is actually in profit in a token.", 150, 445);
+ctx.fillText("Shows future token's PnL", 150, 445);
 
 // bottom line
 ctx.font = "400 34px 'JetBrains Mono'";
 ctx.fillStyle = C.faint;
 ctx.fillText("$XRAY   ·   holder pnl terminal for pons v2   ·   read-only", 150, 620);
 
-// ribcage with glow on the right
-const cage = await loadImage(brand + "logo-sprite.png");
-const sh = 560;
-const sw = Math.round((cage.width / cage.height) * sh);
-const cx = W - 420;
-const cy = H / 2;
-const grad = ctx.createRadialGradient(cx, cy, 40, cx, cy, 360);
-grad.addColorStop(0, "rgba(159, 217, 255, 0.22)");
-grad.addColorStop(1, "rgba(159, 217, 255, 0)");
-ctx.fillStyle = grad;
-ctx.fillRect(cx - 380, cy - 380, 760, 760);
-ctx.imageSmoothingEnabled = false;
-ctx.drawImage(cage, cx - sw / 2, cy - sh / 2, sw, sh);
-
-await writeFile(brand + "banner.png", canvas.toBuffer("image/png"));
-console.log("assets/brand/banner.png");
+await writeFile(brand + "banner-base.png", canvas.toBuffer("image/png"));
+console.log("assets/brand/banner-base.png");

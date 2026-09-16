@@ -12,7 +12,7 @@
     "typecheck": "tsc",
     "cli": "tsx bin/xray.mjs",
     "render:readme": "tsx scripts/render-readme.mjs",
-    "render:banner": "tsx scripts/render-banner.mjs"
+    "render:banner": "tsx scripts/render-banner.mjs && python3 scripts/render-banner-gif.py"
   },
   "repository": {
     "type": "git",
