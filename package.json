@@ -26,6 +26,7 @@
   "description": "",
   "type": "module",
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "better-sqlite3": "^13.0.3",
     "commander": "^15.0.0",
     "viem": "^2.56.5"

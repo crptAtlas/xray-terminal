@@ -10,7 +10,7 @@ with measured chain behavior. Everything else follows the spec verbatim.
   single rename commit swaps it later.
 - Language: code, comments, docs, commits - English.
 - Stack: TypeScript, Node >= 20, ESM. Runtime deps: `viem`, `commander`,
-  `better-sqlite3`. Dev deps: `tsx`, `typescript`, `@types/node`,
+  `better-sqlite3`, `@napi-rs/canvas` (share cards). Dev deps: `tsx`, `typescript`, `@types/node`,
   `@types/better-sqlite3`. Tests: `node --test`, no frameworks.
 
 ## RPC behavior (measured, not assumed)

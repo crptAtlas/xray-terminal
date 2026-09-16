@@ -31,7 +31,7 @@ export interface CheckResult {
 const short = (a: string) => `${a.slice(0, 6)}..${a.slice(-4)}`;
 
 // Below this many current holders the token is not worth averaging.
-export const DEAD_HOLDERS_MIN = 5;
+export const DEAD_HOLDERS_MIN = 10;
 export const DEAD_LINE = "Token is dead. You're too early or too late";
 
 export function isDead(r: CheckResult): boolean {

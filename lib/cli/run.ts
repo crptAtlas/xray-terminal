@@ -8,6 +8,15 @@ export interface CliOpts {
   provider?: "rpc" | "bitquery";
   top: number;
   profiles: boolean;
+  card?: string;
+}
+
+async function writeCard(result: CheckResult, file: string): Promise<void> {
+  const { existsSync, writeFileSync } = await import("node:fs");
+  if (existsSync(file)) throw new Error(`refusing to overwrite existing file: ${file}`);
+  const { renderCard, cardMood } = await import("../card.ts");
+  writeFileSync(file, renderCard(result));
+  console.error(`card (${cardMood(result)}) written to ${file}`);
 }
 
 export async function runCheck(token: string, opts: CliOpts): Promise<void> {
@@ -94,6 +103,7 @@ export async function runCheck(token: string, opts: CliOpts): Promise<void> {
   if (opts.output && result !== null) {
     writeOutput(formatCheck(result, opts.format), opts.output);
   }
+  if (opts.card && result !== null) await writeCard(result, opts.card);
   cache.close();
 }
 
@@ -161,6 +171,20 @@ export async function runDemo(opts: CliOpts): Promise<void> {
       ),
       opts.output,
     );
+    if (opts.card) {
+      await writeCard(
+        {
+          snapshot: phase.snapshot,
+          header: phase.header,
+          groups: phase.groups,
+          aggregates: phase.aggregates,
+          top: phase.snapshot.holders.slice(0, opts.top),
+          source: { label: s.label, requests: s.requests, seconds: (Date.now() - t0) / 1000 },
+          demo: true,
+        },
+        opts.card,
+      );
+    }
   }
   cache.close();
 }

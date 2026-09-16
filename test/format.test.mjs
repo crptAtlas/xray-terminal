@@ -38,6 +38,11 @@ function sampleResult() {
         { wallet: "0x3".padEnd(42, "0"), position: pos(15), supplyShare: 0.02 },
         { wallet: "0x4".padEnd(42, "0"), position: pos(-5), supplyShare: 0.01 },
         { wallet: "0x5".padEnd(42, "0"), position: pos(40), supplyShare: 0.01 },
+        ...Array.from({ length: 7 }, (_, i) => ({
+          wallet: `0x${String(i + 6).padStart(40, "0")}`,
+          position: pos(20),
+          supplyShare: 0.005,
+        })),
       ],
       holdersTotal: 1043,
       excluded: { dust: 412, unknownBasis: { wallets: 14, supplyShare: 0.031 }, infra: 6 },
@@ -105,7 +110,7 @@ test("demo flag marks the output", () => {
   assert.match(formatCheck(r, "text"), /^DEMO/);
 });
 
-test("dead token: under 5 current holders replaces the stats block", () => {
+test("dead token: under 10 current holders replaces the stats block", () => {
   const r = sampleResult();
   r.snapshot.holders = r.snapshot.holders.slice(0, 2);
   r.top = r.snapshot.holders;

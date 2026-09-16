@@ -11,6 +11,7 @@ program
   .option("--output <file>", "write output to a file (refuses to overwrite)")
   .option("--provider <name>", "data source: rpc | bitquery")
   .option("--top <n>", "top holders to show", (v) => parseInt(v, 10), 10)
+  .option("--card <file>", "also render a 1080x1080 share card PNG (green/yellow/red by token state)")
   .option("--no-profiles", "skip the wallet profile phase");
 
 program

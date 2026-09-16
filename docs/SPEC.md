@@ -383,10 +383,22 @@ to overwrite an existing file.
 Tickers are not unique. If several launches share a ticker, print a list
 with age, mcap and holder count and ask for the address.
 
-**Dead tokens.** When fewer than 5 wallets currently hold the token, the
-stats block (averages, groups) is replaced with one line:
+**Dead tokens.** When fewer than 10 wallets currently hold the token,
+the stats block (averages, groups) is replaced with one line:
 `Token is dead. You're too early or too late`. The header, exited and
 excluded lines still print.
+
+**Share card.** `--card <file.png>` on `check` and `demo` renders a
+1080x1080 PNG of the breakdown in one of three moods:
+
+```
+green    supply-weighted avg pnl >= 0
+yellow   supply-weighted avg pnl < 0
+red      token is dead (fewer than 10 current holders)
+```
+
+Pure typography while the project name is a placeholder; demo cards
+carry the DEMO mark. The card file also refuses to overwrite.
 
 `check` output format:
 

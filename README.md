@@ -98,7 +98,9 @@ appname demo                offline breakdown on fixtures, marked DEMO
 ```
 
 Flags: `--format text|json|markdown`, `--output <file>` (refuses to
-overwrite), `--provider rpc|bitquery`, `--top <n>`, `--no-profiles`.
+overwrite), `--provider rpc|bitquery`, `--top <n>`, `--no-profiles`,
+`--card <file.png>` (1080x1080 share card: green when holders are in
+profit, yellow when underwater, red when the token is dead).
 
 Tickers are not unique on Pons; when several launches share one, the CLI
 lists them (address, launch block) and asks for the address. The first
