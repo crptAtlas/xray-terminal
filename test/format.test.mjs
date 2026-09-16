@@ -131,7 +131,7 @@ test("exited-only holders count as dead too", () => {
 });
 
 test("writeOutput refuses to overwrite", () => {
-  const dir = mkdtempSync(join(tmpdir(), "appname-"));
+  const dir = mkdtempSync(join(tmpdir(), "xray-"));
   const f = join(dir, "out.txt");
   writeOutput("hello", f);
   assert.equal(readFileSync(f, "utf8"), "hello\n");

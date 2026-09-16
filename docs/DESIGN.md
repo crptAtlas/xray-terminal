@@ -5,8 +5,8 @@ with measured chain behavior. Everything else follows the spec verbatim.
 
 ## Repository
 
-- Private repo, placeholder name `APPNAME` throughout code and CLI per
-  the spec; the binary is `appname` until the product name lands. A
+- Private repo, placeholder name `xray` throughout code and CLI per
+  the spec; the binary is `xray` until the product name lands. A
   single rename commit swaps it later.
 - Language: code, comments, docs, commits - English.
 - Stack: TypeScript, Node >= 20, ESM. Runtime deps: `viem`, `commander`,

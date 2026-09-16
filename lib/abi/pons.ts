@@ -5,7 +5,7 @@ import { parseAbi } from "viem";
  * Sources: docs.ponsfamily.com/v2, the verified PonsV2LaunchFactory ABI on
  * Blockscout and contractsV2/src/v2 in github.com/ponsdotdev/ponsfamily
  * (the curve contract is not verified on Blockscout, so its ABI comes from
- * the repo). `appname doctor` re-verifies the event topics on the live chain.
+ * the repo). `xray doctor` re-verifies the event topics on the live chain.
  */
 
 export const factoryAbi = parseAbi([

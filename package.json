@@ -1,5 +1,5 @@
 {
-  "name": "appname",
+  "name": "xray",
   "version": "0.1.0",
   "main": "index.js",
   "directories": {
@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test --import tsx \"test/*.test.mjs\"",
     "typecheck": "tsc",
-    "cli": "tsx bin/appname.mjs"
+    "cli": "tsx bin/xray.mjs"
   },
   "repository": {
     "type": "git",
@@ -38,6 +38,6 @@
     "typescript": "^7.0.2"
   },
   "bin": {
-    "appname": "bin/appname.mjs"
+    "xray": "bin/xray.mjs"
   }
 }

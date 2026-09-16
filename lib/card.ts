@@ -9,7 +9,7 @@ import { DEAD_LINE, fmtAge, fmtUsd, isDead, type CheckResult } from "./format.ts
  *   green   holders are in profit: supply-weighted avg pnl at or above zero
  *
  * Pure typography - the project ships no images or branding while the name
- * is still the APPNAME placeholder.
+ * is still the xray placeholder.
  */
 
 export type Mood = "green" | "yellow" | "red";

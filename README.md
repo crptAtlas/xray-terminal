@@ -1,4 +1,4 @@
-# APPNAME
+# xray
 
 Holder PnL terminal for Pons V2 tokens on Robinhood Chain (chain id 4663).
 Give it a token address and it answers one question: **who is holding this
@@ -14,10 +14,10 @@ token and how much has each of them made or lost.**
 - token header: mcap, liquidity, 24h volume, holders, age, phase
 
 ```
-$ appname demo          # works offline, right now, no keys, marked DEMO
-$ appname check <ca>    # live token breakdown
-$ appname wallet <addr> # wallet profile (mode B only)
-$ appname doctor        # verify addresses, topics and limits on the live chain
+$ xray demo          # works offline, right now, no keys, marked DEMO
+$ xray check <ca>    # live token breakdown
+$ xray wallet <addr> # wallet profile (mode B only)
+$ xray doctor        # verify addresses, topics and limits on the live chain
 ```
 
 **This tool only reads.** It holds no keys, signs nothing and sends no
@@ -91,10 +91,10 @@ Node >= 20. Dependencies: `viem`, `commander`, `better-sqlite3`.
 ## CLI
 
 ```
-appname check <ca|ticker>   full token breakdown
-appname wallet <address>    wallet profile, mode B only
-appname doctor              verify source, addresses, limits
-appname demo                offline breakdown on fixtures, marked DEMO
+xray check <ca|ticker>   full token breakdown
+xray wallet <address>    wallet profile, mode B only
+xray doctor              verify source, addresses, limits
+xray demo                offline breakdown on fixtures, marked DEMO
 ```
 
 Flags: `--format text|json|markdown`, `--output <file>` (refuses to
@@ -118,7 +118,7 @@ math in `lib/pnl/` and `lib/profile/` is pure functions covered by tests.
 
 ## Cache
 
-SQLite at `~/.appname/cache.db`: per-token trade ledger with the last
+SQLite at `~/.xray/cache.db`: per-token trade ledger with the last
 synced block (repeats fetch only new blocks), the launch index for ticker
 lookup and a global wallet-profile cache with a 24h TTL shared across
 tokens.

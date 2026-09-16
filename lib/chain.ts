@@ -1,5 +1,5 @@
 // Chain constants for Robinhood Chain (Arbitrum Orbit) and the Pons V2
-// launchpad. Every address and topic here is verified by `appname doctor`
+// launchpad. Every address and topic here is verified by `xray doctor`
 // against the live chain; nothing is taken on faith.
 
 export type Hex = `0x${string}`;

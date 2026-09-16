@@ -15,7 +15,7 @@
 - Node >= 20, ESM only, TypeScript.
 - Runtime deps limited to `viem`, `commander`, `better-sqlite3`.
 - No signing anywhere: CI job greps `lib/` and `bin/` for `PRIVATE_KEY`, `privateKeyToAccount`, `signTransaction`, `sendTransaction`, `writeContract`, `walletClient`, `signMessage` and fails on match.
-- Placeholder name `APPNAME` / binary `appname`; no product name, no mention of any other project anywhere in the repo.
+- Placeholder name `xray` / binary `xray`; no product name, no mention of any other project anywhere in the repo.
 - All English: code, comments, docs, commits. Commits lowercase, short, no attribution lines.
 - Pure math modules never import network code.
 - Tests run offline on fixtures.
@@ -26,13 +26,13 @@
 ### Task 1: Scaffold + CI (M0)
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `.gitignore`, `.github/workflows/ci.yml`, `bin/appname.mjs`, `lib/version.ts`
+- Create: `package.json`, `tsconfig.json`, `.gitignore`, `.github/workflows/ci.yml`, `bin/xray.mjs`, `lib/version.ts`
 
 **Interfaces:**
 - Produces: `npm run typecheck`, `npm test`, `npm run cli -- <args>` (tsx-driven dev entry); CI with jobs `check` (typecheck+test) and `no-signer`.
 
-- [x] Step 1: `npm init`, install deps (`viem commander better-sqlite3`, dev `tsx typescript @types/node @types/better-sqlite3`), write `tsconfig.json` (strict, NodeNext, noEmit for typecheck), scripts: `typecheck`, `test` (`node --test --import tsx test/`), `cli` (`tsx bin/appname.mjs`).
-- [x] Step 2: `bin/appname.mjs` - commander program with stub subcommands `check`, `wallet`, `doctor`, `demo` and global flags `--format`, `--output`, `--provider`, `--top`, `--no-profiles`.
+- [x] Step 1: `npm init`, install deps (`viem commander better-sqlite3`, dev `tsx typescript @types/node @types/better-sqlite3`), write `tsconfig.json` (strict, NodeNext, noEmit for typecheck), scripts: `typecheck`, `test` (`node --test --import tsx test/`), `cli` (`tsx bin/xray.mjs`).
+- [x] Step 2: `bin/xray.mjs` - commander program with stub subcommands `check`, `wallet`, `doctor`, `demo` and global flags `--format`, `--output`, `--provider`, `--top`, `--no-profiles`.
 - [x] Step 3: `.github/workflows/ci.yml` - job `check`: npm ci, typecheck, test; job `no-signer`: grep -rEn the seven forbidden identifiers over `lib/ bin/`, exit 1 on match.
 - [x] Step 4: verify `npm run typecheck && npm test` green locally; run the no-signer grep locally.
 - [x] Step 5: commit `scaffold: cli skeleton, ci, no-signer job`.
@@ -85,7 +85,7 @@ export async function getLogsAdaptive(client, params: {address?, topics?, fromBl
 
 **Files:**
 - Create: `lib/providers/provider.ts`, `lib/providers/rpc.ts` (partial: token info, logs plumbing), `lib/doctor.ts`
-- Modify: `bin/appname.mjs` (wire doctor)
+- Modify: `bin/xray.mjs` (wire doctor)
 
 **Interfaces:**
 - Produces:
@@ -109,7 +109,7 @@ export function pickProvider(flag?: "rpc" | "bitquery"): Provider; // env BITQUE
 ```
 - `doctor`: against live chain - chain id == 4663, code exists at factory/router/hook/locker/poolManager/WETH, finds a recent CurveBuy log by topic and prints its curve address, measures getLogs limit behavior and request latency, prints verdict lines.
 
-- [x] Step 1: write provider.ts types. Write doctor with checks above; wire `appname doctor`.
+- [x] Step 1: write provider.ts types. Write doctor with checks above; wire `xray doctor`.
 - [x] Step 2: run `npm run cli -- doctor` against the live chain; iterate until all checks print OK (this validates topics/addresses empirically, including CurveBuy/CurveSell arg layout - decode a real event and record the layout as a comment in `lib/abi/curve.ts`).
 - [x] Step 3: commit `doctor: live chain verification`. **M0 done.**
 
@@ -159,7 +159,7 @@ export function position(trades: Trade[], transfersInTokens: bigint, remaining: 
 - Produces:
 ```ts
 export class Cache {
-  constructor(path?: string); // default ~/.appname/cache.db, ":memory:" in tests
+  constructor(path?: string); // default ~/.xray/cache.db, ":memory:" in tests
   tokenState(address): { syncedBlock: bigint } | null;
   saveToken(meta: TokenMeta, syncedBlock: bigint): void;
   loadTrades(token): Trade[];  appendTrades(token, trades: Trade[]): void;
@@ -177,7 +177,7 @@ export class Cache {
 
 **Files:**
 - Create: `lib/read/token.ts`, `lib/read/holders.ts`, `lib/usd.ts`
-- Modify: `lib/providers/rpc.ts` (activity via getLogsAdaptive: Transfer logs of token + curve events of curve + swap/weth of pool per-tx), `bin/appname.mjs`
+- Modify: `lib/providers/rpc.ts` (activity via getLogsAdaptive: Transfer logs of token + curve events of curve + swap/weth of pool per-tx), `bin/xray.mjs`
 
 **Interfaces:**
 - Produces:
@@ -235,7 +235,7 @@ export async function header(provider, snap: TokenSnapshot): Promise<Header>
 
 **Files:**
 - Create: `lib/format.ts`, `lib/read/launches.ts`
-- Modify: `bin/appname.mjs`, `lib/providers/rpc.ts` (factory launch log scan)
+- Modify: `bin/xray.mjs`, `lib/providers/rpc.ts` (factory launch log scan)
 - Test: `test/format.test.mjs`, `test/cli.test.mjs`
 
 **Interfaces:**
@@ -286,7 +286,7 @@ export function badges(p: { trades; avgPnlPerTrade; winrate; realizedTotalEth; b
 
 **Files:**
 - Create: `lib/profile/profile.ts`, `lib/read/wallet.ts`, `lib/check.ts`
-- Modify: `bin/appname.mjs`, `lib/format.ts`
+- Modify: `bin/xray.mjs`, `lib/format.ts`
 
 **Interfaces:**
 - Produces:

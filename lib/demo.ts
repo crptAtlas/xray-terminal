@@ -5,7 +5,7 @@ import type { Hex } from "./chain.ts";
 import type { Provider, QuoteEvent, RawTransfer, TokenActivity, TokenMeta } from "./providers/provider.ts";
 
 /**
- * Offline provider over bundled fixture snapshots. Powers `appname demo`
+ * Offline provider over bundled fixture snapshots. Powers `xray demo`
  * and the full-pipeline tests. Requires nothing: no network, no keys.
  * Every output produced from it is marked DEMO.
  */

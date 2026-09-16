@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 `;
 
 export function defaultCachePath(): string {
-  const dir = join(homedir(), ".appname");
+  const dir = join(homedir(), ".xray");
   mkdirSync(dir, { recursive: true });
   return join(dir, "cache.db");
 }

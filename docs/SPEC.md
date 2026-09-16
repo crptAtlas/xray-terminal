@@ -1,7 +1,7 @@
 # SPEC: holder PnL terminal (Robinhood Chain)
 
 Project name, ticker, branding, images and animations are intentionally absent
-from this document. `APPNAME` is used as a placeholder wherever a name is
+from this document. `xray` is used as a placeholder wherever a name is
 required in code.
 
 Chain: Robinhood Chain, chain id 4663, Arbitrum Orbit, ~0.1s blocks,
@@ -327,7 +327,7 @@ mode B, repeat:  seconds
 ## 5. Repository layout
 
 ```
-bin/APPNAME.mjs             CLI entry point
+bin/xray.mjs             CLI entry point
 lib/
   chain.ts                  chain definition, addresses, topics
   abi/                      factory, curve, pool, erc20
@@ -370,10 +370,10 @@ fails the build on a match.
 ## 6. CLI
 
 ```
-APPNAME check <ca|ticker>     full token breakdown
-APPNAME wallet <address>      wallet profile, mode B only
-APPNAME doctor                verify source, addresses, limits
-APPNAME demo                  breakdown on fixtures, offline, marked DEMO
+xray check <ca|ticker>     full token breakdown
+xray wallet <address>      wallet profile, mode B only
+xray doctor                verify source, addresses, limits
+xray demo                  breakdown on fixtures, offline, marked DEMO
 ```
 
 Flags: `--format text|json|markdown`, `--output <file>`,

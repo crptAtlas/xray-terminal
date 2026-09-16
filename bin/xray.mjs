@@ -4,7 +4,7 @@ import { Command } from "commander";
 const program = new Command();
 
 program
-  .name("appname")
+  .name("xray")
   .description("holder PnL terminal for Pons V2 tokens on Robinhood Chain (read-only)")
   .version("0.1.0")
   .option("--format <fmt>", "output format: text | json | markdown", "text")
