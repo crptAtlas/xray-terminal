@@ -383,6 +383,11 @@ to overwrite an existing file.
 Tickers are not unique. If several launches share a ticker, print a list
 with age, mcap and holder count and ask for the address.
 
+**Dead tokens.** When fewer than 5 wallets currently hold the token, the
+stats block (averages, groups) is replaced with one line:
+`Token is dead. You're too early or too late`. The header, exited and
+excluded lines still print.
+
 `check` output format:
 
 ```

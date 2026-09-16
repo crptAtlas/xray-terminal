@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { formatCheck, writeOutput, fmtUsd, fmtAge } from "../lib/format.ts";
+import { formatCheck, writeOutput, fmtUsd, fmtAge, DEAD_LINE, isDead } from "../lib/format.ts";
 
 function sampleResult() {
   const pos = (pnlPct, closed = false) => ({
@@ -34,6 +34,10 @@ function sampleResult() {
       },
       holders: [
         { wallet: "0x1234567890123456789012345678901234abcdef", position: pos(180), supplyShare: 0.042 },
+        { wallet: "0x2".padEnd(42, "0"), position: pos(10), supplyShare: 0.02 },
+        { wallet: "0x3".padEnd(42, "0"), position: pos(15), supplyShare: 0.02 },
+        { wallet: "0x4".padEnd(42, "0"), position: pos(-5), supplyShare: 0.01 },
+        { wallet: "0x5".padEnd(42, "0"), position: pos(40), supplyShare: 0.01 },
       ],
       holdersTotal: 1043,
       excluded: { dust: 412, unknownBasis: { wallets: 14, supplyShare: 0.031 }, infra: 6 },
@@ -99,6 +103,26 @@ test("demo flag marks the output", () => {
   const r = sampleResult();
   r.demo = true;
   assert.match(formatCheck(r, "text"), /^DEMO/);
+});
+
+test("dead token: under 5 current holders replaces the stats block", () => {
+  const r = sampleResult();
+  r.snapshot.holders = r.snapshot.holders.slice(0, 2);
+  r.top = r.snapshot.holders;
+  assert.equal(isDead(r), true);
+  const out = formatCheck(r, "text");
+  assert.match(out, /Token is dead\. You're too early or too late/);
+  assert.doesNotMatch(out, /^avg pnl/m);
+  assert.doesNotMatch(out, /group 1/);
+  const parsed = JSON.parse(formatCheck(r, "json"));
+  assert.equal(parsed.dead, true);
+  assert.match(formatCheck(r, "markdown"), new RegExp(DEAD_LINE.replace(".", "\\.")));
+});
+
+test("exited-only holders count as dead too", () => {
+  const r = sampleResult();
+  r.snapshot.holders = r.snapshot.holders.map((h) => ({ ...h, supplyShare: 0 }));
+  assert.equal(isDead(r), true);
 });
 
 test("writeOutput refuses to overwrite", () => {

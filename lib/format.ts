@@ -30,6 +30,14 @@ export interface CheckResult {
 
 const short = (a: string) => `${a.slice(0, 6)}..${a.slice(-4)}`;
 
+// Below this many current holders the token is not worth averaging.
+export const DEAD_HOLDERS_MIN = 5;
+export const DEAD_LINE = "Token is dead. You're too early or too late";
+
+export function isDead(r: CheckResult): boolean {
+  return r.snapshot.holders.filter((h) => h.supplyShare > 0).length < DEAD_HOLDERS_MIN;
+}
+
 export function fmtUsd(n: number): string {
   if (!Number.isFinite(n)) return "-";
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
@@ -65,19 +73,24 @@ function textCheck(r: CheckResult): string {
     `mcap ${fmtUsd(h.mcapUsd)}   liquidity ${fmtUsd(h.liquidityUsd)}   volume 24h ${fmtUsd(h.volume24hUsd)}   holders ${h.holders.toLocaleString("en-US").replace(/,/g, " ")}`,
   );
   lines.push("");
-  lines.push(`avg pnl  ${pct(a.avgPnlPct)}        across ${a.pnlWallets} wallets`);
-  if (a.avgWinrate !== null) {
-    lines.push(`winrate   ${a.avgWinrate.toFixed(0)}%        across ${a.winrateWallets} wallets with 2+ trades`);
+  if (isDead(r)) {
+    lines.push(DEAD_LINE);
+    lines.push("");
+  } else {
+    lines.push(`avg pnl  ${pct(a.avgPnlPct)}        across ${a.pnlWallets} wallets`);
+    if (a.avgWinrate !== null) {
+      lines.push(`winrate   ${a.avgWinrate.toFixed(0)}%        across ${a.winrateWallets} wallets with 2+ trades`);
+    }
+    lines.push("");
+    r.groups.forEach((g, i) => {
+      lines.push(
+        `group ${i + 1}   ${g.minPct >= 0 ? "+" : ""}${g.minPct.toFixed(0)}..${g.maxPct.toFixed(0)}%   ${(g.supplyShare * 100).toFixed(0)}% of supply   ${g.wallets} wallets`,
+      );
+    });
+    if (r.groups.length === 0) lines.push("no dense pnl groups");
+    lines.push("");
   }
-  lines.push("");
-  r.groups.forEach((g, i) => {
-    lines.push(
-      `group ${i + 1}   ${g.minPct >= 0 ? "+" : ""}${g.minPct.toFixed(0)}..${g.maxPct.toFixed(0)}%   ${(g.supplyShare * 100).toFixed(0)}% of supply   ${g.wallets} wallets`,
-    );
-  });
-  if (r.groups.length === 0) lines.push("no dense pnl groups");
-  lines.push("");
-  lines.push("top holders");
+  if (r.top.length > 0) lines.push("top holders");
   r.top.forEach((t, i) => {
     const ex = r.topExtras?.get(t.wallet);
     let profilePart = "";
@@ -122,6 +135,7 @@ function jsonCheck(r: CheckResult): string {
   return JSON.stringify(
     {
       demo: r.demo ?? false,
+      dead: isDead(r),
       token: {
         address: s.meta.address,
         symbol: s.meta.symbol,
@@ -153,6 +167,10 @@ function markdownCheck(r: CheckResult): string {
   lines.push("");
   lines.push(`\`${s.meta.address}\`  age ${fmtAge(h.ageMs)}  phase ${phaseStr(h.phase)}`);
   lines.push("");
+  if (isDead(r)) {
+    lines.push(`**${DEAD_LINE}**`);
+    lines.push("");
+  }
   lines.push("| mcap | liquidity | volume 24h | holders |");
   lines.push("|---|---|---|---|");
   lines.push(`| ${fmtUsd(h.mcapUsd)} | ${fmtUsd(h.liquidityUsd)} | ${fmtUsd(h.volume24hUsd)} | ${h.holders} |`);
