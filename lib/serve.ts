@@ -16,7 +16,7 @@ import { looksLikeAddress } from "./read/launches.ts";
  *
  *   GET /                      the terminal page
  *   GET /brand/<file>          brand assets (sprites, fonts, css)
- *   GET /favicon.png           the skull sprite
+ *   GET /favicon.png           the ribcage sprite
  *   GET /api/check?token=0x..  SSE: stage events, then phase payloads
  */
 

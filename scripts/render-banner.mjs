@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Renders assets/brand/banner.png for the README header: pixel wordmark,
-// tagline, bottom line, the skull sprite with a soft glow on the right.
+// tagline, bottom line, the ribcage sprite with a soft glow on the right.
 // Refresh with: npm run render:banner
 import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import { writeFile } from "node:fs/promises";
@@ -64,8 +64,9 @@ ctx.fillStyle = C.faint;
 ctx.fillText("$XRAY   ·   holder pnl terminal for pons v2   ·   read-only", 150, 620);
 
 // skull with glow on the right
-const skull = await loadImage(brand + "logo-sprite.png");
-const size = 520;
+const cage = await loadImage(brand + "logo-sprite.png");
+const sh = 560;
+const sw = Math.round((cage.width / cage.height) * sh);
 const cx = W - 420;
 const cy = H / 2;
 const grad = ctx.createRadialGradient(cx, cy, 40, cx, cy, 360);
@@ -74,7 +75,7 @@ grad.addColorStop(1, "rgba(159, 217, 255, 0)");
 ctx.fillStyle = grad;
 ctx.fillRect(cx - 380, cy - 380, 760, 760);
 ctx.imageSmoothingEnabled = false;
-ctx.drawImage(skull, cx - size / 2, cy - size / 2, size, size);
+ctx.drawImage(cage, cx - sw / 2, cy - sh / 2, sw, sh);
 
 await writeFile(brand + "banner.png", canvas.toBuffer("image/png"));
 console.log("assets/brand/banner.png");
