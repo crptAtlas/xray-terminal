@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cardMood, renderCard } from "../lib/card.ts";
+import { cardGrade, cardMood, renderCard } from "../lib/card.ts";
 
 const pos = (pnlPct) => ({
   boughtTokens: 100n,
@@ -14,10 +14,10 @@ const pos = (pnlPct) => ({
   closed: false,
 });
 
-function result({ holders = 12, avgPnlPct = 40 } = {}) {
+function result({ holders = 12, avgPnlPct = 40, pnls = null } = {}) {
   const rows = Array.from({ length: holders }, (_, i) => ({
     wallet: `0x${String(i).padStart(40, "0")}`,
-    position: pos(avgPnlPct),
+    position: pos(pnls ? pnls[i % pnls.length] : avgPnlPct),
     supplyShare: 0.01,
   }));
   return {
@@ -65,17 +65,26 @@ function result({ holders = 12, avgPnlPct = 40 } = {}) {
   };
 }
 
-test("mood: green in profit, yellow underwater, red when dead", () => {
+test("grade: healthy in profit, cracked mixed, shattered underwater or dead", () => {
+  // everyone up: healthy/green
+  assert.equal(cardGrade(result({ avgPnlPct: 40 })), "healthy");
   assert.equal(cardMood(result({ avgPnlPct: 40 })), "green");
-  assert.equal(cardMood(result({ avgPnlPct: 0 })), "green");
-  assert.equal(cardMood(result({ avgPnlPct: -1 })), "yellow");
-  assert.equal(cardMood(result({ holders: 9, avgPnlPct: 40 })), "red");
-  assert.equal(cardMood(result({ holders: 10, avgPnlPct: 40 })), "green");
+  // mixed: avg positive but half underwater -> cracked/yellow
+  const mixed = result({ pnls: [60, -10], avgPnlPct: 25 });
+  assert.equal(cardGrade(mixed), "cracked");
+  assert.equal(cardMood(mixed), "yellow");
+  // most underwater: shattered/red
+  const under = result({ pnls: [-40, -60, 10], avgPnlPct: -30 });
+  assert.equal(cardGrade(under), "shattered");
+  assert.equal(cardMood(under), "red");
+  // dead is always shattered, even in profit
+  assert.equal(cardGrade(result({ holders: 9, avgPnlPct: 40 })), "shattered");
+  assert.equal(cardGrade(result({ holders: 10, avgPnlPct: 40 })), "healthy");
 });
 
-test("all three moods render a real PNG", () => {
+test("all three moods render a real PNG", async () => {
   for (const r of [result(), result({ avgPnlPct: -30 }), result({ holders: 2 })]) {
-    const buf = renderCard(r);
+    const buf = await renderCard(r);
     // PNG magic bytes
     assert.deepEqual([...buf.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
     assert.ok(buf.length > 5000, `png too small: ${buf.length}`);

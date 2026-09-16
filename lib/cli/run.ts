@@ -15,7 +15,7 @@ async function writeCard(result: CheckResult, file: string): Promise<void> {
   const { existsSync, writeFileSync } = await import("node:fs");
   if (existsSync(file)) throw new Error(`refusing to overwrite existing file: ${file}`);
   const { renderCard, cardMood } = await import("../card.ts");
-  writeFileSync(file, renderCard(result));
+  writeFileSync(file, await renderCard(result));
   console.error(`card (${cardMood(result)}) written to ${file}`);
 }
 
