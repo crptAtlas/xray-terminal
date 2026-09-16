@@ -6,6 +6,7 @@ import type { Hex } from "./chain.ts";
 import type { Provider } from "./providers/provider.ts";
 import { header, type Header } from "./read/header.ts";
 import { tokenSnapshot, type TokenSnapshot } from "./read/token.ts";
+import type { StageReporter } from "./stages.ts";
 
 /**
  * The library entry: progressive two-phase check (spec 4.1). Phase 1 -
@@ -34,6 +35,7 @@ export type CheckPhase = PhaseOne | PhaseTwo;
 export interface CheckOpts {
   profiles?: boolean;
   profileDeadlineMs?: number;
+  onStage?: StageReporter;
 }
 
 export async function* check(
@@ -42,26 +44,41 @@ export async function* check(
   address: Hex,
   opts: CheckOpts = {},
 ): AsyncGenerator<CheckPhase> {
-  const snapshot = await tokenSnapshot(provider, cache, address);
+  const onStage: StageReporter = opts.onStage ?? (() => {});
+  const snapshot = await tokenSnapshot(provider, cache, address, onStage);
   const hdr = await header(provider, snapshot);
+  onStage({ agent: "sorter", status: "start" });
   const groups = findGroups(
     snapshot.holders
       .filter((h) => h.position.pnlPct !== null)
       .map((h) => ({ pnlPct: h.position.pnlPct as number, supplyShare: h.supplyShare })),
   );
-  yield { phase: 1, snapshot, header: hdr, groups, aggregates: aggregate(snapshot.holders) };
+  onStage({ agent: "sorter", status: "done", detail: `${groups.length} groups` });
+  onStage({ agent: "auditor", status: "start" });
+  const aggregates = aggregate(snapshot.holders);
+  onStage({
+    agent: "auditor",
+    status: "done",
+    detail: aggregates.avgPnlPct === null ? "no averages" : `avg ${aggregates.avgPnlPct >= 0 ? "+" : ""}${aggregates.avgPnlPct.toFixed(0)}%`,
+  });
+  yield { phase: 1, snapshot, header: hdr, groups, aggregates };
 
-  if (opts.profiles === false || !provider.supportsProfiles) return;
+  if (opts.profiles === false || !provider.supportsProfiles) {
+    onStage({ agent: "tracer", status: "skip", detail: "needs mode B" });
+    return;
+  }
 
   const { walletProfilesWithDeadline } = await import("./read/wallet.ts");
   const { BitqueryProvider } = await import("./providers/bitquery.ts");
   if (!(provider instanceof BitqueryProvider)) return;
   const wallets = snapshot.holders.map((h) => h.wallet);
+  onStage({ agent: "tracer", status: "start" });
   const profiles = await walletProfilesWithDeadline(
     provider,
     cache,
     wallets,
     opts.profileDeadlineMs ?? 60_000,
   );
+  onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }

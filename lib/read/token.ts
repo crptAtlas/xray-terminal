@@ -4,6 +4,7 @@ import { classify, type Trade, type TransferIn } from "../pnl/classify.ts";
 import { position, type Position } from "../pnl/position.ts";
 import type { Provider, TokenMeta } from "../providers/provider.ts";
 import { ethUsd } from "../usd.ts";
+import type { StageReporter } from "../stages.ts";
 
 /**
  * Builds the full holder snapshot for one token: incremental trade sync
@@ -50,7 +51,9 @@ export async function tokenSnapshot(
   provider: Provider,
   cache: Cache,
   address: Hex,
+  onStage: StageReporter = () => {},
 ): Promise<TokenSnapshot> {
+  onStage({ agent: "scanner", status: "start" });
   const meta = await provider.tokenMeta(address);
 
   // incremental sync: cached trades + only the new blocks
@@ -65,6 +68,8 @@ export async function tokenSnapshot(
 
   const trades = state ? cache.loadTrades(meta.address) : fresh.trades;
   const transfersIn = state ? cache.loadTransfersIn(meta.address) : fresh.transfersIn;
+  onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades` });
+  onStage({ agent: "ledger", status: "start" });
 
   // candidate wallets: anyone who ever traded or received tokens
   const wallets = new Set<string>();
@@ -96,6 +101,8 @@ export async function tokenSnapshot(
   const supplyFloat = Number(meta.totalSupply) / Number(one);
   const dustTokens = priceEth > 0 ? (DUST_USD / usdRate / priceEth) : Infinity;
 
+  onStage({ agent: "ledger", status: "done", detail: `${candidates.length} wallets` });
+  onStage({ agent: "flagger", status: "start" });
   const holders: HolderRow[] = [];
   let dust = 0;
   let ubWallets = 0;
@@ -126,6 +133,11 @@ export async function tokenSnapshot(
     holders.push({ wallet: w, position: pos, supplyShare: share });
   }
 
+  onStage({
+    agent: "flagger",
+    status: "done",
+    detail: `dust ${dust}, unknown basis ${ubWallets}`,
+  });
   // "top holders" means by supply held
   holders.sort((a, b) => b.supplyShare - a.supplyShare);
 

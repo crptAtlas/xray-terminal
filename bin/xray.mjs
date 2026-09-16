@@ -41,6 +41,16 @@ program
   });
 
 program
+  .command("serve")
+  .description("serve the web terminal on 127.0.0.1 (SSE progress, agent row)")
+  .option("--port <n>", "port", (v) => parseInt(v, 10), 4663)
+  .option("--demo", "serve offline on bundled fixtures, marked DEMO")
+  .action(async (cmdOpts) => {
+    const { runServe } = await import("../lib/cli/run.ts");
+    await runServe({ ...program.opts(), ...cmdOpts });
+  });
+
+program
   .command("demo")
   .description("offline breakdown on bundled fixtures, output marked DEMO")
   .action(async () => {

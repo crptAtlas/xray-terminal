@@ -136,6 +136,44 @@ export async function runWallet(address: string, opts: CliOpts): Promise<void> {
   cache.close();
 }
 
+export async function runServe(opts: CliOpts & { port: number; demo?: boolean }): Promise<void> {
+  const { startServer } = await import("../serve.ts");
+  if (opts.demo) {
+    const { FixtureProvider, DEMO_FIXTURE, DEMO_ETH_USD } = await import("../demo.ts");
+    process.env.ETH_USD ??= DEMO_ETH_USD;
+    startServer({
+      port: opts.port,
+      top: opts.top,
+      cachePath: ":memory:",
+      makeProvider: () => new FixtureProvider(DEMO_FIXTURE),
+    });
+  } else {
+    const { pickProvider, RpcProvider, makeClient } = await import("../providers/rpc.ts");
+    const { resolveTicker } = await import("../read/launches.ts");
+    startServer({
+      port: opts.port,
+      top: opts.top,
+      makeProvider: () => pickProvider(opts.provider),
+      resolveQuery: async (provider, cache, q) => {
+        const client = provider instanceof RpcProvider ? provider.client : makeClient();
+        const matches = await resolveTicker(client, cache, q);
+        if (matches.length === 0) throw new Error(`no launch found for ticker "${q}"`);
+        if (matches.length > 1) {
+          throw new Error(
+            `ticker "${q}" matches ${matches.length} launches, use the address: ` +
+              matches.map((m) => m.token).join(", "),
+          );
+        }
+        const first = matches[0];
+        if (!first) throw new Error("no match");
+        return first.token;
+      },
+    });
+  }
+  console.log(`xray terminal on http://127.0.0.1:${opts.port}${opts.demo ? "  (DEMO fixtures)" : ""}`);
+  await new Promise(() => {}); // run until interrupted
+}
+
 export async function runDoctor(_opts: CliOpts): Promise<void> {
   const { doctor } = await import("../doctor.ts");
   const { ok } = await doctor();
