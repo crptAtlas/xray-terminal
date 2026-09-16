@@ -15,7 +15,7 @@
 
 ## Why xray
 
-A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets, and the only question that matters before you walk in is how the people already inside are doing: who is up, who is down, who already left and who is stuck holding a bag they cannot explain. xray takes a token address and reads the whole room: the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds.
+A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets. The only question that matters before you walk in is how the people already inside are doing: who is up, who is down, who already left and who is stuck holding a bag they cannot explain. xray takes a token address and reads the whole room: the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds.
 
 ### One command, the whole room
 
