@@ -63,7 +63,7 @@ ctx.font = "400 34px 'JetBrains Mono'";
 ctx.fillStyle = C.faint;
 ctx.fillText("$XRAY   ·   holder pnl terminal for pons v2   ·   read-only", 150, 620);
 
-// skull with glow on the right
+// ribcage with glow on the right
 const cage = await loadImage(brand + "logo-sprite.png");
 const sh = 560;
 const sw = Math.round((cage.width / cage.height) * sh);
