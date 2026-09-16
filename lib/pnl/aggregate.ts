@@ -1,10 +1,15 @@
 import type { HolderRow } from "../read/token.ts";
 
 /**
- * Token aggregates (spec 3.6). avg_pnl over every holder that survived the
- * filters (dust, infra and unknown_basis never reach HolderRow). avg_winrate
- * only over wallets whose chain-wide history has 2+ trades - that needs
- * wallet profiles, so in rpc mode the winrate side stays null.
+ * Token aggregates (spec 3.6), supply-weighted: a holder's contribution to
+ * avg_pnl and avg_winrate is proportional to the share of supply they hold.
+ * A wallet with 5% of supply moves the average five times harder than one
+ * with 1%. Wallets that exited (share 0) do not pull the current averages;
+ * they get their own `exited` line, unweighted. A dead token where everyone
+ * exited shows no current average - the exited line carries the story.
+ *
+ * avg_winrate needs wallet profiles (2+ chain-wide trades), so in rpc mode
+ * the winrate side stays null.
  */
 
 // The slice of a wallet profile the aggregates need. Full profiles live in
@@ -27,27 +32,42 @@ export interface Aggregates {
 const mean = (xs: number[]): number | null =>
   xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
 
+function weightedMean(pairs: { value: number; weight: number }[]): number | null {
+  if (pairs.length === 0) return null;
+  const totalWeight = pairs.reduce((s, p) => s + p.weight, 0);
+  // callers only pass weights > 0; the guard is numerical safety
+  if (totalWeight <= 0) return mean(pairs.map((p) => p.value));
+  return pairs.reduce((s, p) => s + p.value * p.weight, 0) / totalWeight;
+}
+
 export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>): Aggregates {
-  const pnls = rows.map((r) => r.position.pnlPct).filter((p): p is number => p !== null);
+  // current holders only: an exited wallet (share 0) must not steer the
+  // averages of what is being held right now
+  const holding = rows.filter((r) => r.supplyShare > 0);
+  const pnlPairs = holding
+    .filter((r) => r.position.pnlPct !== null)
+    .map((r) => ({ value: r.position.pnlPct as number, weight: r.supplyShare }));
 
   let avgWinrate: number | null = null;
   let winrateWallets = 0;
   let firstTrade: Aggregates["firstTrade"] = null;
   if (profiles) {
-    const wrs: number[] = [];
+    const wrPairs: { value: number; weight: number }[] = [];
     let ftWallets = 0;
     let ftSupply = 0;
-    for (const r of rows) {
+    for (const r of holding) {
       const p = profiles.get(r.wallet);
       if (!p || p.notRead) continue;
-      if (p.trades >= 2 && p.winrate !== null) wrs.push(p.winrate);
+      if (p.trades >= 2 && p.winrate !== null) {
+        wrPairs.push({ value: p.winrate, weight: r.supplyShare });
+      }
       if (p.trades === 0) {
         ftWallets++;
         ftSupply += r.supplyShare;
       }
     }
-    avgWinrate = mean(wrs);
-    winrateWallets = wrs.length;
+    avgWinrate = weightedMean(wrPairs);
+    winrateWallets = wrPairs.length;
     firstTrade = { wallets: ftWallets, supplyShare: ftSupply };
   }
 
@@ -63,8 +83,8 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
   }
 
   return {
-    avgPnlPct: mean(pnls),
-    pnlWallets: pnls.length,
+    avgPnlPct: weightedMean(pnlPairs),
+    pnlWallets: pnlPairs.length,
     avgWinrate,
     winrateWallets,
     firstTrade,

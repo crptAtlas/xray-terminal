@@ -5,7 +5,9 @@ Give it a token address and it answers one question: **who is holding this
 token and how much has each of them made or lost.**
 
 - PnL of every holder, one number each (realized + unrealized)
-- token averages: avg PnL and avg winrate of its holders
+- token averages: avg PnL and avg winrate of its holders, weighted by
+  the share of supply each holder keeps (5% of supply pulls the average
+  five times harder than 1%)
 - holders clustered into dense PnL groups
 - per-wallet chain-wide stats: avg PnL per trade, winrate, badges
   (`[smart]`, `[rich]`)

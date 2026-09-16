@@ -246,9 +246,18 @@ rich:   realized_total >= 5 ETH  or   balance >= 10 ETH
 ### 3.6 Token aggregates
 
 ```
-avg_pnl      mean pnl_pct over all holders except dust, infra and unknown_basis
-avg_winrate  mean winrate over holders with trades >= 2
+avg_pnl      supply-weighted mean pnl_pct over all current holders
+             except dust, infra and unknown_basis
+avg_winrate  supply-weighted mean winrate over current holders
+             with trades >= 2
 ```
+
+**Supply weighting.** A holder's contribution is proportional to the
+share of supply they hold: a wallet with +15% PnL holding 1% of supply
+and a wallet with -50% holding 5% average to (15*1 - 50*5) / 6 = -39%,
+not to -17.5%. Exited wallets (share 0) do not steer the current
+averages; they appear only in the `exited` line, which stays a plain
+mean.
 
 Next to `avg_winrate`, always print how many wallets it was computed
 over.
