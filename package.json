@@ -10,7 +10,8 @@
   "scripts": {
     "test": "node --test --import tsx \"test/*.test.mjs\"",
     "typecheck": "tsc",
-    "cli": "tsx bin/xray.mjs"
+    "cli": "tsx bin/xray.mjs",
+    "render:readme": "tsx scripts/render-readme.mjs"
   },
   "repository": {
     "type": "git",

@@ -10,7 +10,11 @@ import type { Trade } from "./classify.ts";
  * A wallet whose tokens did not all come from tracked buys (inbound
  * transfers, or sells+balance exceeding buys) has no known cost basis:
  * flagged unknownBasis, excluded from groups and averages by the caller.
+ * A cost basis below MIN_COST_WEI is equally unreliable - dividing by a
+ * few wei turns pnl_pct into astronomy - so it is flagged the same way.
  */
+
+export const MIN_COST_WEI = 10n ** 13n; // 0.00001 ETH
 
 export interface Position {
   boughtTokens: bigint;
@@ -51,8 +55,11 @@ export function position(
   const valueNowWei = (remaining * priceWad) / one;
 
   const pnlWei = soldProceedsWei + valueNowWei - boughtCostWei;
-  const unknownBasis = transfersInTokens > 0n || soldTokens + remaining > boughtTokens || boughtCostWei === 0n;
-  const pnlPct = boughtCostWei === 0n ? null : (Number(pnlWei) / Number(boughtCostWei)) * 100;
+  const unknownBasis =
+    transfersInTokens > 0n ||
+    soldTokens + remaining > boughtTokens ||
+    boughtCostWei < MIN_COST_WEI;
+  const pnlPct = unknownBasis && boughtCostWei < MIN_COST_WEI ? null : (Number(pnlWei) / Number(boughtCostWei)) * 100;
 
   return {
     boughtTokens,

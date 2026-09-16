@@ -1,0 +1,21 @@
+{
+  "capturedAt": "2026-09-16 15:50 UTC",
+  "output": [
+    "endpoints: publicnode, official",
+    " ok   chain id               4663 (146ms first request)",
+    " ok   latest block           64628874",
+    " ok   code at factory        0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e",
+    " ok   code at router         0xe33e9e479df8802cb0866d5d05258bec4cf62948",
+    " ok   code at hook           0xe5e702641ea86f4ae6cc3cdaed2b886f976be044",
+    " ok   code at locker         0x267444d099b10fb5ed7c3cc7b7c767adca574952",
+    " ok   code at poolManager    0x8366a39cc670b4001a1121b8f6a443a643e40951",
+    " ok   code at weth           0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+    " ok   code at multicall3     0xca11bde05977b3631167028862be2a173976ca11",
+    " ok   recent curve events    1573 in last 3000 blocks (15033ms)",
+    " ok   decode curve event     CurveBuy on 0x79c5c733a681637c788cd89c66ba110331194753 quote 24750000000000000 wei",
+    " ok   getlogs pacing         ~15033ms per window; response cap 10000 logs",
+    "",
+    "all green",
+    "source rpc   14 requests"
+  ]
+}

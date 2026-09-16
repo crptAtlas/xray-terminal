@@ -70,3 +70,10 @@ test("zero cost basis: pnlPct is null, unknown basis", () => {
   assert.equal(p.pnlPct, null);
   assert.equal(p.unknownBasis, true);
 });
+
+test("microscopic cost basis is unknown basis, not astronomy", () => {
+  // bought a mountain of tokens for 100 wei: pnl_pct would be nonsense
+  const p = position([buy(T(1000000), 100n)], 0n, T(1000000), 0.01, D);
+  assert.equal(p.unknownBasis, true);
+  assert.equal(p.pnlPct, null);
+});

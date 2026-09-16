@@ -108,6 +108,7 @@ export async function renderCard(r: CheckResult): Promise<Buffer> {
     }
     y += 12;
     for (const [i, g] of r.groups.entries()) {
+      if (y > H - 340) break; // never run into the footer panel
       const range = `${g.minPct >= 0 ? "+" : ""}${g.minPct.toFixed(0)}..${g.maxPct.toFixed(0)}%`;
       line(ctx, `group ${i + 1}  ${range}`, M, y, font(36), p.text);
       y += 46;

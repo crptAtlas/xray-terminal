@@ -442,31 +442,7 @@ source rpc   34 requests   18.2s
 
 ---
 
-## 8. Milestones
-
-**M0.** Skeleton, `chain.ts`, provider interface, implementation A,
-`doctor`, CI with the no-signing check. Done when `doctor` against the
-live chain prints addresses and limits and everything is green.
-
-**M1.** Token trade reading, classification, PnL formula, filters,
-cache. Done when `check` on a live token matches a manual Blockscout
-check on several wallets.
-
-**M2.** Groups, aggregates, header, output formats. Done when the output
-matches the sample in section 6.
-
-**M3.** Implementation B on Bitquery, provider switching. Done when
-`check` on the same token via A and via B produces the same numbers.
-
-**M4.** Wallet profiles, winrate, badges, profile cache, progressive
-output. Done when `wallet` on a known active wallet answers in under a
-second from cache.
-
-**M5.** Fixtures, `demo`, README, docs, repository polish.
-
----
-
-## 9. README: mandatory content
+## 8. README: mandatory content
 
 - the two deployment modes, A and B, with an honest description of what
   A cannot do

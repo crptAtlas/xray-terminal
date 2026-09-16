@@ -31,6 +31,7 @@ function isRangeError(err: unknown): boolean {
     msg.includes("limit") ||
     msg.includes("range") ||
     msg.includes("timeout") ||
+    msg.includes("deadline exceeded") ||
     msg.includes("response size")
   );
 }

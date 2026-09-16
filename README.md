@@ -1,157 +1,156 @@
-<p align="center">
-  <img src="assets/brand/logo.png" alt="xray" width="180">
-</p>
+<p align="center"><img src="assets/brand/logo-sprite.png" width="128" alt="xray pixel skull"></p>
 
 <p align="center">
-  <a href="https://github.com/Skynet-inisghts/holder-pnl/actions"><img src="https://img.shields.io/badge/ci-passing-4ef07f" alt="ci"></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D20-9fd9ff" alt="node">
-  <img src="https://img.shields.io/badge/chain-Robinhood%204663-cfe4f0" alt="chain">
-  <img src="https://img.shields.io/badge/signing-none-ff5c5c" alt="no signing">
-  <img src="https://img.shields.io/badge/license-MIT-5d7387" alt="mit">
+  <a href="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml"><img src="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/Node-20%2B-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Node 20 or newer">
+  <img src="https://img.shields.io/badge/Robinhood_Chain-4663-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Robinhood Chain 4663">
+  <img src="https://img.shields.io/badge/signing-none-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="No signing">
+  <img src="https://img.shields.io/badge/tests-77-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="77 tests">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="MIT license"></a>
 </p>
 
-<p align="center"><i>the terminal that shows who is actually in profit in a token</i></p>
+<p align="center"><strong>The terminal that shows who is actually in profit in a token.</strong><br>A read-only CLI and library for holder PnL on Pons V2 tokens, Robinhood Chain.</p>
 
-Give xray a Pons V2 token on Robinhood Chain and it answers one question:
-**who is holding this token and how much has each of them made or lost.**
+<p align="center"><a href="#start-in-one-minute">Start in one minute</a> · <a href="#how-it-reads-a-token">How it reads a token</a> · <a href="#grades">Grades</a> · <a href="#live-check">Live check</a> · <a href="#methodology">Methodology</a> · <a href="#boundaries">Boundaries</a></p>
 
-```
-$ xray demo          # works offline, right now, no keys, marked DEMO
-$ xray check <ca>    # live token breakdown
-$ xray wallet <addr> # wallet profile (mode B only)
-$ xray doctor        # verify addresses, topics and limits on the live chain
-```
+## Why xray
+
+A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets, and the only question that matters before you walk in is how the people already inside are doing: who is up, who is down, who already left and who is stuck holding a bag they cannot explain. xray takes a token address and reads the whole room: the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds.
+
+### One command, the whole room
+
+![xray check of a live public token: header, supply-weighted avg pnl, three dense holder groups, top holders with individual PnL, exited wallets and exclusion counters](assets/readme/check.svg)
+
+A captured run of `xray check` against the live chain, mode A, public RPC, no keys. The capture time is printed inside the image; it is a historical snapshot, not a current grade. [Captured output as JSON](assets/readme/check-snapshot.json)
 
 ## How it reads a token
 
-Six agents, one per step of the pipeline. On the way to a verdict every
-token passes through all of them:
+<p align="center"><img src="assets/brand/agents.png" width="100%" alt="The six xray agents at their desks: scanner, ledger, tracer, auditor, sorter and flagger"></p>
+
+Six agents, one per step of the pipeline. In the terminal they light up in the order the engine actually works, each one reporting its result when done - that row is the progress bar:
 
 | | agent | what it does |
 |---|---|---|
-| <img src="assets/brand/agent-scanner.png" width="48"> | **scanner** | pulling every trade of this token |
-| <img src="assets/brand/agent-ledger.png" width="48"> | **ledger** | rebuilding each wallet's book: bought, sold, left |
-| <img src="assets/brand/agent-tracer.png" width="48"> | **tracer** | following the same wallets across other tokens |
-| <img src="assets/brand/agent-auditor.png" width="48"> | **auditor** | avg pnl and winrate, wallet by wallet |
-| <img src="assets/brand/agent-sorter.png" width="48"> | **sorter** | splitting holders into groups |
-| <img src="assets/brand/agent-flagger.png" width="48"> | **flagger** | dust, transfers in, first-ever trades |
+| <img src="assets/brand/agent-scanner.png" width="48" alt="scanner"> | **scanner** | pulling every trade of this token |
+| <img src="assets/brand/agent-ledger.png" width="48" alt="ledger"> | **ledger** | rebuilding each wallet's book: bought, sold, left |
+| <img src="assets/brand/agent-tracer.png" width="48" alt="tracer"> | **tracer** | following the same wallets across other tokens |
+| <img src="assets/brand/agent-auditor.png" width="48" alt="auditor"> | **auditor** | avg pnl and winrate, wallet by wallet |
+| <img src="assets/brand/agent-sorter.png" width="48" alt="sorter"> | **sorter** | splitting holders into groups |
+| <img src="assets/brand/agent-flagger.png" width="48" alt="flagger"> | **flagger** | dust, transfers in, first-ever trades |
 
 ## Grades
 
-The state of the holder base, in one look:
+The verdict is a skeleton. Three states of a holder base, thresholds in config, not hardcoded:
 
-| <img src="assets/brand/h-healthy.png" width="200"> | <img src="assets/brand/h-cracked.png" width="200"> | <img src="assets/brand/h-shattered.png" width="200"> |
-|---|---|---|
-| **healthy** - avg pnl above zero and most holders in profit | **cracked** - mixed picture | **shattered** - most holders underwater, or the token is dead |
+| <img src="assets/brand/h-healthy.png" width="220" alt="healthy skeleton, green glow"> | <img src="assets/brand/h-cracked.png" width="220" alt="cracked skeleton with a cast and crutch, yellow glow"> | <img src="assets/brand/h-shattered.png" width="220" alt="shattered skeleton in pieces, red glow"> |
+|:---:|:---:|:---:|
+| **healthy** | **cracked** | **shattered** |
+| avg pnl above zero and most holders in profit | mixed picture | most holders underwater, or the token is dead |
 
-The same skeleton goes on the share card (`--card <file.png>`), next to
-the numbers. A token that fewer than 10 wallets still hold prints
-`Token is dead. You're too early or too late` instead of averages.
+A token that fewer than 10 wallets still hold does not get averages at all - it gets the truth: `Token is dead. You're too early or too late`.
+
+### Share cards
+
+<p align="center">
+  <img src="assets/readme/cards/card-healthy.png" width="32%" alt="Green share card: intact skeleton, holders avg pnl +71%, grade healthy">
+  <img src="assets/readme/cards/card-cracked.png" width="32%" alt="Yellow share card marked DEMO: cracked skeleton with a crutch, avg pnl -14%, grade cracked">
+  <img src="assets/readme/cards/card-shattered.png" width="32%" alt="Red share card: shattered skeleton, grade shattered">
+</p>
+
+Every check renders a 1080x1080 card with the grade skeleton next to the numbers. The green and red cards above are captured live runs of public tokens; the yellow one is a synthetic fixture and carries the DEMO plate, like everything synthetic here.
+
+```bash
+xray check 0x… --card card.png
+```
 
 ## Start in one minute
 
-```
+```bash
+git clone https://github.com/Skynet-inisghts/holder-pnl.git
+cd holder-pnl
 npm install
-npm test          # offline, runs on bundled fixtures
+npm test              # 77 tests, offline, on bundled fixtures
 npm run cli -- demo
 ```
 
-Node >= 20. Runtime deps: `viem`, `commander`, `better-sqlite3`,
-`@napi-rs/canvas`.
+![xray demo: the full pipeline on a bundled fixture snapshot, offline, every line marked DEMO](assets/readme/demo.svg)
 
-**This tool only reads.** It holds no keys, signs nothing and sends no
-transactions - CI greps the source for signing code and fails the build
-if any ever appears.
+`demo` runs the whole pipeline on a fixture snapshot bundled in the repo: no network, no keys, marked DEMO on the first line. Node 20+; runtime deps are `viem`, `commander`, `better-sqlite3` and `@napi-rs/canvas`.
+
+### Check the sources
+
+![xray doctor: chain id, bytecode at every Pons V2 contract, a decoded CurveBuy from the recent chain and measured getLogs pacing, all green](assets/readme/doctor.svg)
+
+```bash
+npm run cli -- doctor
+```
+
+The doctor verifies every hardcoded address and topic against the live chain instead of taking them on faith: chain id, bytecode at the factory, router, hook, locker, pool manager, WETH and multicall3, a real CurveBuy decoded from a recent block and the practical getLogs limits. A red line means numbers cannot be trusted yet.
 
 ## Live check
 
+```bash
+npm run cli -- check 0x…            # by contract address
+npm run cli -- check TICKER         # by ticker; ambiguous tickers list the cluster
+npm run cli -- check 0x… --format json --output out.json
+npm run cli -- wallet 0x…           # wallet profile, mode B only
+```
+
 Two ways to run it, honestly different:
 
-**Mode A - free and slow (default).** The public RPC
-`https://rpc.mainnet.chain.robinhood.com`, no keys. Responses truncate at
-10,000 logs and a request takes 1.6-3.2s regardless of size. A
-1,000-holder token computes in ~10-20s with parallel windows; repeats are
-instant from the incremental cache. Works: holder PnL, groups, token avg
-PnL, header. Does not work: wallet-wide profiles, badges, token winrate -
-the CLI prints a warning and skips them.
+**Mode A - free and slow (default).** The public RPC, no keys, no registration. Responses truncate at 10,000 logs and a request takes 1.6-3.2s regardless of size, so a 1,000-holder token computes in ~10-20s with parallel windows; repeats are near-instant from the incremental cache. Works: holder PnL, groups, supply-weighted averages, header, cards. Does not work: wallet-wide profiles, badges, token winrate - finding every trade of a wallet would mean scanning the whole chain, so the CLI says so and skips them.
 
-**Mode B - paid and fast.** [Bitquery](https://bitquery.io) (GraphQL,
-network `robinhood`, plans from $49/mo): decoded Pons trades, holder and
-balance APIs. Everything works.
+**Mode B - paid and fast.** [Bitquery](https://bitquery.io), GraphQL, network `robinhood`, plans from $49/mo. Decoded Pons trades, holder and balance APIs; everything works, including `[smart]` and `[rich]` wallet badges. Setup is one line:
 
-```
-export BITQUERY_TOKEN=...   # that's the whole setup
+```bash
+export BITQUERY_TOKEN=…
 ```
 
-The Bitquery trades cube keeps roughly the last 30 days; a wallet's
-averages are month-scoped. Mode B queries are pinned by tests on canned
-responses; live A/B parity verification is pending an account token.
+The Bitquery trades cube keeps roughly the last 30 days, so a wallet's averages are month-scoped. Mode B is written against their documented schema and pinned by tests on canned responses; live A/B parity verification is pending an account token.
 
-```
-xray check <ca|ticker>   full token breakdown
-xray wallet <address>    wallet profile, mode B only
-xray doctor              verify source, addresses, limits
-xray demo                offline breakdown on fixtures, marked DEMO
-```
-
-Flags: `--format text|json|markdown`, `--output <file>` (refuses to
-overwrite), `--provider rpc|bitquery`, `--top <n>`, `--no-profiles`,
-`--card <file.png>`.
-
-Tickers are not unique on Pons; when several launches share one, the CLI
-lists them and asks for the address. The first ticker query builds a
-launch index (minutes); later queries extend it incrementally (seconds).
+Tickers are not unique on Pons. When several launches share one, the CLI lists every candidate with its launch block and asks for the address. The first ticker query builds a launch index of the whole chain (minutes, half a million launches); later queries extend it incrementally (seconds).
 
 ## Methodology
 
-- **PnL per token, not per wallet balance:**
-  `pnl = sold_proceeds + value_now - bought_cost`, realized and
-  unrealized in one number. An ETH top-up between trades cannot leak in.
-- **The trader is the token movement, never `tx.from`** - the signer is
-  almost always a relayer.
-- **Token averages are supply-weighted:** a wallet holding 5% of supply
-  moves the average five times harder than one holding 1%. Wallets that
-  exited hold nothing and get their own line instead.
-- **Transfers break cost basis.** Such wallets are flagged
-  `unknown basis` and counted, never guessed.
-- **Opening tax is not part of cost basis** - first-second buyers show
-  inflated PnL.
-- **Winrate is penalized on purpose:** `wins / (trades + 1)`, hidden
-  below two closed trades.
-- **Groups:** at most three, each no wider than 5 percentage points,
-  chosen to maximize the supply share inside.
-- Dust (balance under $50) is hidden. Dollar figures use one keyless
-  request to a public ETH/USD spot API (`ETH_USD=...` overrides it for
-  fully offline runs).
+- **PnL per token, not per wallet balance.** `pnl = sold_proceeds + value_now - bought_cost`, realized and unrealized in one number. An ETH top-up between trades cannot leak into it.
+- **The trader is the token movement, never `tx.from`.** The transaction signer is almost always a relayer; buys and sells are detected by which side of the market the tokens crossed.
+- **Averages are supply-weighted.** A wallet holding 5% of supply moves the token average five times harder than one holding 1%. Wallets that exited hold nothing, so they get their own line instead of steering the current picture.
+- **Transfers break cost basis.** Tokens that arrived by transfer have no honest entry price; such wallets are flagged `unknown basis` and counted, never guessed. A microscopic cost basis (a few wei) is flagged the same way instead of printing astronomical percentages.
+- **Opening tax is not part of cost basis**, so first-second buyers show inflated PnL - stated, not hidden.
+- **Winrate is penalized on purpose:** `wins / (trades + 1)`. One virtual losing trade cuts a newcomer's percentage and dissolves for a veteran; below two closed trades the winrate is not shown at all.
+- **Groups:** at most three per token, each no wider than 5 percentage points, chosen to maximize the share of supply inside.
+- Dust (balance under $50) is hidden from the stats. Dollar figures use one keyless request to a public ETH/USD spot API; `ETH_USD=…` overrides it for fully offline runs.
+
+The full spec lives in [docs/SPEC.md](docs/SPEC.md), the decisions on top of it in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Project map
 
-```
-bin/xray.mjs           CLI entry
+```text
+bin/xray.mjs             CLI: check, wallet, doctor, demo, serve
 lib/
-  chain.ts             chain constants, verified by doctor
-  providers/           the source boundary: rpc (A) and bitquery (B)
-  read/                token snapshot, holders, launches, wallets
-  pnl/                 pure math: classify, position, groups, aggregate
-  profile/             winrate, badges, wallet profile
-  grade.ts             healthy / cracked / shattered
-  card.ts              1080x1080 share card with the grade skeleton
-  cache.ts             SQLite: token ledger, launch index, profiles
-  format.ts            text / json / markdown
-assets/brand/          sprites, fonts, generators (render_*.py)
-test/                  node --test, offline on fixtures
+  chain.ts               chain constants, verified by doctor
+  providers/             the source boundary: gate, adaptive logs, rpc (A), bitquery (B)
+  read/                  token snapshot, header, launches, wallets
+  pnl/                   pure math: classify, position, groups, aggregate
+  profile/               winrate, badges, wallet profile
+  grade.ts               healthy / cracked / shattered
+  card.ts                1080x1080 share card with the grade skeleton
+  cache.ts               SQLite: token ledger, launch index, 24h profile cache
+  format.ts              text / json / markdown
+assets/brand/            the art pack: sprites, fonts, generators (render_*.py)
+assets/readme/           SVG views rendered from real command output (npm run render:readme)
+test/                    node --test, offline, fixtures snapped from the live chain
+.github/workflows/       ci.yml: typecheck, tests, no-signer
 ```
 
-The math in `lib/pnl/` and `lib/profile/` is pure functions with no
-network access. Data sources sit behind one interface; everything above
-it cannot tell mode A from mode B.
+The math in `lib/pnl/` and `lib/profile/` is pure functions with no network access, tested on fixtures. Data sources sit behind one interface; everything above it cannot tell mode A from mode B.
 
 ## Boundaries
 
-- Read-only, forever: no keys, no signing, no transactions. A dedicated
-  CI job enforces it.
-- No external calls beyond the chain RPC (and one keyless ETH/USD spot
-  request, override with `ETH_USD`).
+- **Read-only, forever.** No keys, no signing, no transactions. A dedicated CI job greps the source for signing code on every commit and fails the build on a match.
+- No external calls beyond the chain RPC and one keyless ETH/USD spot request (`ETH_USD` overrides it).
 - `demo` runs offline and requires nothing.
-- Demo output is always marked `DEMO` - fixtures are never passed off as
-  the live chain.
+- Synthetic output is always marked DEMO - fixtures are never passed off as the live chain.
+- Exports refuse to overwrite existing files.
+
+MIT.

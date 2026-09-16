@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-09-16 15:50 UTC",
+  "token": "0x2ffab1d13717c9cd72c497febd08aa5b7b8648f0",
+  "output": [
+    "note: wallet profiles are disabled in rpc mode (set BITQUERY_TOKEN to enable)",
+    "$FOMOPAD  0x2ffab1d13717c9cd72c497febd08aa5b7b8648f0  age 58m  phase graduated",
+    "mcap $413k   liquidity $49k   volume 24h $990k   holders 1 964",
+    "",
+    "avg pnl  +117%        across 1012 wallets",
+    "",
+    "group 1   +46..51%   7% of supply   70 wallets",
+    "group 2   +31..36%   5% of supply   109 wallets",
+    "group 3   +67..72%   5% of supply   60 wallets",
+    "",
+    "top holders",
+    "  #1  0x4fa6..5b86   1.0% supply   pnl +493%",
+    "  #2  0x4290..6623   0.8% supply   pnl +452%",
+    "  #3  0x41b4..7972   0.7% supply   pnl +750%",
+    "  #4  0x5415..d730   0.7% supply   pnl +309%",
+    "  #5  0x5565..f98c   0.7% supply   pnl +222%",
+    "",
+    "exited      981 wallets, avg pnl +26%",
+    "excluded    dust 729 wallets, unknown basis 223 wallets (5.5% supply), infra 3 addresses",
+    "",
+    "source rpc   176 requests   50.0s"
+  ]
+}
