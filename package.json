@@ -11,7 +11,8 @@
     "test": "node --test --import tsx \"test/*.test.mjs\"",
     "typecheck": "tsc",
     "cli": "tsx bin/xray.mjs",
-    "render:readme": "tsx scripts/render-readme.mjs"
+    "render:readme": "tsx scripts/render-readme.mjs",
+    "render:banner": "tsx scripts/render-banner.mjs"
   },
   "repository": {
     "type": "git",

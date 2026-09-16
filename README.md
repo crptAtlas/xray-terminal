@@ -1,4 +1,5 @@
 <p align="center"><img src="assets/brand/logo-sprite.png" width="128" alt="xray pixel skull"></p>
+<p align="center"><img src="assets/brand/banner.png" width="100%" alt="XRAY - shows who is actually in profit in a token. $XRAY, holder pnl terminal for pons v2, read-only"></p>
 
 <p align="center">
   <a href="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml"><img src="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
