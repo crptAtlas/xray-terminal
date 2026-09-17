@@ -21,7 +21,7 @@ browser → /api/scan?token=0x…            (Next route, Vercel)
    `findGroups`: at most three, five points wide, supply-weighted - the
    same rule the design shows) and the holders table.
 3. Phase 2 (mode B only) fills avg winrate, per-wallet profile columns
-   and the SMART / RICH badges, under the profile deadline; wallets that
+   and the SMART / WHALE badges, under the profile deadline; wallets that
    miss it come back `not read`.
 4. `/api/card` renders the same share card server-side with
    `@napi-rs/canvas` for OG unfurls on X and Telegram.
@@ -38,10 +38,9 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 - **SMART**: chain-wide record, mode B data: `trades >= 30` closed
   positions and `avg_pnl_per_trade >= +25%` and `winrate >= 55%`
   (winrate = wins / (trades + 1)). Thresholds in `lib/profile/badges.ts`.
-- **RICH**: `realized profit >= 5 ETH` total, or current wallet value
-  `>= 10 ETH` (ETH + open positions at last trade price).
-- **WHALE** (site fixture rule, to be kept when wiring): holds `>= 1%`
-  of supply.
+- **WHALE**: total wallet balance worth `>= $10,000` - native ETH plus
+  open token positions at their last trade price, any tokens. (Share of
+  one token's supply is not a badge.)
 - **Grade**: healthy = supply-weighted avg pnl above zero and most
   current holders in profit; shattered = most underwater or the token is
   dead (under 10 current holders); cracked = the middle.
@@ -51,7 +50,7 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 | # | Item | Unlocks | Where it goes |
 |---|---|---|---|
-| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Free plan today: rate-limited profiles (top holders fill in over repeat scans) and a ~4-5 day realtime window; a paid plan lifts the rps and the archive add-on deepens history | winrate, SMART/RICH badges, wallet page, tracer stage | Vercel env var + `.env` locally |
+| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Free plan today: rate-limited profiles (top holders fill in over repeat scans) and a ~4-5 day realtime window; a paid plan lifts the rps and the archive add-on deepens history | winrate, SMART/WHALE badges, wallet page, tracer stage | Vercel env var + `.env` locally |
 | 2 | Domain (e.g. buy the one you want, point it at Vercel) | real URL instead of xray-xi-puce.vercel.app, OG links | Vercel → Domains |
 | 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | `components/ca-block.tsx`, `CHART_URL` in `app/page.tsx` |
 | 4 | X / Telegram / public GitHub links | header and footer links | `components/header.tsx`, `components/footer.tsx` |

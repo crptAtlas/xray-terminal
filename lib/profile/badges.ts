@@ -1,23 +1,24 @@
 /**
- * Wallet badges (spec 3.5). Thresholds live here as config; >= semantics
- * on every boundary. smart is impossible below 30 closed trades.
+ * Wallet badges. Thresholds live here as config; >= semantics on every
+ * boundary. smart is impossible below 30 closed trades. whale is wealth:
+ * the wallet's total balance (ETH plus open token positions) worth
+ * $10,000 or more - not a share of any one token's supply.
  */
 
 export const BADGE_CONFIG = {
   smart: { avgPnlPct: 25, winrate: 55, trades: 30 },
-  rich: { realizedEth: 5, balanceEth: 10 },
+  whale: { balanceUsd: 10_000 },
 } as const;
 
 export interface BadgeInput {
   trades: number;
   avgPnlPerTrade: number | null;
   winrate: number | null;
-  realizedTotalEth: number;
-  balanceEth: number;
+  balanceUsd: number;
 }
 
-export function badges(p: BadgeInput, config = BADGE_CONFIG): ("smart" | "rich")[] {
-  const out: ("smart" | "rich")[] = [];
+export function badges(p: BadgeInput, config = BADGE_CONFIG): ("smart" | "whale")[] {
+  const out: ("smart" | "whale")[] = [];
   if (
     p.trades >= config.smart.trades &&
     p.avgPnlPerTrade !== null &&
@@ -27,8 +28,8 @@ export function badges(p: BadgeInput, config = BADGE_CONFIG): ("smart" | "rich")
   ) {
     out.push("smart");
   }
-  if (p.realizedTotalEth >= config.rich.realizedEth || p.balanceEth >= config.rich.balanceEth) {
-    out.push("rich");
+  if (p.balanceUsd >= config.whale.balanceUsd) {
+    out.push("whale");
   }
   return out;
 }

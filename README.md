@@ -100,7 +100,7 @@ Two ways to run it, honestly different:
 
 **Mode A - free and slow (default).** The public RPC, no keys, no registration. Responses truncate at 10,000 logs and a request takes 1.6-3.2s regardless of size, so a 1,000-holder token computes in ~10-20s with parallel windows; repeats are near-instant from the incremental cache. Works: holder PnL, groups, supply-weighted averages, header, cards. Does not work: wallet-wide profiles, badges, token winrate - finding every trade of a wallet would mean scanning the whole chain, so the CLI says so and skips them.
 
-**Mode B - paid and fast.** [Bitquery](https://bitquery.io), GraphQL, network `robinhood`, plans from $49/mo. Decoded Pons trades, holder and balance APIs; everything works, including `[smart]` and `[rich]` wallet badges. Setup is one line:
+**Mode B - paid and fast.** [Bitquery](https://bitquery.io), GraphQL, network `robinhood`, plans from $49/mo. Decoded Pons trades, holder and balance APIs; everything works, including `[smart]` and `[whale]` wallet badges. Setup is one line:
 
 ```bash
 export BITQUERY_TOKEN=…

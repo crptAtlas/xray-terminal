@@ -159,7 +159,7 @@ export function makeRows(bias: number): HolderRowFixture[] {
     const wr = Math.round(30 + r() * 45 + bias * 8);
     const badges: { text: string; color: string }[] = [];
     if (wr >= 55) badges.push({ text: "SMART", color: "#78DCFF" });
-    if (supply >= 1) badges.push({ text: "WHALE", color: "#FFD640" });
+    if (r() > 0.75) badges.push({ text: "WHALE", color: "#FFD640" }); // demo: $10k+ total balance
     if (!badges.length && r() > 0.6) badges.push({ text: r() > 0.5 ? "FIRST TRADE" : "TRANSFER IN", color: "#6E8291" });
     const col = (v: number) => (v > 20 ? "#60F080" : v < -20 ? "#FF605C" : "#FFD640");
     const fmt = (v: number) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%";

@@ -1,6 +1,7 @@
 import type { Cache } from "../cache.ts";
 import type { BitqueryProvider } from "../providers/bitquery.ts";
 import { buildPositions, profileFromPositions, type PositionSummary, type Profile } from "../profile/profile.ts";
+import { ethUsd } from "../usd.ts";
 
 /**
  * Wallet profiles through the global 24h cache. The cache stores per-token
@@ -41,8 +42,9 @@ export async function walletProfile(
   wallet: string,
   excludeToken?: string,
 ): Promise<Profile> {
+  const rate = await ethUsd().catch(() => 0);
   const cached = readCached(cache, wallet);
-  if (cached) return profileFromPositions(wallet, cached.positions, BigInt(cached.ethWei), excludeToken);
+  if (cached) return profileFromPositions(wallet, cached.positions, BigInt(cached.ethWei), excludeToken, rate);
 
   const [byToken, ethWei] = await Promise.all([
     provider.walletTrades(wallet),
@@ -50,7 +52,7 @@ export async function walletProfile(
   ]);
   const positions = buildPositions(byToken, ledgerRemaining(byToken));
   cache.saveProfile(wallet, JSON.stringify({ positions, ethWei: ethWei.toString() } satisfies CachedWallet));
-  return profileFromPositions(wallet, positions, ethWei, excludeToken);
+  return profileFromPositions(wallet, positions, ethWei, excludeToken, rate);
 }
 
 /**
@@ -68,10 +70,11 @@ export async function walletProfilesBatch(
 ): Promise<Map<string, Profile>> {
   const out = new Map<string, Profile>();
   const deadline = Date.now() + deadlineMs;
+  const rate = await ethUsd().catch(() => 0);
   const misses: string[] = [];
   for (const w of wallets) {
     const cached = readCached(cache, w);
-    if (cached) out.set(w, profileFromPositions(w, cached.positions, BigInt(cached.ethWei), excludeToken));
+    if (cached) out.set(w, profileFromPositions(w, cached.positions, BigInt(cached.ethWei), excludeToken, rate));
     else misses.push(w);
   }
   const CHUNK = 100;
@@ -91,7 +94,7 @@ export async function walletProfilesBatch(
         const positions = buildPositions(byToken, ledgerRemaining(byToken));
         const eth = ethWei.get(w.toLowerCase()) ?? 0n;
         cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString() } satisfies CachedWallet));
-        out.set(w, profileFromPositions(w, positions, eth, excludeToken));
+        out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
       }
     } catch (err) {
       failures++;

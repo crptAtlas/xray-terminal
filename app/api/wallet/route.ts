@@ -7,7 +7,7 @@ import { cachePath } from "../../../lib/site/live";
 export const maxDuration = 60;
 
 // One wallet, read (mode B): the wallet's Pons record via Bitquery -
-// per-token trades, closed positions, winrate, badges. 24h cached.
+// per-token trades, closed positions, winrate, SMART/WHALE badges. 24h cached.
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const wallet = (req.nextUrl.searchParams.get("address") ?? "").trim().toLowerCase();
   if (!looksLikeAddress(wallet)) {

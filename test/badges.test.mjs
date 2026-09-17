@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { badges } from "../lib/profile/badges.ts";
 
-const base = { trades: 30, avgPnlPerTrade: 25, winrate: 55, realizedTotalEth: 0, balanceEth: 0 };
+const base = { trades: 30, avgPnlPerTrade: 25, winrate: 55, balanceUsd: 0 };
 
 test("smart exactly at every threshold", () => {
   assert.deepEqual(badges(base), ["smart"]);
@@ -15,12 +15,11 @@ test("smart denied one notch below each threshold", () => {
   assert.deepEqual(badges({ ...base, avgPnlPerTrade: null }), []);
 });
 
-test("rich via realized OR balance", () => {
-  assert.deepEqual(badges({ ...base, trades: 0, avgPnlPerTrade: null, winrate: null, realizedTotalEth: 5 }), ["rich"]);
-  assert.deepEqual(badges({ ...base, trades: 0, avgPnlPerTrade: null, winrate: null, balanceEth: 10 }), ["rich"]);
-  assert.deepEqual(badges({ ...base, trades: 0, avgPnlPerTrade: null, winrate: null, realizedTotalEth: 4.99, balanceEth: 9.99 }), []);
+test("whale is wealth: 10k usd total balance, any tokens", () => {
+  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 10_000 }), ["whale"]);
+  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 9_999 }), []);
 });
 
 test("both badges together", () => {
-  assert.deepEqual(badges({ ...base, realizedTotalEth: 6 }), ["smart", "rich"]);
+  assert.deepEqual(badges({ ...base, balanceUsd: 25_000 }), ["smart", "whale"]);
 });

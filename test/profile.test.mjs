@@ -31,10 +31,13 @@ test("balance = eth + open positions at last trade price", () => {
   assert.ok(Math.abs(p.balanceEth - 2.5) < 1e-9);
 });
 
-test("rich badge from balance", () => {
+test("whale badge from a 10k usd balance", () => {
   const byToken = new Map([["0xt1", [buy(T(100), E(1))]]]);
-  const p = buildProfile("0xw", byToken, () => 0n, E(12));
-  assert.deepEqual(p.badges, ["rich"]);
+  // 5 ETH at $2400 = $12k -> whale; rate 0 -> never a whale
+  const p = buildProfile("0xw", byToken, () => 0n, E(5), () => 18, undefined, 2400);
+  assert.deepEqual(p.badges, ["whale"]);
+  const noRate = buildProfile("0xw", byToken, () => 0n, E(5));
+  assert.deepEqual(noRate.badges, []);
 });
 
 test("empty history", () => {
@@ -65,11 +68,11 @@ test("the scanned token is excluded from the profile: insiders get no credit fro
 
 test("badges still judge the full record including the scanned token", async () => {
   const { buildPositions, profileFromPositions } = await import("../lib/profile/profile.ts");
-  // 6 ETH realized on the scanned token alone -> RICH holds even when the
-  // shown stats exclude it
-  const byToken = new Map([["0xscanned", [buy(T(100), E(1)), sell(T(100), E(7))]]]);
-  const positions = buildPositions(byToken, () => 0n);
-  const p = profileFromPositions("0xw", positions, 0n, "0xscanned");
+  // a fat open position on the scanned token alone -> WHALE holds even
+  // when the shown stats exclude it
+  const byToken = new Map([["0xscanned", [buy(T(100), E(5))]]]);
+  const positions = buildPositions(byToken, () => T(100));
+  const p = profileFromPositions("0xw", positions, 0n, "0xscanned", 2400);
   assert.equal(p.trades, 0); // shown stats exclude the token
-  assert.deepEqual(p.badges, ["rich"]); // the badge does not
+  assert.deepEqual(p.badges, ["whale"]); // the badge does not
 });

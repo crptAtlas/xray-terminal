@@ -93,7 +93,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     pnlNum: r.position.pnlPct,
     avgPnl: null,
     winrate: null,
-    badges: r.supplyShare >= 0.01 ? [{ text: "WHALE", color: "#FFD640" }] : [],
+    badges: [], // SMART / WHALE arrive with the profile phase
   }));
 
   const exitedAvg = a.exited.avgPnlPct;
@@ -186,10 +186,7 @@ function withProfiles(
   const holders = scan.holders.map((r) => {
     const p = profiles.get(r.addrFull);
     if (!p || p.notRead) return r;
-    const badges = [...r.badges];
-    for (const b of p.badges) {
-      badges.unshift({ text: b.toUpperCase(), color: b === "smart" ? "#78DCFF" : "#FFD640" });
-    }
+    const badges = p.badges.map((b) => ({ text: b.toUpperCase(), color: b === "smart" ? "#78DCFF" : "#FFD640" }));
     return {
       ...r,
       avgPnl: p.avgPnlPerTrade === null ? null : pct(p.avgPnlPerTrade),

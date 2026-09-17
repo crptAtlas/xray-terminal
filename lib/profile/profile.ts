@@ -37,7 +37,7 @@ export interface Profile {
   winrate: number | null;
   realizedTotalEth: number;
   balanceEth: number;
-  badges: ("smart" | "rich")[];
+  badges: ("smart" | "whale")[];
   notRead?: boolean;
 }
 
@@ -98,6 +98,7 @@ export function profileFromPositions(
   positions: PositionSummary[],
   ethWei: bigint,
   excludeToken?: string,
+  ethUsdRate = 0, // 0 = whale badge cannot trigger (rate unknown)
 ): Profile {
   const shown = foldStats(positions, excludeToken?.toLowerCase());
   // badges judge the full record, the scanned token included
@@ -116,8 +117,7 @@ export function profileFromPositions(
       trades: full.closed,
       avgPnlPerTrade: full.avg,
       winrate: full.wr,
-      realizedTotalEth: Number(full.realizedWei) / 1e18,
-      balanceEth: Number(ethWei + full.openValueWei) / 1e18,
+      balanceUsd: (Number(ethWei + full.openValueWei) / 1e18) * ethUsdRate,
     }),
   };
 }
@@ -129,6 +129,7 @@ export function buildProfile(
   ethWei: bigint,
   decimalsOf: (token: string) => number = () => 18,
   excludeToken?: string,
+  ethUsdRate = 0,
 ): Profile {
-  return profileFromPositions(wallet, buildPositions(byToken, remainingOf, decimalsOf), ethWei, excludeToken);
+  return profileFromPositions(wallet, buildPositions(byToken, remainingOf, decimalsOf), ethWei, excludeToken, ethUsdRate);
 }
