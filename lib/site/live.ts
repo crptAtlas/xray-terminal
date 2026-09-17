@@ -1,8 +1,10 @@
 import { Cache } from "../cache.ts";
 import { check, type PhaseOne } from "../check.ts";
+import type { Profile } from "../profile/profile.ts";
+import type { Aggregates } from "../pnl/aggregate.ts";
 import { fmtAge, fmtUsd, isDead, DEAD_HOLDERS_MIN } from "../format.ts";
 import { gradeOf, type Grade } from "../grade.ts";
-import { RpcProvider, makeClient } from "../providers/rpc.ts";
+import { RpcProvider, makeClient, pickProvider } from "../providers/rpc.ts";
 import { resolveTicker, looksLikeAddress } from "../read/launches.ts";
 import type { StageEvent } from "../stages.ts";
 import type { CardData } from "./types";
@@ -161,12 +163,52 @@ export async function resolveQuery(q: string, cache: Cache): Promise<ResolveOutc
   };
 }
 
+/** Fold the profile phase (mode B) into a finished phase-1 scan. */
+function withProfiles(
+  scan: LiveScan,
+  profiles: Map<string, Profile>,
+  aggregates: Aggregates,
+  seconds: number,
+  requests: number,
+): LiveScan {
+  const holders = scan.holders.map((r) => {
+    const p = profiles.get(r.addrFull);
+    if (!p || p.notRead) return r;
+    const badges = [...r.badges];
+    for (const b of p.badges) {
+      badges.unshift({ text: b.toUpperCase(), color: b === "smart" ? "#78DCFF" : "#FFD640" });
+    }
+    return {
+      ...r,
+      avgPnl: p.avgPnlPerTrade === null ? null : pct(p.avgPnlPerTrade),
+      winrate: p.winrate === null ? null : p.winrate.toFixed(0) + "%",
+      badges,
+    };
+  });
+  const wr = aggregates.avgWinrate;
+  return {
+    ...scan,
+    holders,
+    verdict: {
+      ...scan.verdict,
+      winrate: wr === null ? null : wr.toFixed(0) + "%",
+      traced: aggregates.winrateWallets,
+    },
+    card: { ...scan.card, winrate: wr === null ? "—" : wr.toFixed(0) + "%" },
+    source: { ...scan.source, label: "rpc + bitquery", requests, seconds },
+  };
+}
+
 // One in-flight scan per token per process: concurrent viewers (the SSE
 // terminal, the OG card route, a second tab) subscribe to the same run
 // instead of racing each other for RPC slots and the SQLite writer.
 const inflight = new Map<string, { promise: Promise<LiveScan>; listeners: Set<(e: StageEvent) => void> }>();
 
-export function runScan(address: string, onStage: (e: StageEvent) => void): Promise<LiveScan> {
+export function runScan(
+  address: string,
+  onStage: (e: StageEvent) => void,
+  onPhase?: (partial: LiveScan) => void,
+): Promise<LiveScan> {
   const key = address.toLowerCase();
   const existing = inflight.get(key);
   if (existing) {
@@ -175,19 +217,26 @@ export function runScan(address: string, onStage: (e: StageEvent) => void): Prom
   }
   const listeners = new Set<(e: StageEvent) => void>([onStage]);
   const promise = (async () => {
-    const provider = new RpcProvider();
+    const provider = await pickProvider();
     const cache = new Cache(cachePath());
     const t0 = Date.now();
     try {
+      let scan: LiveScan | null = null;
       for await (const phase of check(provider, cache, key as `0x${string}`, {
-        profiles: false,
+        profiles: true,
+        profileLimit: 20,
+        profileDeadlineMs: 45_000,
         onStage: (e) => listeners.forEach((fn) => fn(e)),
       })) {
         if (phase.phase === 1) {
-          return toLiveScan(phase, (Date.now() - t0) / 1000, provider.stats().requests);
+          scan = toLiveScan(phase, (Date.now() - t0) / 1000, provider.stats().requests);
+          onPhase?.(scan);
+        } else if (scan) {
+          scan = withProfiles(scan, phase.profiles, phase.aggregates, (Date.now() - t0) / 1000, provider.stats().requests);
         }
       }
-      throw new Error("scan produced no result");
+      if (!scan) throw new Error("scan produced no result");
+      return scan;
     } finally {
       cache.close();
       inflight.delete(key);

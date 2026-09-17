@@ -8,9 +8,25 @@ import { AgentGif } from "./motion";
 // its four states (empty / running / result / error). Fixture result until
 // mode B (Bitquery) is live; the layout and contracts are final.
 
-type View = "empty" | "running" | "result" | "error";
+type View = "empty" | "running" | "result" | "live-result" | "error";
 
 const DEMO_WALLET = "0x3f9a71c0e8b2d4a6f51c93e0a7b2d8f4c6e1c21e";
+
+interface LiveWallet {
+  addr: string;
+  trades: number;
+  wins: number;
+  avgPnl: string | null;
+  winrate: string | null;
+  realized: string;
+  realizedPositive: boolean;
+  balance: string;
+  badges: string[];
+  tokensTouched: number;
+  openPositions: number;
+  tokens: { token: string; trades: number; status: string; pnl: string; pnlNum: number | null }[];
+  window: string;
+}
 
 const TOKENS: [string, string, string, number, string, "HEALTHY" | "CRACKED" | "SHATTERED"][] = [
   ["$MARROW", "holding · 3h", "4.21%", 184.2, "3h 12m", "HEALTHY"],
@@ -29,6 +45,8 @@ const GC = { HEALTHY: "#60F080", CRACKED: "#FFD640", SHATTERED: "#FF605C" } as c
 export function Holders() {
   const [view, setView] = useState<View>("empty");
   const [query, setQuery] = useState("");
+  const [liveData, setLiveData] = useState<LiveWallet | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -36,12 +54,29 @@ export function Holders() {
   }, []);
 
   const check = (raw?: string) => {
-    const q = (raw ?? query).trim();
+    const q = (raw ?? query).trim().toLowerCase();
     setQuery(q);
+    setLiveError(null);
     if (!/^0x[0-9a-f]{40}$/i.test(q)) return setView("error");
+    if (q === DEMO_WALLET) {
+      // the design tour wallet stays on fixtures
+      setView("running");
+      if (t.current) clearTimeout(t.current);
+      t.current = setTimeout(() => setView("result"), 2200);
+      return;
+    }
     setView("running");
-    if (t.current) clearTimeout(t.current);
-    t.current = setTimeout(() => setView("result"), 2200);
+    fetch(`/api/wallet?address=${q}`)
+      .then(async (res) => {
+        const body = (await res.json()) as LiveWallet & { error?: string };
+        if (!res.ok || body.error) throw new Error(body.error ?? `http ${res.status}`);
+        setLiveData(body);
+        setView("live-result");
+      })
+      .catch((err: Error) => {
+        setLiveError(err.message);
+        setView("error");
+      });
   };
 
   const tokens = TOKENS.map((x) => ({
@@ -98,8 +133,8 @@ export function Holders() {
         {view === "error" && (
           <div style={{ border: "1px solid var(--loss)", background: "var(--bg-panel)", padding: "14px 16px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ fontSize: 13, color: "var(--loss)", fontWeight: 700 }}>not an address</div>
-              <div style={{ fontSize: 12, color: "var(--text)" }}>a wallet address is 42 characters starting with 0x. contracts and ENS names are not supported yet.</div>
+              <div style={{ fontSize: 13, color: "var(--loss)", fontWeight: 700 }}>{liveError ? "could not read the wallet" : "not an address"}</div>
+              <div style={{ fontSize: 12, color: "var(--text)" }}>{liveError ?? "a wallet address is 42 characters starting with 0x. contracts and ENS names are not supported yet."}</div>
             </div>
             <button
               onClick={() => {
@@ -145,6 +180,65 @@ export function Holders() {
             <div style={{ fontSize: 12, color: "var(--bone-light)" }}>following this wallet across every Pons token it touched…</div>
           </div>
         </div>
+      )}
+
+      {view === "live-result" && liveData && (
+        <>
+          <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "16px 20px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 18, lineHeight: 1, color: "var(--bone-bright)", letterSpacing: ".02em" }}>{liveData.addr.slice(0, 10)}…{liveData.addr.slice(-4)}</span>
+              <a href={`https://robinhood.blockscout.com/address/${liveData.addr}`} target="_blank" rel="noopener" style={{ fontSize: 12 }}>blockscout</a>
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{liveData.tokensTouched} Pons tokens in the {""}window · {liveData.openPositions} still open</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {liveData.badges.map((b) => (
+                <span key={b} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b === "SMART" ? "var(--accent)" : "var(--neutral)"}`, color: b === "SMART" ? "var(--accent)" : "var(--neutral)", padding: "2px 6px" }}>{b}</span>
+              ))}
+              {liveData.badges.length === 0 && <span style={{ fontSize: 11, color: "var(--text-dim)" }}>no badges</span>}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 1, background: "var(--border)", border: "1px solid var(--border)" }}>
+            {[
+              ["avg pnl per trade", liveData.avgPnl ?? "—", `over ${liveData.trades} closed trades`, liveData.avgPnl?.startsWith("+") ? "var(--profit)" : liveData.avgPnl ? "var(--loss)" : "var(--bone-dark)"],
+              ["winrate", liveData.winrate ?? "—", liveData.winrate ? "wins / (trades + 1)" : "needs 2+ closed trades", liveData.winrate ? "var(--bone-bright)" : "var(--bone-dark)"],
+              ["closed trades", String(liveData.trades), `${liveData.wins} wins · ${liveData.tokensTouched} tokens`, "var(--bone-bright)"],
+              ["realized pnl", liveData.realized, `wallet now holds ${liveData.balance}`, liveData.realizedPositive ? "var(--profit)" : "var(--loss)"],
+            ].map(([t2, v, sub, color]) => (
+              <div key={t2 as string} style={{ background: "var(--bg-panel)", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>{t2}</div>
+                <div className="tabular" style={{ fontWeight: 700, fontSize: 44, lineHeight: 1, color: color as string, letterSpacing: "-.03em", whiteSpace: "nowrap" }}>{v}</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)" }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
+              <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>PONS TOKENS</div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>newest first · every row opens the token in the terminal</div>
+            </div>
+            <div className="tabular" style={{ fontSize: 13, borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr .8fr .9fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>
+                <span>token</span>
+                <span>status</span>
+                <span style={{ textAlign: "right" }}>trades</span>
+                <span style={{ textAlign: "right" }}>realized pnl</span>
+              </div>
+              {liveData.tokens.map((tk) => (
+                <Link key={tk.token} href={`/terminal?token=${tk.token}`} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr .8fr .9fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", alignItems: "center", color: "inherit", textShadow: "none" }}>
+                  <span style={{ color: "var(--bone-light)" }}>{tk.token.slice(0, 10)}…{tk.token.slice(-4)}</span>
+                  <span style={{ color: "var(--text-dim)" }}>{tk.status}</span>
+                  <span style={{ textAlign: "right", color: "var(--text)" }}>{tk.trades}</span>
+                  <span style={{ textAlign: "right", color: tk.pnlNum === null ? "var(--text-dim)" : tk.pnlNum > 20 ? "var(--profit)" : tk.pnlNum < -20 ? "var(--loss)" : "var(--neutral)" }}>{tk.pnl}</span>
+                </Link>
+              ))}
+            </div>
+            <div style={{ padding: "14px 24px", fontSize: 12, color: "var(--text-dim)" }}>
+              history covers the {liveData.window} · open positions get their pnl in the terminal scan
+            </div>
+          </div>
+        </>
       )}
 
       {view === "result" && (

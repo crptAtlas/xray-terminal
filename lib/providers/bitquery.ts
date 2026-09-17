@@ -1,87 +1,54 @@
-import type { Hex } from "../chain.ts";
+import { ADDR, ZERO, type Hex } from "../chain.ts";
 import { RpcProvider } from "./rpc.ts";
-import type { Provider, QuoteEvent, RawTransfer, TokenActivity, TokenMeta } from "./provider.ts";
+import type { Provider, TokenActivity, TokenMeta } from "./provider.ts";
 import type { Trade } from "../pnl/classify.ts";
 
 /**
- * Mode B: Bitquery streaming GraphQL, network `robinhood`. Pons is indexed
- * there: CurveBuy/CurveSell arrive decoded and the same trades sit in the
- * DEX trades cube as protocol `pons_v2` with USD prices. The trades cube
- * keeps roughly the last 30 days; deeper history needs their archive
- * add-on, so a wallet's averages are month-scoped.
+ * Mode B: Bitquery streaming GraphQL, network `robinhood`, verified against
+ * the live schema. Token scans stay on the RPC (exact, free); Bitquery
+ * answers the one question the RPC cannot: every trade of a wallet across
+ * every Pons token, which powers winrate, badges and wallet profiles.
  *
- * Cheap point reads (token meta, current price, reserves) still go through
- * the public RPC - they are single eth_calls and free. Bitquery carries
- * everything bulky: token trade history, balances and the wallet-wide
- * trade history that the RPC cannot answer at all.
+ * How a wallet's history is rebuilt: token Transfers touching the wallet
+ * (the trader is the token movement - Buyer/Seller in the trade cubes are
+ * relayers and pool contracts on this chain), joined with DEXTradeByTokens
+ * rows of the same transactions for the ETH quote. A transfer with no
+ * trade in its transaction is a plain transfer: no cost basis, skipped.
  *
- * Live verification of this provider is pending a Bitquery account; the
- * response mapping is pinned by tests on canned responses. The token comes
- * only from the BITQUERY_TOKEN env var - never from the repo.
+ * The `realtime` dataset spans only the last several days (the archive
+ * add-on unlocks deeper history), so a wallet's averages are windowed to
+ * what the plan covers. The token comes from BITQUERY_TOKEN, never the repo.
  */
 
 export const BITQUERY_URL = "https://streaming.bitquery.io/graphql";
 
-const TOKEN_TRADES_QUERY = `
-query ($token: String!, $since: DateTime) {
-  EVM(network: robinhood, dataset: combined) {
-    DEXTrades(
-      where: {Trade: {Currency: {SmartContract: {is: $token}}}, Block: {Time: {since: $since}}}
-      orderBy: {ascending: Block_Number}
-      limit: {count: 25000}
-    ) {
-      Block { Number }
-      Transaction { Hash }
-      Trade {
-        Buy { Amount Buyer Currency { SmartContract } }
-        Sell { Amount Seller Currency { SmartContract } }
-      }
-    }
-  }
-}`;
-
-const TOKEN_TRANSFERS_QUERY = `
-query ($token: String!, $since: DateTime) {
-  EVM(network: robinhood, dataset: combined) {
-    Transfers(
-      where: {Transfer: {Currency: {SmartContract: {is: $token}}}, Block: {Time: {since: $since}}}
-      orderBy: {ascending: Block_Number}
-      limit: {count: 25000}
-    ) {
-      Block { Number }
-      Transaction { Hash }
-      Transfer { Amount Sender Receiver }
-    }
-  }
-}`;
-
-const BALANCES_QUERY = `
-query ($token: String!) {
-  EVM(network: robinhood, dataset: combined) {
-    BalanceUpdates(
-      where: {Currency: {SmartContract: {is: $token}}}
-      orderBy: {descendingByField: "balance"}
-      limit: {count: 25000}
-    ) {
-      BalanceUpdate { Address }
-      balance: sum(of: BalanceUpdate_Amount)
-    }
-  }
-}`;
-
-const WALLET_TRADES_QUERY = `
+const WALLET_TRANSFERS_QUERY = `
 query ($wallet: String!) {
-  EVM(network: robinhood, dataset: combined) {
-    DEXTrades(
-      where: {any: [{Trade: {Buy: {Buyer: {is: $wallet}}}}, {Trade: {Sell: {Seller: {is: $wallet}}}}]}
+  EVM(network: robinhood, dataset: realtime) {
+    Transfers(
+      where: {any: [{Transfer: {Sender: {is: $wallet}}}, {Transfer: {Receiver: {is: $wallet}}}], Transfer: {Currency: {Fungible: true}}}
       orderBy: {ascending: Block_Number}
-      limit: {count: 25000}
+      limit: {count: 5000}
     ) {
       Block { Number }
       Transaction { Hash }
+      Transfer { Amount Sender Receiver Currency { SmartContract } }
+    }
+  }
+}`;
+
+const QUOTES_BY_TX_QUERY = `
+query ($hashes: [String!]) {
+  EVM(network: robinhood, dataset: realtime) {
+    DEXTradeByTokens(
+      where: {Transaction: {Hash: {in: $hashes}}, Trade: {Side: {Currency: {SmartContract: {is: "0x0000000000000000000000000000000000000000"}}}}}
+      limit: {count: 5000}
+    ) {
+      Transaction { Hash }
       Trade {
-        Buy { Amount Buyer Currency { SmartContract } }
-        Sell { Amount Seller Currency { SmartContract } }
+        Currency { SmartContract }
+        Amount
+        Side { Amount }
       }
     }
   }
@@ -89,27 +56,18 @@ query ($wallet: String!) {
 
 // --- response shapes (the mapping contract, pinned by tests) ---
 
-export interface BqTradeRow {
-  Block: { Number: string };
-  Transaction: { Hash: string };
-  Trade: {
-    Buy: { Amount: string; Buyer: string; Currency: { SmartContract: string } };
-    Sell: { Amount: string; Seller: string; Currency: { SmartContract: string } };
-  };
-}
-
 export interface BqTransferRow {
   Block: { Number: string };
   Transaction: { Hash: string };
-  Transfer: { Amount: string; Sender: string; Receiver: string };
+  Transfer: { Amount: string; Sender: string; Receiver: string; Currency: { SmartContract: string } };
 }
 
-export interface BqBalanceRow {
-  BalanceUpdate: { Address: string };
-  balance: string;
+export interface BqQuoteRow {
+  Transaction: { Hash: string };
+  Trade: { Currency: { SmartContract: string }; Amount: string; Side: { Amount: string } };
 }
 
-function toWei(amount: string, decimals: number): bigint {
+export function toWei(amount: string, decimals: number): bigint {
   // Bitquery amounts are decimal strings in whole-token units.
   const [int, frac = ""] = amount.split(".");
   const fracPadded = (frac + "0".repeat(decimals)).slice(0, decimals);
@@ -117,75 +75,40 @@ function toWei(amount: string, decimals: number): bigint {
 }
 
 /**
- * A pons_v2 cube row is one decoded trade: one side is the token, the other
- * the quote (ETH). Rebuild the (transfer, quote) pair our classifier eats,
- * so mode A and mode B run the identical pipeline.
+ * Rebuild a wallet's per-token trade ledger from its transfers plus the
+ * ETH quotes of the same transactions. Pons launches are uniformly 18
+ * decimals.
  */
-export function mapTokenTrades(
-  rows: BqTradeRow[],
-  token: string,
-  curve: string,
-  decimals: number,
-): { transfers: RawTransfer[]; quotes: QuoteEvent[] } {
-  const transfers: RawTransfer[] = [];
-  const quotes: QuoteEvent[] = [];
-  const t = token.toLowerCase();
-  let logIndex = 0;
-  for (const r of rows) {
-    const buySide = r.Trade.Buy;
-    const sellSide = r.Trade.Sell;
-    const tokenIsBuySide = buySide.Currency.SmartContract.toLowerCase() === t;
-    const block = BigInt(r.Block.Number);
-    const tx = r.Transaction.Hash as Hex;
-    if (tokenIsBuySide) {
-      // trader bought the token: tokens flow market -> buyer
-      const tokens = toWei(buySide.Amount, decimals);
-      const eth = toWei(sellSide.Amount, 18);
-      transfers.push({ from: curve, to: buySide.Buyer.toLowerCase(), tokens, block, tx, logIndex: logIndex++ });
-      quotes.push({ tx, kind: "curveBuy", eth, tokens });
-    } else {
-      const tokens = toWei(sellSide.Amount, decimals);
-      const eth = toWei(buySide.Amount, 18);
-      transfers.push({ from: sellSide.Seller.toLowerCase(), to: curve, tokens, block, tx, logIndex: logIndex++ });
-      quotes.push({ tx, kind: "curveSell", eth, tokens });
-    }
-  }
-  return { transfers, quotes };
-}
-
-export function mapWalletTrades(
-  rows: BqTradeRow[],
+export function mapWalletHistory(
   wallet: string,
-  decimalsOf: (token: string) => number,
+  transfers: BqTransferRow[],
+  quotes: BqQuoteRow[],
 ): Map<string, Trade[]> {
   const w = wallet.toLowerCase();
+  const quoteByTxToken = new Map<string, bigint>();
+  for (const q of quotes) {
+    const key = q.Transaction.Hash.toLowerCase() + ":" + q.Trade.Currency.SmartContract.toLowerCase();
+    quoteByTxToken.set(key, (quoteByTxToken.get(key) ?? 0n) + toWei(q.Trade.Side.Amount, 18));
+  }
   const out = new Map<string, Trade[]>();
-  for (const r of rows) {
-    const { Buy, Sell } = r.Trade;
-    const block = BigInt(r.Block.Number);
-    const tx = r.Transaction.Hash;
-    let token: string;
-    let trade: Trade;
-    if (Buy.Buyer.toLowerCase() === w) {
-      token = Buy.Currency.SmartContract.toLowerCase();
-      trade = { wallet: w, kind: "buy", tokens: toWei(Buy.Amount, decimalsOf(token)), eth: toWei(Sell.Amount, 18), block, tx };
-    } else if (Sell.Seller.toLowerCase() === w) {
-      token = Sell.Currency.SmartContract.toLowerCase();
-      trade = { wallet: w, kind: "sell", tokens: toWei(Sell.Amount, decimalsOf(token)), eth: toWei(Buy.Amount, 18), block, tx };
-    } else {
-      continue;
-    }
+  for (const t of transfers) {
+    const token = t.Transfer.Currency.SmartContract.toLowerCase();
+    if (token === ZERO || token === ADDR.weth) continue; // quote legs, not positions
+    const tx = t.Transaction.Hash.toLowerCase();
+    const eth = quoteByTxToken.get(tx + ":" + token);
+    if (eth === undefined) continue; // plain transfer: no honest cost basis
+    const inbound = t.Transfer.Receiver.toLowerCase() === w;
+    const trade: Trade = {
+      wallet: w,
+      kind: inbound ? "buy" : "sell",
+      tokens: toWei(t.Transfer.Amount, 18),
+      eth,
+      block: BigInt(t.Block.Number),
+      tx,
+    };
     const list = out.get(token) ?? [];
     list.push(trade);
     out.set(token, list);
-  }
-  return out;
-}
-
-export function mapBalances(rows: BqBalanceRow[], decimals: number): Map<string, bigint> {
-  const out = new Map<string, bigint>();
-  for (const r of rows) {
-    out.set(r.BalanceUpdate.Address.toLowerCase(), toWei(r.balance, decimals));
   }
   return out;
 }
@@ -207,75 +130,42 @@ export class BitqueryProvider implements Provider {
   }
 
   private async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    this.requests++;
-    const res = await this.fetchImpl(BITQUERY_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.token}`,
-      },
-      body: JSON.stringify({ query, variables }),
-    });
-    if (!res.ok) throw new Error(`bitquery http ${res.status}`);
-    const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-    if (body.errors?.length) throw new Error(`bitquery: ${body.errors[0]!.message}`);
-    if (!body.data) throw new Error("bitquery: empty response");
-    return body.data;
+    // the public plans rate-limit; back off and retry instead of failing
+    // the wallet outright
+    for (let attempt = 0; ; attempt++) {
+      this.requests++;
+      const res = await this.fetchImpl(BITQUERY_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      if (res.status === 429 && attempt < 4) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`bitquery http ${res.status}`);
+      const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
+      if (body.errors?.length) throw new Error(`bitquery: ${body.errors[0]!.message}`);
+      if (!body.data) throw new Error("bitquery: empty response");
+      return body.data;
+    }
   }
 
-  tokenMeta(address: Hex): Promise<TokenMeta> {
-    return this.rpc.tokenMeta(address);
+  // Token scans delegate to the RPC provider: exact, free and not limited
+  // to the realtime window. Bitquery carries the wallet histories.
+  tokenMeta(address: Hex, hint?: { createdBlock?: bigint }): Promise<TokenMeta> {
+    return this.rpc.tokenMeta(address, hint);
   }
 
-  async activity(token: TokenMeta, fromBlock: bigint): Promise<TokenActivity> {
-    // The cube is time-indexed; ask since the launch and let the caller's
-    // cache dedupe by block. 30-day cube window: on a young token this is
-    // everything; on an older one it is what Bitquery keeps.
-    const since = new Date(token.createdAt * 1000).toISOString();
-    const [tradesData, transfersData] = await Promise.all([
-      this.gql<{ EVM: { DEXTrades: BqTradeRow[] } }>(TOKEN_TRADES_QUERY, { token: token.address, since }),
-      this.gql<{ EVM: { Transfers: BqTransferRow[] } }>(TOKEN_TRANSFERS_QUERY, { token: token.address, since }),
-    ]);
-    const mapped = mapTokenTrades(tradesData.EVM.DEXTrades, token.address, token.curve, token.decimals);
-    // plain transfers (possible unknown-basis wallets); trades already carry
-    // their own synthetic transfers, so keep only rows whose tx has no trade
-    const tradeTxs = new Set(mapped.transfers.map((t) => t.tx));
-    let logIndex = 1_000_000;
-    const plain: RawTransfer[] = transfersData.EVM.Transfers.filter(
-      (r) => !tradeTxs.has(r.Transaction.Hash as Hex),
-    ).map((r) => ({
-      from: r.Transfer.Sender.toLowerCase(),
-      to: r.Transfer.Receiver.toLowerCase(),
-      tokens: toWei(r.Transfer.Amount, token.decimals),
-      block: BigInt(r.Block.Number),
-      tx: r.Transaction.Hash as Hex,
-      logIndex: logIndex++,
-    }));
-    const transfers = mapped.transfers.concat(plain).filter((t) => t.block >= fromBlock);
-    const toBlock = transfers.reduce((m, t) => (t.block > m ? t.block : m), fromBlock);
-    return { transfers, quotes: mapped.quotes, toBlock };
+  activity(token: TokenMeta, fromBlock: bigint): Promise<TokenActivity> {
+    return this.rpc.activity(token, fromBlock);
   }
 
-  async balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
-    const data = await this.gql<{ EVM: { BalanceUpdates: BqBalanceRow[] } }>(BALANCES_QUERY, {
-      token: token.address,
-    });
-    const all = mapBalances(data.EVM.BalanceUpdates, token.decimals);
-    const out = new Map<string, bigint>();
-    for (const w of wallets) out.set(w, all.get(w.toLowerCase()) ?? 0n);
-    return out;
-  }
-
-  async walletTrades(wallet: string): Promise<Map<string, Trade[]>> {
-    const data = await this.gql<{ EVM: { DEXTrades: BqTradeRow[] } }>(WALLET_TRADES_QUERY, {
-      wallet,
-    });
-    // decimals per token are unknown here; pons launches are uniformly 18
-    return mapWalletTrades(data.EVM.DEXTrades, wallet, () => 18);
-  }
-
-  async walletEthWei(wallet: string): Promise<bigint> {
-    return this.rpc.client.getBalance({ address: wallet as Hex });
+  balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
+    return this.rpc.balances(token, wallets);
   }
 
   priceNowEth(token: TokenMeta): Promise<number> {
@@ -286,8 +176,29 @@ export class BitqueryProvider implements Provider {
     return this.rpc.liquidityEth(token);
   }
 
+  async walletTrades(wallet: string): Promise<Map<string, Trade[]>> {
+    const w = wallet.toLowerCase();
+    const data = await this.gql<{ EVM: { Transfers: BqTransferRow[] } }>(WALLET_TRANSFERS_QUERY, { wallet: w });
+    const transfers = data.EVM.Transfers.filter((t) => {
+      const c = t.Transfer.Currency.SmartContract.toLowerCase();
+      return c !== ZERO && c !== ADDR.weth;
+    });
+    const hashes = [...new Set(transfers.map((t) => t.Transaction.Hash))];
+    const quotes: BqQuoteRow[] = [];
+    for (let i = 0; i < hashes.length; i += 100) {
+      const chunk = hashes.slice(i, i + 100);
+      const q = await this.gql<{ EVM: { DEXTradeByTokens: BqQuoteRow[] } }>(QUOTES_BY_TX_QUERY, { hashes: chunk });
+      quotes.push(...q.EVM.DEXTradeByTokens);
+    }
+    return mapWalletHistory(w, transfers, quotes);
+  }
+
+  async walletEthWei(wallet: string): Promise<bigint> {
+    return this.rpc.client.getBalance({ address: wallet as Hex });
+  }
+
   stats(): { label: string; requests: number } {
     const rpcReqs = this.rpc.stats().requests;
-    return { label: "bitquery", requests: this.requests + rpcReqs };
+    return { label: "rpc + bitquery", requests: this.requests + rpcReqs };
   }
 }

@@ -35,6 +35,8 @@ export type CheckPhase = PhaseOne | PhaseTwo;
 export interface CheckOpts {
   profiles?: boolean;
   profileDeadlineMs?: number;
+  /** Profile at most this many top holders (default: all). */
+  profileLimit?: number;
   onStage?: StageReporter;
 }
 
@@ -71,7 +73,7 @@ export async function* check(
   const { walletProfilesWithDeadline } = await import("./read/wallet.ts");
   const { BitqueryProvider } = await import("./providers/bitquery.ts");
   if (!(provider instanceof BitqueryProvider)) return;
-  const wallets = snapshot.holders.map((h) => h.wallet);
+  const wallets = snapshot.holders.slice(0, opts.profileLimit ?? snapshot.holders.length).map((h) => h.wallet);
   onStage({ agent: "tracer", status: "start" });
   const profiles = await walletProfilesWithDeadline(
     provider,

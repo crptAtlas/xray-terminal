@@ -39,7 +39,7 @@ export async function walletProfilesWithDeadline(
   cache: Cache,
   wallets: string[],
   deadlineMs: number,
-  concurrency = 8,
+  concurrency = 3,
 ): Promise<Map<string, Profile>> {
   const out = new Map<string, Profile>();
   const queue = wallets.slice();

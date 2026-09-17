@@ -34,7 +34,11 @@ export function GET(req: NextRequest): Response {
           send("picks", outcome.picks);
           return;
         }
-        const result = await runScan(outcome.address!, (e) => send("stage", e));
+        const result = await runScan(
+          outcome.address!,
+          (e) => send("stage", e),
+          (partial) => send("result", partial),
+        );
         send("result", result);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

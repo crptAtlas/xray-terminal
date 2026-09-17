@@ -51,7 +51,7 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 | # | Item | Unlocks | Where it goes |
 |---|---|---|---|
-| 1 | `BITQUERY_TOKEN` (plan from $49/mo, bitquery.io) | winrate, SMART/RICH badges, wallet page, tracer stage - everything mode B | Vercel env var + `.env` locally |
+| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Free plan today: rate-limited profiles (top holders fill in over repeat scans) and a ~4-5 day realtime window; a paid plan lifts the rps and the archive add-on deepens history | winrate, SMART/RICH badges, wallet page, tracer stage | Vercel env var + `.env` locally |
 | 2 | Domain (e.g. buy the one you want, point it at Vercel) | real URL instead of xray-xi-puce.vercel.app, OG links | Vercel → Domains |
 | 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | `components/ca-block.tsx`, `CHART_URL` in `app/page.tsx` |
 | 4 | X / Telegram / public GitHub links | header and footer links | `components/header.tsx`, `components/footer.tsx` |
