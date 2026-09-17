@@ -11,7 +11,7 @@ import type { CardData } from "./types";
 
 // Server-side bridge between the engine and the site. Mode A works with no
 // keys at all: holder pnl, bands, header, grade, card. Mode B (Bitquery)
-// adds winrate, badges and wallet profiles when BITQUERY_TOKEN is set.
+// adds winrate, badges and wallet profiles from the local trade index.
 
 const HINTS: Record<Grade, string> = {
   healthy: "holders in profit and they know how to trade",

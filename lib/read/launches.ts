@@ -24,11 +24,10 @@ export interface TickerMatch {
   block: bigint;
 }
 
-export async function resolveTicker(
-  client: PublicClient,
-  cache: Cache,
-  symbol: string,
-): Promise<TickerMatch[]> {
+/** Bring the launch index up to the chain head. Also fills the
+ * curve -> token map every profile build leans on, so a synced launch
+ * index means zero RPC round-trips to resolve curves. */
+export async function syncLaunches(client: PublicClient, cache: Cache): Promise<void> {
   const latest = await client.getBlockNumber();
   const tip = cache.launchesTip();
   if (tip < latest) {
@@ -68,6 +67,14 @@ export async function resolveTicker(
     }
     cache.appendLaunches(rows, latest);
   }
+}
+
+export async function resolveTicker(
+  client: PublicClient,
+  cache: Cache,
+  symbol: string,
+): Promise<TickerMatch[]> {
+  await syncLaunches(client, cache);
   return cache.findTicker(symbol);
 }
 

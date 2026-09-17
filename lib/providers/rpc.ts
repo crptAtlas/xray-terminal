@@ -433,7 +433,9 @@ export class RpcProvider implements Provider {
 }
 
 export async function pickProvider(flag?: "rpc" | "bitquery"): Promise<Provider> {
-  const wanted = flag ?? (process.env.BITQUERY_TOKEN ? "bitquery" : "rpc");
+  // The RPC path is the product: full history, no key, no rate budget.
+  // Bitquery stays available behind an explicit flag for benchmarking.
+  const wanted = flag ?? "rpc";
   if (wanted === "bitquery") {
     const { BitqueryProvider } = await import("./bitquery.ts");
     return new BitqueryProvider();

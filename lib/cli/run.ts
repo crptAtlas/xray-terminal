@@ -132,9 +132,12 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   const { makeClient } = await import("../providers/rpc.ts");
   const { Cache } = await import("../cache.ts");
   const { backfillTradeIndex, tradeIndexDepthDays } = await import("../read/indexer.ts");
+  const { syncLaunches } = await import("../read/launches.ts");
   const client = makeClient();
   const cache = new Cache();
   const t0 = Date.now();
+  console.error("syncing the launch index (curve -> token map)...");
+  await syncLaunches(client, cache);
   console.error("building the chain-wide trade index (resumable; ctrl-c any time)...");
   const res = await backfillTradeIndex(client, cache, {
     onProgress: (p) => {
