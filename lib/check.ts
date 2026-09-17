@@ -65,19 +65,23 @@ export async function* check(
   });
   yield { phase: 1, snapshot, header: hdr, groups, aggregates };
 
-  if (opts.profiles === false || !provider.supportsProfiles) {
-    onStage({ agent: "tracer", status: "skip", detail: "needs mode B" });
-    return;
-  }
+  if (opts.profiles === false) return;
 
   const { walletProfilesBatch } = await import("./read/wallet.ts");
-  const { BitqueryProvider } = await import("./providers/bitquery.ts");
-  if (!(provider instanceof BitqueryProvider)) return;
+  const { RpcProvider } = await import("./providers/rpc.ts");
+  const rpc =
+    provider instanceof RpcProvider
+      ? provider
+      : (provider as { rpc?: InstanceType<typeof RpcProvider> }).rpc;
+  if (!rpc) {
+    onStage({ agent: "tracer", status: "skip", detail: "no rpc source" });
+    return;
+  }
   const wallets = snapshot.holders.slice(0, opts.profileLimit ?? 1000).map((h) => h.wallet);
   onStage({ agent: "tracer", status: "start" });
   // the scanned token itself is excluded from every profile: insiders of
   // this launch must not decorate their stats with it
-  const profiles = await walletProfilesBatch(provider, cache, wallets, opts.profileDeadlineMs ?? 60_000, snapshot.meta.address);
+  const profiles = await walletProfilesBatch(rpc, cache, wallets, opts.profileDeadlineMs ?? 60_000, snapshot.meta.address);
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }

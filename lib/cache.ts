@@ -39,6 +39,16 @@ CREATE INDEX IF NOT EXISTS idx_launch_symbol ON launches(symbol);
 CREATE TABLE IF NOT EXISTS profiles (
   wallet TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS curve_tokens (
+  curve TEXT PRIMARY KEY, token TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chain_trades (
+  block INTEGER NOT NULL, log_index INTEGER NOT NULL, tx TEXT NOT NULL,
+  curve TEXT NOT NULL, wallet TEXT NOT NULL, kind TEXT NOT NULL,
+  tokens TEXT NOT NULL, eth TEXT NOT NULL,
+  PRIMARY KEY (block, log_index)
+);
+CREATE INDEX IF NOT EXISTS idx_ct_wallet ON chain_trades(wallet);
 `;
 
 export function defaultCachePath(): string {
@@ -147,6 +157,75 @@ export class Cache {
       .prepare("SELECT token, symbol, curve, block FROM launches WHERE symbol = ? COLLATE NOCASE")
       .all(symbol) as { token: string; symbol: string; curve: string; block: string }[];
     return rows.map((r) => ({ ...r, block: BigInt(r.block) }));
+  }
+
+  curveTokens(curves: string[]): Map<string, string> {
+    const out = new Map<string, string>();
+    if (curves.length === 0) return out;
+    const q = this.db.prepare(`SELECT curve, token FROM curve_tokens WHERE curve IN (${curves.map(() => "?").join(",")})`);
+    for (const row of q.all(...curves.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
+      out.set(row.curve, row.token);
+    }
+    // the launch index knows most curves already
+    const missing = curves.filter((c) => !out.has(c.toLowerCase()));
+    if (missing.length) {
+      const q2 = this.db.prepare(`SELECT curve, token FROM launches WHERE curve IN (${missing.map(() => "?").join(",")})`);
+      for (const row of q2.all(...missing.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
+        out.set(row.curve, row.token);
+      }
+    }
+    return out;
+  }
+
+  saveCurveTokens(map: Map<string, string>): void {
+    const ins = this.db.prepare("INSERT OR IGNORE INTO curve_tokens (curve, token) VALUES (?, ?)");
+    const tx = this.db.transaction(() => {
+      for (const [curve, token] of map) ins.run(curve.toLowerCase(), token.toLowerCase());
+    });
+    tx();
+  }
+
+  /** Indexed span of the chain-wide trade index: [floor, tip], both inclusive. */
+  tradeIndexSpan(): { floor: bigint; tip: bigint } | null {
+    const g = (k: string) => (this.db.prepare("SELECT value FROM meta WHERE key = ?").get(k) as { value: string } | undefined)?.value;
+    const floor = g("trades_floor");
+    const tip = g("trades_tip");
+    return floor && tip ? { floor: BigInt(floor), tip: BigInt(tip) } : null;
+  }
+
+  setTradeIndexSpan(floor: bigint, tip: bigint): void {
+    const put = this.db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+    const tx = this.db.transaction(() => {
+      put.run("trades_floor", floor.toString());
+      put.run("trades_tip", tip.toString());
+    });
+    tx();
+  }
+
+  appendChainTrades(rows: { block: bigint; logIndex: number; tx: string; curve: string; wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint }[]): void {
+    const ins = this.db.prepare(
+      "INSERT OR IGNORE INTO chain_trades (block, log_index, tx, curve, wallet, kind, tokens, eth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    );
+    const tx = this.db.transaction(() => {
+      for (const r of rows) {
+        ins.run(Number(r.block), r.logIndex, r.tx, r.curve, r.wallet, r.kind, r.tokens.toString(), r.eth.toString());
+      }
+    });
+    tx();
+  }
+
+  chainTradesFor(wallets: string[]): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]> {
+    const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]>();
+    if (wallets.length === 0) return out;
+    const q = this.db.prepare(
+      `SELECT wallet, curve, kind, tokens, eth, block, tx FROM chain_trades WHERE wallet IN (${wallets.map(() => "?").join(",")}) ORDER BY block, log_index`,
+    );
+    for (const row of q.all(...wallets.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]) {
+      const list = out.get(row.wallet) ?? [];
+      list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx });
+      out.set(row.wallet, list);
+    }
+    return out;
   }
 
   profile(wallet: string): { json: string; fetchedAt: number } | null {

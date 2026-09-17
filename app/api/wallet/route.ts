@@ -1,25 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BitqueryProvider } from "../../../lib/providers/bitquery.ts";
+import { RpcProvider } from "../../../lib/providers/rpc.ts";
 import { looksLikeAddress } from "../../../lib/read/launches.ts";
 import { Cache } from "../../../lib/cache.ts";
 import { cachePath } from "../../../lib/site/live";
 
 export const maxDuration = 60;
 
-// One wallet, read (mode B): the wallet's Pons record via Bitquery -
-// per-token trades, closed positions, winrate, SMART/WHALE badges. 24h cached.
+// One wallet, read: the wallet's full Pons record straight off the chain
+// (topic-filtered curve events, whole history) - per-token trades, closed
+// positions, winrate, SMART/WHALE badges. 24h cached.
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const wallet = (req.nextUrl.searchParams.get("address") ?? "").trim().toLowerCase();
   if (!looksLikeAddress(wallet)) {
     return NextResponse.json({ error: "not an address" }, { status: 400 });
   }
-  if (!process.env.BITQUERY_TOKEN) {
-    return NextResponse.json({ error: "mode B is not configured" }, { status: 503 });
-  }
   const cache = new Cache(cachePath());
   try {
-    const provider = new BitqueryProvider();
-    const byToken = await provider.walletTrades(wallet);
+    const provider = new RpcProvider();
+    const resolver = async (curves: string[]) => {
+      const known = cache.curveTokens(curves);
+      const missing = curves.filter((c) => !known.has(c.toLowerCase()));
+      if (missing.length) {
+        const fetched = await provider.curvesToTokens(missing);
+        cache.saveCurveTokens(fetched);
+        for (const [c, t] of fetched) known.set(c, t);
+      }
+      return known;
+    };
+    const byWallet = await provider.walletTradesBatch([wallet], resolver);
+    const byToken = byWallet.get(wallet) ?? new Map();
     const remainingOf = (token: string): bigint => {
       let bal = 0n;
       for (const t of byToken.get(token) ?? []) bal += t.kind === "buy" ? t.tokens : -t.tokens;
@@ -63,7 +72,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         pnl: t.pnlPct === null ? "—" : fmt(t.pnlPct),
         pnlNum: t.pnlPct,
       })),
-      window: "realtime window of the current Bitquery plan (last few days)",
+      window: "full chain history · curve trades",
     });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });

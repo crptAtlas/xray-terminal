@@ -7,10 +7,15 @@ site (app/) runs on design fixtures; this file is the bridge.
 ## The data path when everything is live
 
 ```
-browser → /api/scan?token=0x…            (Next route, Vercel)
+browser → /api/scan?token=0x…            (Next route)
             └─ engine check() iterator   (lib/check.ts)
-                 ├─ mode A: public RPC   (holders, pnl, bands, header, card)
-                 └─ mode B: Bitquery     (adds: winrate, badges, wallet profiles)
+                 ├─ phase 1: token scan  (holders, pnl, bands, header, card;
+                 │                        Bitquery fast path when fresh,
+                 │                        public RPC otherwise)
+                 └─ phase 2: profiles    (winrate, badges, wallet histories;
+                                          local chain-wide trade index fed
+                                          by the public RPC - full history,
+                                          no paid API)
 ```
 
 1. `/api/scan` resolves the query (address directly; ticker via the
@@ -20,12 +25,15 @@ browser → /api/scan?token=0x…            (Next route, Vercel)
 2. Phase 1 fills the token header, avg pnl, the pnl bands (the engine's
    `findGroups`: at most three, five points wide, supply-weighted - the
    same rule the design shows) and the holders table.
-3. Phase 2 (mode B only) fills avg winrate, per-wallet profile columns
-   and the SMART / WHALE badges, under the profile deadline; wallets that
-   miss it come back `not read`.
+3. Phase 2 fills avg winrate, per-wallet profile columns and the
+   SMART / WHALE badges from the local trade index (`xray index` builds
+   it once, a tail sync keeps it at the head); without an index it falls
+   back to direct topic-filtered RPC queries in small batches, and
+   wallets that miss the deadline come back `not read`.
 4. `/api/card` renders the same share card server-side with
    `@napi-rs/canvas` for OG unfurls on X and Telegram.
-5. `/api/wallet` is the same story for one wallet (mode B only).
+5. `/api/wallet` is the same story for one wallet - full chain history
+   through a direct topic query, no key needed.
 
 Vercel note: the engine's SQLite cache is per-instance and ephemeral
 there. It still works (each warm lambda keeps its cache), but the
@@ -50,7 +58,7 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 | # | Item | Unlocks | Where it goes |
 |---|---|---|---|
-| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Free plan today: rate-limited profiles (top holders fill in over repeat scans) and a ~4-5 day realtime window; a paid plan lifts the rps and the archive add-on deepens history | winrate, SMART/WHALE badges, wallet page, tracer stage | Vercel env var + `.env` locally |
+| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Only accelerates phase 1 on fresh tokens now; profiles run on the free RPC through the local trade index, full history | fast phase 1 | Vercel env var + `.env` locally |
 | 2 | Domain (e.g. buy the one you want, point it at Vercel) | real URL instead of xray-xi-puce.vercel.app, OG links | Vercel → Domains |
 | 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | `components/ca-block.tsx`, `CHART_URL` in `app/page.tsx` |
 | 4 | X / Telegram / public GitHub links | header and footer links | `components/header.tsx`, `components/footer.tsx` |

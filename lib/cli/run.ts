@@ -30,9 +30,6 @@ export async function runCheck(token: string, opts: CliOpts): Promise<void> {
   const { resolveTicker, looksLikeAddress } = await import("../read/launches.ts");
 
   const provider = await pickProvider(opts.provider);
-  if (!provider.supportsProfiles && opts.profiles) {
-    console.error("note: wallet profiles are disabled in rpc mode (set BITQUERY_TOKEN to enable)");
-  }
   const cache = new Cache();
   const t0 = Date.now();
 
@@ -108,13 +105,8 @@ export async function runCheck(token: string, opts: CliOpts): Promise<void> {
 }
 
 export async function runWallet(address: string, opts: CliOpts): Promise<void> {
-  const { pickProvider } = await import("../providers/rpc.ts");
-  const provider = await pickProvider(opts.provider);
-  if (!provider.supportsProfiles) {
-    throw new Error("wallet profiles need mode B: set BITQUERY_TOKEN (plans from $49/mo at bitquery.io)");
-  }
-  const { BitqueryProvider } = await import("../providers/bitquery.ts");
-  if (!(provider instanceof BitqueryProvider)) throw new Error("wallet profiles need the bitquery provider");
+  const { RpcProvider } = await import("../providers/rpc.ts");
+  const provider = new RpcProvider();
   const { Cache } = await import("../cache.ts");
   const { walletProfile } = await import("../read/wallet.ts");
   const { writeOutput } = await import("../format.ts");
@@ -133,6 +125,32 @@ export async function runWallet(address: string, opts: CliOpts): Promise<void> {
           `badges   ${p.badges.length ? p.badges.map((b) => `[${b}]`).join("") : "none"}`,
         ].join("\n");
   writeOutput(text, opts.output);
+  cache.close();
+}
+
+export async function runIndex(_opts: CliOpts): Promise<void> {
+  const { makeClient } = await import("../providers/rpc.ts");
+  const { Cache } = await import("../cache.ts");
+  const { backfillTradeIndex, tradeIndexDepthDays } = await import("../read/indexer.ts");
+  const client = makeClient();
+  const cache = new Cache();
+  const t0 = Date.now();
+  console.error("building the chain-wide trade index (resumable; ctrl-c any time)...");
+  const res = await backfillTradeIndex(client, cache, {
+    onProgress: (p) => {
+      const days = tradeIndexDepthDays(cache);
+      process.stderr.write(
+        `\r  floor block ${p.floor}   depth ${days === null ? "?" : days.toFixed(1)} days   rows +${p.rows}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `,
+      );
+    },
+  });
+  process.stderr.write("\n");
+  const days = tradeIndexDepthDays(cache);
+  console.error(
+    res.done
+      ? `index complete: full chain history (${days?.toFixed(1)} days), ${res.rows} new rows`
+      : `index paused at block ${res.floor} (${days?.toFixed(1)} days deep); run again to continue`,
+  );
   cache.close();
 }
 

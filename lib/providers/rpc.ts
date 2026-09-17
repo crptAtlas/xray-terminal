@@ -15,6 +15,7 @@ import { poolManagerAbi, SWAP_TOPIC } from "../abi/pool.ts";
 import { makeTransport, rpcStats } from "./gate.ts";
 import { getLogsAdaptive, type RawLog } from "./logs.ts";
 import type { Provider, QuoteEvent, RawTransfer, TokenActivity, TokenMeta } from "./provider.ts";
+import type { Trade } from "../pnl/classify.ts";
 
 const chainDef = {
   id: CHAIN.id,
@@ -66,7 +67,10 @@ interface Launched {
 
 export class RpcProvider implements Provider {
   readonly name = "rpc" as const;
-  readonly supportsProfiles = false;
+  // wallet histories come straight off the chain: the curve events index
+  // the real trader in their topics, so one topic-filtered getLogs over
+  // the whole chain returns a wallet's every curve trade in ~a second
+  readonly supportsProfiles = true;
   readonly client: PublicClient;
 
   constructor(client?: PublicClient) {
@@ -330,6 +334,97 @@ export class RpcProvider implements Provider {
       return (last.liquidity * last.sqrtPriceX96) / 2n ** 96n;
     }
     return (last.liquidity * 2n ** 96n) / last.sqrtPriceX96;
+  }
+
+  /**
+   * Every curve trade of the given wallets across the whole chain, full
+   * history, grouped wallet -> token -> trades. Two topic-filtered
+   * getLogs calls per batch (buys by recipient, sells by seller); curve
+   * addresses resolve to tokens through the launch index plus a batched
+   * factory-event lookup for curves the index has not seen yet.
+   * Post-graduation v4 swaps carry no trader topic and are not included.
+   */
+  async walletTradesBatch(
+    wallets: string[],
+    curveToToken: (curves: string[]) => Promise<Map<string, string>>,
+  ): Promise<Map<string, Map<string, Trade[]>>> {
+    const latest = await this.client.getBlockNumber();
+    const padded = wallets.map((w) => `0x000000000000000000000000${w.slice(2).toLowerCase()}` as Hex);
+    const [buyLogs, sellLogs] = await Promise.all([
+      // CurveBuy(buyer indexed, recipient indexed, ...): recipient = topic2
+      getLogsAdaptive(this.client, { topics: [TOPIC.curveBuy as Hex, null, padded], fromBlock: 0n, toBlock: latest }, { parallel: 2, maxDepth: 3 }),
+      // CurveSell(seller indexed, recipient indexed, ...): seller = topic1
+      getLogsAdaptive(this.client, { topics: [TOPIC.curveSell as Hex, padded], fromBlock: 0n, toBlock: latest }, { parallel: 2, maxDepth: 3 }),
+    ]);
+    const curves = [...new Set([...buyLogs, ...sellLogs].map((l) => l.address))];
+    const tokenOf = await curveToToken(curves);
+    const out = new Map<string, Map<string, Trade[]>>();
+    for (const w of wallets) out.set(w.toLowerCase(), new Map());
+    const push = (wallet: string, token: string, trade: Trade) => {
+      const byToken = out.get(wallet);
+      if (!byToken) return;
+      const list = byToken.get(token) ?? [];
+      list.push(trade);
+      byToken.set(token, list);
+    };
+    for (const l of buyLogs) {
+      const token = tokenOf.get(l.address);
+      if (!token) continue;
+      const decoded = decodeEventLog({ abi: curveAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
+      if (decoded.eventName !== "CurveBuy") continue;
+      const a = decoded.args as { recipient: Hex; quoteIn: bigint; tokensOut: bigint; fee: bigint; tax: bigint };
+      const eth = a.quoteIn - a.fee - a.tax;
+      push(a.recipient.toLowerCase(), token, {
+        wallet: a.recipient.toLowerCase(),
+        kind: "buy",
+        tokens: a.tokensOut,
+        eth: eth > 0n ? eth : a.quoteIn,
+        block: l.blockNumber,
+        tx: l.transactionHash,
+      });
+    }
+    for (const l of sellLogs) {
+      const token = tokenOf.get(l.address);
+      if (!token) continue;
+      const decoded = decodeEventLog({ abi: curveAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
+      if (decoded.eventName !== "CurveSell") continue;
+      const a = decoded.args as { seller: Hex; tokensIn: bigint; quoteOut: bigint };
+      push(a.seller.toLowerCase(), token, {
+        wallet: a.seller.toLowerCase(),
+        kind: "sell",
+        tokens: a.tokensIn,
+        eth: a.quoteOut,
+        block: l.blockNumber,
+        tx: l.transactionHash,
+      });
+    }
+    // trades in block order per token
+    for (const byToken of out.values()) {
+      for (const list of byToken.values()) list.sort((x, y) => (x.block < y.block ? -1 : x.block > y.block ? 1 : 0));
+    }
+    return out;
+  }
+
+  /** Resolve curve addresses to their tokens via batched factory events. */
+  async curvesToTokens(curves: string[]): Promise<Map<string, string>> {
+    if (curves.length === 0) return new Map();
+    const latest = await this.client.getBlockNumber();
+    const out = new Map<string, string>();
+    const chunk = 200;
+    for (let i = 0; i < curves.length; i += chunk) {
+      const slice = curves.slice(i, i + chunk).map((c) => `0x000000000000000000000000${c.slice(2).toLowerCase()}` as Hex);
+      // TokenLaunched(token indexed, curve indexed, ...): curve = topic2
+      const logs = await getLogsAdaptive(this.client, {
+        address: ADDR.factory as Hex,
+        topics: [tokenLaunchedTopic, null, slice],
+        fromBlock: 0n,
+        toBlock: latest,
+      }, { parallel: 1 });
+      for (const l of logs) {
+        out.set(("0x" + (l.topics[2] as string).slice(26)).toLowerCase(), ("0x" + (l.topics[1] as string).slice(26)).toLowerCase());
+      }
+    }
+    return out;
   }
 
   stats(): { label: string; requests: number } {

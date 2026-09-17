@@ -235,7 +235,7 @@ export function Terminal() {
           ["dust", String(live.flags.dust)],
           ["unknown cost basis", `${live.flags.unknownBasis} (${live.flags.unknownSupplyPct} supply)`],
           ["infrastructure", String(live.flags.infra)],
-          ["first-ever trades", "needs mode B"],
+          ["first-ever trades", live.flags.firstTrades ?? "reading…"],
         ] as [string, string][],
         total: String(live.totalHolders),
         source: live.source as { label: string; requests: number; seconds: number } | null,
@@ -565,7 +565,7 @@ export function Terminal() {
                 D.winrate !== null ? (
                   <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades</>
                 ) : D.profilesRead === 0 ? (
-                  <>wallet profiles unavailable - rate-limited · running on public RPC data</>
+                  <>wallet histories unavailable right now - retry the scan</>
                 ) : D.profilesRead !== null ? (
                   <>{D.profilesRead} wallets read · none with 2+ closed trades yet</>
                 ) : (

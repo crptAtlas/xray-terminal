@@ -26,10 +26,18 @@ program
 program
   .command("wallet")
   .argument("<address>", "wallet address")
-  .description("wallet profile across all tokens (requires BITQUERY_TOKEN)")
+  .description("wallet profile across all tokens (full chain history, public RPC)")
   .action(async (address) => {
     const { runWallet } = await import("../lib/cli/run.ts");
     await runWallet(address, program.opts());
+  });
+
+program
+  .command("index")
+  .description("build/extend the local chain-wide trade index (one-time backfill, resumable)")
+  .action(async () => {
+    const { runIndex } = await import("../lib/cli/run.ts");
+    await runIndex(program.opts());
   });
 
 program

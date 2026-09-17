@@ -62,3 +62,23 @@ test("ticker index is case-insensitive and keeps the tip", () => {
   assert.equal(c.findTicker("Pepe").length, 2);
   c.close();
 });
+
+test("chain trade index: span, rows, per-wallet select", () => {
+  const c = new Cache(":memory:");
+  assert.equal(c.tradeIndexSpan(), null);
+  c.setTradeIndexSpan(100n, 200n);
+  assert.deepEqual(c.tradeIndexSpan(), { floor: 100n, tip: 200n });
+  c.appendChainTrades([
+    { block: 150n, logIndex: 3, tx: "0xa", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 5n },
+    { block: 160n, logIndex: 1, tx: "0xb", curve: "0xc1", wallet: "0xw1", kind: "sell", tokens: 10n, eth: 7n },
+    { block: 155n, logIndex: 0, tx: "0xc", curve: "0xc2", wallet: "0xw2", kind: "buy", tokens: 1n, eth: 1n },
+    // duplicate primary key: ignored, not doubled
+    { block: 150n, logIndex: 3, tx: "0xa", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 5n },
+  ]);
+  const got = c.chainTradesFor(["0xw1", "0xmissing"]);
+  assert.equal(got.get("0xw1").length, 2);
+  assert.equal(got.get("0xw1")[0].kind, "buy"); // block order
+  assert.equal(got.get("0xw1")[1].eth, 7n);
+  assert.equal(got.has("0xmissing"), false);
+  c.close();
+});

@@ -239,7 +239,7 @@ export function mapWalletHistory(
 export class BitqueryProvider implements Provider {
   readonly name = "bitquery" as const;
   readonly supportsProfiles = true;
-  private rpc: RpcProvider;
+  readonly rpc: RpcProvider;
   private token: string;
   private requests = 0;
   private fetchImpl: typeof fetch;

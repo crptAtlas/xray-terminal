@@ -48,7 +48,7 @@ export interface LiveScan {
   bandCoverage: string;
   holders: LiveHolderRow[];
   exited: { wallets: number; avgPnl: string | null };
-  flags: { dust: number; unknownBasis: number; unknownSupplyPct: string; infra: number };
+  flags: { dust: number; unknownBasis: number; unknownSupplyPct: string; infra: number; firstTrades?: string };
   totalHolders: number;
   profilesRead?: number; // set by the profile phase; 0 means mode B is rate-limited out
   source: { label: string; requests: number; seconds: number };
@@ -196,10 +196,15 @@ function withProfiles(
   });
   const wr = aggregates.avgWinrate;
   const profilesRead = [...profiles.values()].filter((p) => !p.notRead).length;
+  const ft = aggregates.firstTrade;
   return {
     ...scan,
     holders,
     profilesRead,
+    flags: {
+      ...scan.flags,
+      firstTrades: ft ? `${ft.wallets} (${(ft.supplyShare * 100).toFixed(1)}% supply)` : "—",
+    },
     verdict: {
       ...scan.verdict,
       winrate: wr === null ? null : wr.toFixed(0) + "%",

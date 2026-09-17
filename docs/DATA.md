@@ -11,6 +11,19 @@ the live chain and the live Bitquery API. Date of measurement:
   (oldest trade row: 2026-09-13). The 30-day figure from early planning
   was wrong for this plan tier; deeper history is the paid `archive`
   add-on (`combined` dataset - refused on the current plan).
+- **Wallet histories do not need Bitquery at all.** The curve events
+  index the real trader in their topics (`CurveBuy` topic2 = recipient,
+  `CurveSell` topic1 = seller), and the public RPC serves logs from
+  genesis. A local chain-wide trade index (`xray index`, resumable
+  backfill into SQLite) makes every wallet's full history a local
+  SELECT; a cheap tail sync before each scan keeps it at the head.
+  Post-graduation v4 swaps carry no trader topic and are not part of
+  profiles - the curve is where meme life happens.
+- Node limits worth knowing: batched topic-alternative queries over the
+  full range are unreliable above ~25-50 wallets (the node masks its
+  log-query timeout as "Missing or invalid parameters"), which is why
+  the index exists; narrow windows without an address filter answer
+  consistently.
 - Pons is indexed: protocol `pons_v2` (curve trades) and `uniswap_v4`
   (post-graduation) both appear in `DEXTradeByTokens` with native-ETH
   sides and USD prices. Token-paired launches (e.g. GOOGL pairs) appear
@@ -78,12 +91,17 @@ few hundred requests of mixed size.
 cold scan, small token (~170 holders)      ~5 s to phase 1
 cold scan, large token (47k trades)        ~14 s to phase 1
 repeat scan                                1-3 s (incremental cache)
-single wallet history                      0.6-3.5 s
-profile phase, free plan                   rate-limited: a few wallets per
-                                           scan, the 24h cache fills the
-                                           rest across repeat scans
-profile phase, paid plan (expected)        20-40 s for the top 1000, to be
-                                           measured after the upgrade
+single wallet history                      0.6-3.5 s (direct topic query)
+profile phase with the local trade index   seconds for the top 1000: one
+                                           tail sync + local SELECTs +
+                                           one balance multicall
+profile phase without the index            direct topic queries, 25
+                                           wallets per batch, flaky above
+                                           that; the 24h cache fills in
+                                           across repeat scans
+index backfill (one-time, resumable)       windows of 40k blocks, 3 in
+                                           flight; grows through empty
+                                           pre-launchpad ranges
 ```
 
 ## 7. Limits and the queue

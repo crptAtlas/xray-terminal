@@ -31,7 +31,10 @@ function isRangeError(err: unknown): boolean {
     msg.includes("limit") ||
     msg.includes("range") ||
     msg.includes("timeout") ||
+    msg.includes("timed out") ||
     msg.includes("deadline exceeded") ||
+    // this node wraps its log-query timeout in a generic invalid-params error
+    msg.includes("missing or invalid parameters") ||
     msg.includes("response size")
   );
 }
@@ -68,26 +71,30 @@ async function fetchWindow(client: PublicClient, q: LogQuery): Promise<RawLog[]>
 export async function getLogsAdaptive(
   client: PublicClient,
   q: LogQuery,
-  opts: { parallel?: number } = {},
+  opts: { parallel?: number; maxDepth?: number } = {},
 ): Promise<RawLog[]> {
   const parallel = opts.parallel ?? 6;
+  // Topic-heavy queries over huge ranges can fail at every depth; capping
+  // the recursion turns a pathological hour of splitting into a fast error
+  // the caller can handle (smaller wallet batch, fallback path).
+  const maxDepth = opts.maxDepth ?? 40;
 
-  async function walk(fromBlock: bigint, toBlock: bigint): Promise<RawLog[]> {
+  async function walk(fromBlock: bigint, toBlock: bigint, depth: number): Promise<RawLog[]> {
     try {
       const logs = await fetchWindow(client, { ...q, fromBlock, toBlock });
       if (logs.length >= GETLOGS_MAX && toBlock > fromBlock) {
-        return split(fromBlock, toBlock);
+        return split(fromBlock, toBlock, depth);
       }
       return logs;
     } catch (err) {
-      if (isRangeError(err) && toBlock > fromBlock) return split(fromBlock, toBlock);
+      if (isRangeError(err) && toBlock > fromBlock && depth < maxDepth) return split(fromBlock, toBlock, depth);
       throw err;
     }
   }
 
-  async function split(fromBlock: bigint, toBlock: bigint): Promise<RawLog[]> {
+  async function split(fromBlock: bigint, toBlock: bigint, depth: number): Promise<RawLog[]> {
     const mid = fromBlock + (toBlock - fromBlock) / 2n;
-    const [a, b] = await Promise.all([walk(fromBlock, mid), walk(mid + 1n, toBlock)]);
+    const [a, b] = await Promise.all([walk(fromBlock, mid, depth + 1), walk(mid + 1n, toBlock, depth + 1)]);
     return a.concat(b);
   }
 
@@ -100,7 +107,7 @@ export async function getLogsAdaptive(
   for (let i = 0n; i < n; i++) {
     const from = q.fromBlock + i * step;
     const to = i === n - 1n ? q.toBlock : from + step - 1n;
-    slices.push(walk(from, to));
+    slices.push(walk(from, to, 0));
   }
   const parts = await Promise.all(slices);
   const all = parts.flat();
