@@ -219,6 +219,9 @@ export function Terminal() {
         token: live.token,
         pnl: live.verdict.pnl as string | null,
         pnlNum: live.verdict.pnlNum,
+        median: live.verdict.median,
+        inProfit: live.verdict.inProfit as number | null,
+        bandCoverage: live.bandCoverage as string | null,
         winrate: live.verdict.winrate,
         counted: String(live.verdict.counted),
         traced: live.verdict.traced === null ? null : String(live.verdict.traced),
@@ -241,6 +244,9 @@ export function Terminal() {
       token: { ticker: "$MARROW", address: DEMO_ADDR, age: "3h 12m", stage: "graduated", mcap: "$412k", liquidity: "$58k", vol24h: "$1.21M", holders: "1 043" },
       pnl: G.pnl as string | null,
       pnlNum: parseFloat(G.pnl.replace("−", "-")) as number | null,
+      median: null as string | null,
+      inProfit: null as number | null,
+      bandCoverage: null as string | null,
       winrate: G.winrate as string | null,
       counted: G.counted,
       traced: G.traced as string | null,
@@ -291,6 +297,7 @@ export function Terminal() {
   const metric = (
     label: string,
     value: string | null,
+    valueColor: string,
     pos: number,
     scale: [string, string, string, string],
     across: React.ReactNode,
@@ -298,7 +305,7 @@ export function Terminal() {
   ) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0, ...extraStyle }}>
       <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".14em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: value === null ? "var(--bone-dark)" : D.gradeColor, letterSpacing: "-.03em", textShadow: value === null ? "none" : `0 0 18px ${D.gradeColor},0 0 40px ${glowColor}`, whiteSpace: "nowrap" }}>{value ?? "—"}</div>
+      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: value === null ? "var(--bone-dark)" : valueColor, letterSpacing: "-.03em", textShadow: value === null ? "none" : `0 0 18px ${valueColor},0 0 40px ${valueColor}55`, whiteSpace: "nowrap" }}>{value ?? "—"}</div>
       <div style={{ position: "relative", height: 8, marginTop: 6 }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", gap: 2 }}>
           <div style={{ flex: 1, background: "rgba(255,96,92,.35)" }} />
@@ -534,13 +541,26 @@ export function Terminal() {
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "minmax(0,1fr) 520px", gap: 12, alignItems: "start" }}>
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, justifyContent: "space-between", minWidth: 0, boxSizing: "border-box", height: isMobile ? "auto" : 520, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "repeat(2,minmax(0,1fr))", gap: 0 }}>
-              {metric("avg holder pnl", D.pnl, pnlPos, ["−100%", "0", "+100%", "+200%"], <>across <span style={{ color: "var(--text)" }}>{D.counted}</span> holders</>, { paddingRight: isMobile ? 0 : 24 })}
+              {metric(
+                "avg holder pnl",
+                D.pnl,
+                D.pnlNum === null ? "var(--bone-dark)" : pnlColor(D.pnlNum),
+                pnlPos,
+                ["−100%", "0", "+100%", "+200%"],
+                D.median !== null && D.inProfit !== null ? (
+                  <>median <span style={{ color: "var(--text)" }}>{D.median}</span> · <span style={{ color: "var(--text)" }}>{D.inProfit}</span> of {D.counted} in profit</>
+                ) : (
+                  <>across <span style={{ color: "var(--text)" }}>{D.counted}</span> holders</>
+                ),
+                { paddingRight: isMobile ? 0 : 24 },
+              )}
               {metric(
                 "avg winrate",
                 D.winrate,
+                D.winrate === null ? "var(--bone-dark)" : wrPos >= 55 ? "var(--profit)" : wrPos >= 45 ? "var(--neutral)" : "var(--loss)",
                 wrPos,
                 ["0", "33", "66", "100"],
-                D.winrate === null ? <>unlocks with mode B · Bitquery</> : <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders · ≥ 5 past trades</>,
+                D.winrate === null ? <>reading wallet histories · fills in on repeat scans</> : <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades</>,
                 isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" },
               )}
             </div>
@@ -567,6 +587,11 @@ export function Terminal() {
                   </div>
                 ))}
                 {D.bands.length === 0 && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>no dense pnl bands on this token</div>}
+                {D.bandCoverage !== null && D.bands.length > 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                    bands cover {D.bandCoverage} of supply - the densest clusters; the rest is spread out (see the table)
+                  </div>
+                )}
               </div>
             )}
           </div>

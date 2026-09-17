@@ -3,6 +3,10 @@ import type { HolderRow } from "../read/token.ts";
 /**
  * Token aggregates (spec 3.6), supply-weighted: a holder's contribution to
  * avg_pnl and avg_winrate is proportional to the share of supply they hold.
+ * For the average, each wallet's pnl is clamped to [-100%, +500%]: one
+ * first-block sniper at +12000% with dust supply must not steer the token
+ * metric (their honest pnl still shows in the holder table). The median is
+ * reported next to the average as the outlier-proof view of the crowd.
  * A wallet with 5% of supply moves the average five times harder than one
  * with 1%. Wallets that exited (share 0) do not pull the current averages;
  * they get their own `exited` line, unweighted. A dead token where everyone
@@ -20,8 +24,12 @@ export interface ProfileLite {
   notRead?: boolean; // missed the profile deadline; never counted anywhere
 }
 
+export const AVG_CLAMP = { min: -100, max: 500 } as const;
+
 export interface Aggregates {
   avgPnlPct: number | null;
+  medianPnlPct: number | null;
+  inProfit: number; // current holders with pnl above zero
   pnlWallets: number;
   avgWinrate: number | null;
   winrateWallets: number;
@@ -44,9 +52,21 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
   // current holders only: an exited wallet (share 0) must not steer the
   // averages of what is being held right now
   const holding = rows.filter((r) => r.supplyShare > 0);
-  const pnlPairs = holding
+  const pnls = holding
     .filter((r) => r.position.pnlPct !== null)
     .map((r) => ({ value: r.position.pnlPct as number, weight: r.supplyShare }));
+  const pnlPairs = pnls.map((p) => ({
+    value: Math.max(AVG_CLAMP.min, Math.min(AVG_CLAMP.max, p.value)),
+    weight: p.weight,
+  }));
+  const sorted = pnls.map((p) => p.value).sort((a, b) => a - b);
+  const medianPnlPct =
+    sorted.length === 0
+      ? null
+      : sorted.length % 2
+        ? sorted[(sorted.length - 1) / 2]!
+        : (sorted[sorted.length / 2 - 1]! + sorted[sorted.length / 2]!) / 2;
+  const inProfit = pnls.filter((p) => p.value > 0).length;
 
   let avgWinrate: number | null = null;
   let winrateWallets = 0;
@@ -84,6 +104,8 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
 
   return {
     avgPnlPct: weightedMean(pnlPairs),
+    medianPnlPct,
+    inProfit,
     pnlWallets: pnlPairs.length,
     avgWinrate,
     winrateWallets,

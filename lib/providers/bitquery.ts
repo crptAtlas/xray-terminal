@@ -22,6 +22,78 @@ import type { Trade } from "../pnl/classify.ts";
 
 export const BITQUERY_URL = "https://streaming.bitquery.io/graphql";
 
+// Adaptive throttle shared by every provider instance in the process:
+// full speed until the API answers 429, then a global queue with spacing
+// for a while (the free plan allows on the order of ten requests a
+// minute; a paid plan effectively never trips this).
+const SPACING_MS = Number(process.env.BITQUERY_SPACING_MS ?? 6500);
+const COOLDOWN_MS = 120_000;
+let rateLimitedUntil = 0;
+let queueTail: Promise<void> = Promise.resolve();
+
+function throttled<T>(fn: () => Promise<T>): Promise<T> {
+  if (Date.now() > rateLimitedUntil) return fn();
+  const run = queueTail.then(async () => {
+    await new Promise((r) => setTimeout(r, SPACING_MS));
+  });
+  queueTail = run.catch(() => {});
+  return run.then(fn);
+}
+
+export function noteRateLimit(): void {
+  rateLimitedUntil = Date.now() + COOLDOWN_MS;
+}
+
+// Conservative width of the realtime dataset: tokens born inside it can be
+// scanned entirely from Bitquery in a handful of requests; older ones fall
+// back to the RPC log walk.
+export const REALTIME_WINDOW_S = 3.5 * 24 * 3600;
+
+const TOKEN_TRANSFERS_PAGE = `
+query ($token: String!, $after: String!) {
+  EVM(network: robinhood, dataset: realtime) {
+    Transfers(
+      where: {Transfer: {Currency: {SmartContract: {is: $token}}}, Block: {Number: {gt: $after}}}
+      orderBy: {ascending: Block_Number}
+      limit: {count: 25000}
+    ) {
+      Block { Number }
+      Transaction { Hash }
+      Transfer { Amount Sender Receiver }
+      TransactionStatus { Success }
+    }
+  }
+}`;
+
+const TOKEN_QUOTES_PAGE = `
+query ($token: String!, $after: String!) {
+  EVM(network: robinhood, dataset: realtime) {
+    DEXTradeByTokens(
+      where: {Trade: {Currency: {SmartContract: {is: $token}}, Side: {Currency: {SmartContract: {is: "0x0000000000000000000000000000000000000000"}}}}, Block: {Number: {gt: $after}}}
+      orderBy: {ascending: Block_Number}
+      limit: {count: 25000}
+    ) {
+      Block { Number }
+      Transaction { Hash }
+      Trade { Amount Side { Amount } }
+    }
+  }
+}`;
+
+const TOKEN_BALANCES_QUERY = `
+query ($token: String!) {
+  EVM(network: robinhood, dataset: realtime) {
+    BalanceUpdates(
+      where: {Currency: {SmartContract: {is: $token}}}
+      orderBy: {descendingByField: "balance"}
+      limit: {count: 25000}
+    ) {
+      BalanceUpdate { Address }
+      balance: sum(of: BalanceUpdate_Amount)
+    }
+  }
+}`;
+
 const WALLET_TRANSFERS_QUERY = `
 query ($wallet: String!) {
   EVM(network: robinhood, dataset: realtime) {
@@ -65,6 +137,24 @@ export interface BqTransferRow {
 export interface BqQuoteRow {
   Transaction: { Hash: string };
   Trade: { Currency: { SmartContract: string }; Amount: string; Side: { Amount: string } };
+}
+
+interface BqTokenTransferRow {
+  Block: { Number: string };
+  Transaction: { Hash: string };
+  Transfer: { Amount: string; Sender: string; Receiver: string };
+  TransactionStatus: { Success: boolean };
+}
+
+interface BqTokenQuoteRow {
+  Block: { Number: string };
+  Transaction: { Hash: string };
+  Trade: { Amount: string; Side: { Amount: string } };
+}
+
+interface BqBalanceRow {
+  BalanceUpdate: { Address: string };
+  balance: string;
 }
 
 export function toWei(amount: string, decimals: number): bigint {
@@ -129,43 +219,107 @@ export class BitqueryProvider implements Provider {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
-  private async gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    // the public plans rate-limit; back off and retry instead of failing
-    // the wallet outright
-    for (let attempt = 0; ; attempt++) {
-      this.requests++;
-      const res = await this.fetchImpl(BITQUERY_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.token}`,
-        },
-        body: JSON.stringify({ query, variables }),
-      });
-      if (res.status === 429 && attempt < 4) {
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-        continue;
+  private gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+    return throttled(async () => {
+      for (let attempt = 0; ; attempt++) {
+        this.requests++;
+        const res = await this.fetchImpl(BITQUERY_URL, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.token}`,
+          },
+          body: JSON.stringify({ query, variables }),
+        });
+        if (res.status === 429 && attempt < 4) {
+          noteRateLimit();
+          await new Promise((r) => setTimeout(r, Math.min(2000 * 2 ** attempt, 8000)));
+          continue;
+        }
+        if (!res.ok) throw new Error(`bitquery http ${res.status}`);
+        const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
+        if (body.errors?.length) throw new Error(`bitquery: ${body.errors[0]!.message}`);
+        if (!body.data) throw new Error("bitquery: empty response");
+        return body.data;
       }
-      if (!res.ok) throw new Error(`bitquery http ${res.status}`);
-      const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-      if (body.errors?.length) throw new Error(`bitquery: ${body.errors[0]!.message}`);
-      if (!body.data) throw new Error("bitquery: empty response");
-      return body.data;
-    }
+    });
   }
 
-  // Token scans delegate to the RPC provider: exact, free and not limited
-  // to the realtime window. Bitquery carries the wallet histories.
+  // Cheap point reads stay on the RPC; the bulky log walks go to Bitquery
+  // for tokens born inside the realtime window (a handful of requests
+  // instead of hundreds of getLogs windows), with the RPC as the fallback.
   tokenMeta(address: Hex, hint?: { createdBlock?: bigint }): Promise<TokenMeta> {
     return this.rpc.tokenMeta(address, hint);
   }
 
-  activity(token: TokenMeta, fromBlock: bigint): Promise<TokenActivity> {
-    return this.rpc.activity(token, fromBlock);
+  private insideWindow(token: TokenMeta): boolean {
+    return Date.now() / 1000 - token.createdAt < REALTIME_WINDOW_S;
   }
 
-  balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
-    return this.rpc.balances(token, wallets);
+  async activity(token: TokenMeta, fromBlock: bigint): Promise<TokenActivity> {
+    if (!this.insideWindow(token)) return this.rpc.activity(token, fromBlock);
+    try {
+      const [transfers, quotes, toBlock] = await Promise.all([
+        this.pageAll<BqTokenTransferRow>(TOKEN_TRANSFERS_PAGE, token.address, fromBlock, (d) => (d as { EVM: { Transfers: BqTokenTransferRow[] } }).EVM.Transfers),
+        this.pageAll<BqTokenQuoteRow>(TOKEN_QUOTES_PAGE, token.address, fromBlock, (d) => (d as { EVM: { DEXTradeByTokens: BqTokenQuoteRow[] } }).EVM.DEXTradeByTokens),
+        this.rpc.client.getBlockNumber(),
+      ]);
+      let logIndex = 0;
+      const rawTransfers = transfers
+        .filter((t) => t.TransactionStatus.Success)
+        .map((t) => ({
+          from: t.Transfer.Sender.toLowerCase(),
+          to: t.Transfer.Receiver.toLowerCase(),
+          tokens: toWei(t.Transfer.Amount, token.decimals),
+          block: BigInt(t.Block.Number),
+          tx: t.Transaction.Hash.toLowerCase() as Hex,
+          logIndex: logIndex++,
+        }));
+      const rawQuotes = quotes.map((q) => ({
+        tx: q.Transaction.Hash.toLowerCase() as Hex,
+        kind: "swap" as const,
+        eth: toWei(q.Trade.Side.Amount, 18),
+        tokens: toWei(q.Trade.Amount, token.decimals),
+      }));
+      return { transfers: rawTransfers, quotes: rawQuotes, toBlock };
+    } catch {
+      return this.rpc.activity(token, fromBlock);
+    }
+  }
+
+  private async pageAll<T extends { Block: { Number: string } }>(
+    query: string,
+    token: string,
+    fromBlock: bigint,
+    pick: (d: unknown) => T[],
+  ): Promise<T[]> {
+    const out: T[] = [];
+    let after = fromBlock > 0n ? (fromBlock - 1n).toString() : "0";
+    for (let page = 0; page < 12; page++) {
+      const data = await this.gql<unknown>(query, { token, after });
+      const rows = pick(data);
+      out.push(...rows);
+      if (rows.length < 25000) return out;
+      after = rows[rows.length - 1]!.Block.Number;
+    }
+    return out;
+  }
+
+  async balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
+    if (!this.insideWindow(token)) return this.rpc.balances(token, wallets);
+    try {
+      const data = await this.gql<{ EVM: { BalanceUpdates: BqBalanceRow[] } }>(TOKEN_BALANCES_QUERY, { token: token.address });
+      const all = new Map<string, bigint>();
+      for (const r of data.EVM.BalanceUpdates) {
+        const v = toWei(r.balance.startsWith("-") ? "0" : r.balance, token.decimals);
+        all.set(r.BalanceUpdate.Address.toLowerCase(), v);
+      }
+      const out = new Map<string, bigint>();
+      for (const w of wallets) out.set(w, all.get(w.toLowerCase()) ?? 0n);
+      return out;
+    } catch {
+      return this.rpc.balances(token, wallets);
+    }
   }
 
   priceNowEth(token: TokenMeta): Promise<number> {

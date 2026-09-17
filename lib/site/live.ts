@@ -43,8 +43,9 @@ export interface LiveScan {
   dead: boolean;
   grade: Grade;
   token: { ticker: string; address: string; age: string; stage: string; mcap: string; liquidity: string; vol24h: string; holders: string };
-  verdict: { pnl: string; pnlNum: number | null; winrate: string | null; counted: number; traced: number | null; hint: string };
+  verdict: { pnl: string; pnlNum: number | null; median: string | null; inProfit: number; winrate: string | null; counted: number; traced: number | null; hint: string };
   bands: LiveBand[];
+  bandCoverage: string;
   holders: LiveHolderRow[];
   exited: { wallets: number; avgPnl: string | null };
   flags: { dust: number; unknownBasis: number; unknownSupplyPct: string; infra: number };
@@ -110,8 +111,18 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
       vol24h: fmtUsd(h.volume24hUsd),
       holders: h.holders.toLocaleString("fr-FR").replace(/ /g, " "),
     },
-    verdict: { pnl: pct(a.avgPnlPct), pnlNum: a.avgPnlPct, winrate: null, counted: a.pnlWallets, traced: null, hint: HINTS[grade] },
+    verdict: {
+      pnl: pct(a.avgPnlPct),
+      pnlNum: a.avgPnlPct,
+      median: a.medianPnlPct === null ? null : pct(a.medianPnlPct),
+      inProfit: a.inProfit,
+      winrate: null,
+      counted: a.pnlWallets,
+      traced: null,
+      hint: HINTS[grade],
+    },
     bands,
+    bandCoverage: (groups.reduce((sum, g) => sum + g.supplyShare, 0) * 100).toFixed(1) + "%",
     holders: rows,
     exited: { wallets: a.exited.wallets, avgPnl: exitedAvg === null ? null : pct(exitedAvg) },
     flags: {
@@ -225,7 +236,7 @@ export function runScan(
       for await (const phase of check(provider, cache, key as `0x${string}`, {
         profiles: true,
         profileLimit: 20,
-        profileDeadlineMs: 45_000,
+        profileDeadlineMs: 30_000,
         onStage: (e) => listeners.forEach((fn) => fn(e)),
       })) {
         if (phase.phase === 1) {

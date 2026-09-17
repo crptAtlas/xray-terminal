@@ -89,11 +89,13 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   x.fillStyle = "#6E8291";
   x.font = '400 22px "JetBrains Mono"';
   x.fillText(d.addr.slice(0, 10) + "…" + d.addr.slice(-8), 200, 176);
-  // big pnl top-right
+  // big pnl top-right, colored by its own sign (the grade keeps the frame)
+  const pnlNum = parseFloat(d.pnl.replace("\u2212", "-"));
+  const pnlCol = Number.isNaN(pnlNum) ? gc : PNL(pnlNum);
   x.textAlign = "right";
-  x.fillStyle = gc;
+  x.fillStyle = pnlCol;
   x.font = '700 108px "JetBrains Mono"';
-  glow(gc, 32);
+  glow(pnlCol, 32);
   x.fillText(d.pnl, 1008, 168);
   noglow();
   x.fillStyle = "#6E8291";

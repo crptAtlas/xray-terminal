@@ -55,7 +55,8 @@ export async function walletProfilesWithDeadline(
       }
       try {
         out.set(w, await walletProfile(provider, cache, w));
-      } catch {
+      } catch (err) {
+        console.warn(`profile ${w.slice(0, 10)}: ${err instanceof Error ? err.message : err}`);
         out.set(w, notRead(w));
       }
     }
