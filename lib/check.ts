@@ -70,17 +70,12 @@ export async function* check(
     return;
   }
 
-  const { walletProfilesWithDeadline } = await import("./read/wallet.ts");
+  const { walletProfilesBatch } = await import("./read/wallet.ts");
   const { BitqueryProvider } = await import("./providers/bitquery.ts");
   if (!(provider instanceof BitqueryProvider)) return;
-  const wallets = snapshot.holders.slice(0, opts.profileLimit ?? snapshot.holders.length).map((h) => h.wallet);
+  const wallets = snapshot.holders.slice(0, opts.profileLimit ?? 1000).map((h) => h.wallet);
   onStage({ agent: "tracer", status: "start" });
-  const profiles = await walletProfilesWithDeadline(
-    provider,
-    cache,
-    wallets,
-    opts.profileDeadlineMs ?? 60_000,
-  );
+  const profiles = await walletProfilesBatch(provider, cache, wallets, opts.profileDeadlineMs ?? 60_000);
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }

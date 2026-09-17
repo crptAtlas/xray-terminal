@@ -235,8 +235,8 @@ export function runScan(
       let scan: LiveScan | null = null;
       for await (const phase of check(provider, cache, key as `0x${string}`, {
         profiles: true,
-        profileLimit: 20,
-        profileDeadlineMs: 30_000,
+        profileLimit: 1000,
+        profileDeadlineMs: Number(process.env.XRAY_PROFILE_DEADLINE_MS ?? 90_000),
         onStage: (e) => listeners.forEach((fn) => fn(e)),
       })) {
         if (phase.phase === 1) {

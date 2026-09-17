@@ -34,6 +34,60 @@ export async function walletProfile(
   return profile;
 }
 
+/**
+ * Profiles for many wallets, batched: cache hits first, then chunks of
+ * 100 wallets - one transfer batch + quote chunks + one balance multicall
+ * per chunk. The deadline is checked between chunks; wallets left over
+ * come back notRead and fill in from the cache on later scans.
+ */
+export async function walletProfilesBatch(
+  provider: BitqueryProvider,
+  cache: Cache,
+  wallets: string[],
+  deadlineMs: number,
+): Promise<Map<string, Profile>> {
+  const out = new Map<string, Profile>();
+  const deadline = Date.now() + deadlineMs;
+  const misses: string[] = [];
+  for (const w of wallets) {
+    const cached = cache.freshProfile(w);
+    if (cached) out.set(w, JSON.parse(cached) as Profile);
+    else misses.push(w);
+  }
+  const CHUNK = 100;
+  let failures = 0;
+  for (let i = 0; i < misses.length; i += CHUNK) {
+    if (Date.now() > deadline) break;
+    if (failures >= 2) break; // the plan is rate-limited out - stop burning time, the cache fills in later
+    const chunk = misses.slice(i, i + CHUNK);
+    try {
+      const [byWallet, ethWei] = await Promise.all([
+        provider.walletTradesBatch(chunk),
+        provider.ethBalances(chunk.map((w) => w.toLowerCase())),
+      ]);
+      failures = 0;
+      for (const w of chunk) {
+        const byToken = byWallet.get(w.toLowerCase()) ?? new Map();
+        const remainingOf = (token: string): bigint => {
+          let bal = 0n;
+          for (const t of byToken.get(token) ?? []) bal += t.kind === "buy" ? t.tokens : -t.tokens;
+          return bal > 0n ? bal : 0n;
+        };
+        const profile = buildProfile(w, byToken, remainingOf, ethWei.get(w.toLowerCase()) ?? 0n);
+        cache.saveProfile(w, JSON.stringify(profile));
+        out.set(w, profile);
+      }
+    } catch (err) {
+      failures++;
+      console.warn(`profile batch ${i / CHUNK}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+  for (const w of wallets) {
+    if (!out.has(w)) out.set(w, notRead(w));
+  }
+  return out;
+}
+
 export async function walletProfilesWithDeadline(
   provider: BitqueryProvider,
   cache: Cache,

@@ -9,6 +9,7 @@ import {
 } from "viem";
 import { ADDR, CHAIN, TOPIC, ZERO, type Hex } from "../chain.ts";
 import { erc20Abi } from "../abi/erc20.ts";
+import { parseAbi } from "viem";
 import { curveAbi, factoryAbi, PHASE } from "../abi/pons.ts";
 import { poolManagerAbi, SWAP_TOPIC } from "../abi/pool.ts";
 import { makeTransport, rpcStats } from "./gate.ts";
@@ -210,6 +211,29 @@ export class RpcProvider implements Provider {
     }
 
     return { transfers, quotes, toBlock };
+  }
+
+  /** Native ETH balances for many wallets in a few multicalls. */
+  async ethBalances(wallets: string[]): Promise<Map<string, bigint>> {
+    const abi = parseAbi(["function getEthBalance(address addr) view returns (uint256)"]);
+    const out = new Map<string, bigint>();
+    const chunk = 500;
+    for (let i = 0; i < wallets.length; i += chunk) {
+      const slice = wallets.slice(i, i + chunk);
+      const res = await this.client.multicall({
+        contracts: slice.map((w) => ({
+          address: ADDR.multicall3 as Hex,
+          abi,
+          functionName: "getEthBalance" as const,
+          args: [w as Hex],
+        })),
+        allowFailure: true,
+      });
+      res.forEach((r, j) => {
+        out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
+      });
+    }
+    return out;
   }
 
   async balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {

@@ -94,6 +94,21 @@ query ($token: String!) {
   }
 }`;
 
+const WALLET_TRANSFERS_BATCH_PAGE = `
+query ($wallets: [String!], $after: String!) {
+  EVM(network: robinhood, dataset: realtime) {
+    Transfers(
+      where: {any: [{Transfer: {Sender: {in: $wallets}}}, {Transfer: {Receiver: {in: $wallets}}}], Block: {Number: {gt: $after}}}
+      orderBy: {ascending: Block_Number}
+      limit: {count: 25000}
+    ) {
+      Block { Number }
+      Transaction { Hash }
+      Transfer { Amount Sender Receiver Currency { SmartContract } }
+    }
+  }
+}`;
+
 const WALLET_TRANSFERS_QUERY = `
 query ($wallet: String!) {
   EVM(network: robinhood, dataset: realtime) {
@@ -330,6 +345,47 @@ export class BitqueryProvider implements Provider {
     return this.rpc.liquidityEth(token);
   }
 
+  /**
+   * Histories for many wallets in a handful of requests: one paged batch
+   * of transfers for the whole set, then the ETH quotes of the touched
+   * transactions in large chunks. This is what makes profiling the top
+   * 1000 holders feasible.
+   */
+  async walletTradesBatch(wallets: string[]): Promise<Map<string, Map<string, Trade[]>>> {
+    const set = new Set(wallets.map((w) => w.toLowerCase()));
+    const transfers: BqTransferRow[] = [];
+    let after = "0";
+    for (let page = 0; page < 8; page++) {
+      const data = await this.gql<{ EVM: { Transfers: BqTransferRow[] } }>(WALLET_TRANSFERS_BATCH_PAGE, {
+        wallets: [...set],
+        after,
+      });
+      const rows = data.EVM.Transfers;
+      transfers.push(...rows);
+      if (rows.length < 25000) break;
+      after = rows[rows.length - 1]!.Block.Number;
+    }
+    const tokenTransfers = transfers.filter((t) => {
+      const c = t.Transfer.Currency.SmartContract.toLowerCase();
+      return c !== ZERO && c !== ADDR.weth;
+    });
+    const hashes = [...new Set(tokenTransfers.map((t) => t.Transaction.Hash))];
+    const quotes: BqQuoteRow[] = [];
+    for (let i = 0; i < hashes.length; i += 400) {
+      const chunk = hashes.slice(i, i + 400);
+      const q = await this.gql<{ EVM: { DEXTradeByTokens: BqQuoteRow[] } }>(QUOTES_BY_TX_QUERY, { hashes: chunk });
+      quotes.push(...q.EVM.DEXTradeByTokens);
+    }
+    const out = new Map<string, Map<string, Trade[]>>();
+    for (const w of set) {
+      const own = tokenTransfers.filter(
+        (t) => t.Transfer.Sender.toLowerCase() === w || t.Transfer.Receiver.toLowerCase() === w,
+      );
+      out.set(w, mapWalletHistory(w, own, quotes));
+    }
+    return out;
+  }
+
   async walletTrades(wallet: string): Promise<Map<string, Trade[]>> {
     const w = wallet.toLowerCase();
     const data = await this.gql<{ EVM: { Transfers: BqTransferRow[] } }>(WALLET_TRANSFERS_QUERY, { wallet: w });
@@ -349,6 +405,10 @@ export class BitqueryProvider implements Provider {
 
   async walletEthWei(wallet: string): Promise<bigint> {
     return this.rpc.client.getBalance({ address: wallet as Hex });
+  }
+
+  ethBalances(wallets: string[]): Promise<Map<string, bigint>> {
+    return this.rpc.ethBalances(wallets);
   }
 
   stats(): { label: string; requests: number } {
