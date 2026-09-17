@@ -21,7 +21,7 @@ A chart shows you a price. It does not show you who is trapped. Every Pons token
 
 ![xray check of a live public token: header, supply-weighted avg pnl, three dense holder groups, top holders with individual PnL, exited wallets and exclusion counters](assets/readme/check.svg)
 
-A captured run of `xray check` against the live chain, mode A, public RPC, no keys. The capture time is printed inside the image; it is a historical snapshot, not a current grade. [Captured output as JSON](assets/readme/check-snapshot.json)
+A captured run of `xray check` against the live chain, public RPC, no keys. The capture time is printed inside the image; it is a historical snapshot, not a current grade. [Captured output as JSON](assets/readme/check-snapshot.json)
 
 ## How it reads a token
 
@@ -93,20 +93,11 @@ The doctor verifies every hardcoded address and topic against the live chain ins
 npm run cli -- check 0x…            # by contract address
 npm run cli -- check TICKER         # by ticker; ambiguous tickers list the cluster
 npm run cli -- check 0x… --format json --output out.json
-npm run cli -- wallet 0x…           # wallet profile, mode B only
+npm run cli -- wallet 0x…           # wallet profile, full chain history
+npm run cli -- index                # build the local chain-wide trade index
 ```
 
-Two ways to run it, honestly different:
-
-**Mode A - free and slow (default).** The public RPC, no keys, no registration. Responses truncate at 10,000 logs and a request takes 1.6-3.2s regardless of size, so a 1,000-holder token computes in ~10-20s with parallel windows; repeats are near-instant from the incremental cache. Works: holder PnL, groups, supply-weighted averages, header, cards. Does not work: wallet-wide profiles, badges, token winrate - finding every trade of a wallet would mean scanning the whole chain, so the CLI says so and skips them.
-
-**Mode B - paid and fast.** [Bitquery](https://bitquery.io), GraphQL, network `robinhood`, plans from $49/mo. Decoded Pons trades, holder and balance APIs; everything works, including `[smart]` and `[whale]` wallet badges. Setup is one line:
-
-```bash
-export BITQUERY_TOKEN=…
-```
-
-The Bitquery trades cube keeps roughly the last 30 days, so a wallet's averages are month-scoped. Mode B is written against their documented schema and pinned by tests on canned responses; live A/B parity verification is pending an account token.
+**One source: the public RPC.** No keys, no registration, no rate budget to buy. Phase 1 (holder PnL, groups, supply-weighted averages, header, cards) reads the token's own logs with adaptive windows: a 1,000-holder token computes in ~10-20s cold, repeats are near-instant from the incremental cache. Phase 2 (wallet profiles, badges, token winrate) reads the local trade index: the curve events name the real trader in their topics, so `xray index` backfills every curve trade on the chain into SQLite once, a cheap tail sync keeps it at the head and any wallet's full history is a local SELECT. Top-1000 profiles land in seconds at full depth. Post-graduation v4 swaps carry no trader topic and stay out of profiles - the curve is where meme life happens.
 
 Tickers are not unique on Pons. When several launches share one, the CLI lists every candidate with its launch block and asks for the address. The first ticker query builds a launch index of the whole chain (minutes, half a million launches); later queries extend it incrementally (seconds).
 
@@ -129,7 +120,7 @@ The full spec lives in [docs/SPEC.md](docs/SPEC.md), the decisions on top of it 
 bin/xray.mjs             CLI: check, wallet, doctor, demo, serve
 lib/
   chain.ts               chain constants, verified by doctor
-  providers/             the source boundary: gate, adaptive logs, rpc (A), bitquery (B)
+  providers/             the source boundary: gate, adaptive logs, rpc
   read/                  token snapshot, header, launches, wallets
   pnl/                   pure math: classify, position, groups, aggregate
   profile/               winrate, badges, wallet profile
@@ -143,7 +134,7 @@ test/                    node --test, offline, fixtures snapped from the live ch
 .github/workflows/       ci.yml: typecheck, tests, no-signer
 ```
 
-The math in `lib/pnl/` and `lib/profile/` is pure functions with no network access, tested on fixtures. Data sources sit behind one interface; everything above it cannot tell mode A from mode B.
+The math in `lib/pnl/` and `lib/profile/` is pure functions with no network access, tested on fixtures. Data sources sit behind one interface; everything above it cannot tell where the rows came from.
 
 ## Boundaries
 

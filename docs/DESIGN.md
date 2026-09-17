@@ -30,7 +30,7 @@ tightly than `eth_call` and dislikes JSON-RPC batching. Therefore:
   so log reads stay on the official endpoint. `RPC_URL` (comma-separated
   list, `#nologs` suffix supported) overrides the defaults.
 
-## ETH/USD rate (mode A)
+## ETH/USD rate
 
 The chain has no reliable on-chain USD oracle. Dollar figures (dust
 filter, mcap, liquidity, volume) use one keyless GET to the Coinbase
@@ -39,7 +39,7 @@ minutes. `ETH_USD` env var overrides it (also the offline/demo path).
 This is the only external source besides the RPC and is stated in the
 README.
 
-## Ticker lookup (mode A)
+## Ticker lookup
 
 An incremental SQLite index of factory launches (block, token address,
 symbol, curve address). The first ticker query builds it; later queries
