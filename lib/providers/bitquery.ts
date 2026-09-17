@@ -173,10 +173,18 @@ interface BqBalanceRow {
 }
 
 export function toWei(amount: string, decimals: number): bigint {
-  // Bitquery amounts are decimal strings in whole-token units.
+  // Bitquery amounts are decimal strings in whole-token units. Anything
+  // that does not parse cleanly becomes 0 and the caller drops the row.
+  if (!/^\d+(\.\d+)?$/.test(amount)) return 0n;
   const [int, frac = ""] = amount.split(".");
   const fracPadded = (frac + "0".repeat(decimals)).slice(0, decimals);
   return BigInt(int || "0") * 10n ** BigInt(decimals) + BigInt(fracPadded || "0");
+}
+
+let droppedRows = 0;
+function dropRow(kind: string): void {
+  droppedRows++;
+  if (droppedRows % 50 === 1) console.warn(`bitquery: dropped invalid ${kind} row (${droppedRows} total)`);
 }
 
 /**
@@ -192,8 +200,13 @@ export function mapWalletHistory(
   const w = wallet.toLowerCase();
   const quoteByTxToken = new Map<string, bigint>();
   for (const q of quotes) {
+    const eth = toWei(q.Trade.Side.Amount, 18);
+    if (eth === 0n) {
+      dropRow("quote");
+      continue;
+    }
     const key = q.Transaction.Hash.toLowerCase() + ":" + q.Trade.Currency.SmartContract.toLowerCase();
-    quoteByTxToken.set(key, (quoteByTxToken.get(key) ?? 0n) + toWei(q.Trade.Side.Amount, 18));
+    quoteByTxToken.set(key, (quoteByTxToken.get(key) ?? 0n) + eth);
   }
   const out = new Map<string, Trade[]>();
   for (const t of transfers) {
@@ -202,11 +215,16 @@ export function mapWalletHistory(
     const tx = t.Transaction.Hash.toLowerCase();
     const eth = quoteByTxToken.get(tx + ":" + token);
     if (eth === undefined) continue; // plain transfer: no honest cost basis
+    const tokensWei = toWei(t.Transfer.Amount, 18);
+    if (tokensWei === 0n) {
+      dropRow("transfer");
+      continue;
+    }
     const inbound = t.Transfer.Receiver.toLowerCase() === w;
     const trade: Trade = {
       wallet: w,
       kind: inbound ? "buy" : "sell",
-      tokens: toWei(t.Transfer.Amount, 18),
+      tokens: tokensWei,
       eth,
       block: BigInt(t.Block.Number),
       tx,
@@ -251,6 +269,10 @@ export class BitqueryProvider implements Provider {
           await new Promise((r) => setTimeout(r, Math.min(2000 * 2 ** attempt, 8000)));
           continue;
         }
+        if (res.status >= 500 && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+          continue;
+        }
         if (!res.ok) throw new Error(`bitquery http ${res.status}`);
         const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
         if (body.errors?.length) throw new Error(`bitquery: ${body.errors[0]!.message}`);
@@ -281,7 +303,14 @@ export class BitqueryProvider implements Provider {
       ]);
       let logIndex = 0;
       const rawTransfers = transfers
-        .filter((t) => t.TransactionStatus.Success)
+        .filter((t) => {
+          if (!t.TransactionStatus.Success) return false;
+          if (toWei(t.Transfer.Amount, token.decimals) === 0n) {
+            dropRow("token transfer");
+            return false;
+          }
+          return true;
+        })
         .map((t) => ({
           from: t.Transfer.Sender.toLowerCase(),
           to: t.Transfer.Receiver.toLowerCase(),
@@ -290,12 +319,20 @@ export class BitqueryProvider implements Provider {
           tx: t.Transaction.Hash.toLowerCase() as Hex,
           logIndex: logIndex++,
         }));
-      const rawQuotes = quotes.map((q) => ({
-        tx: q.Transaction.Hash.toLowerCase() as Hex,
-        kind: "swap" as const,
-        eth: toWei(q.Trade.Side.Amount, 18),
-        tokens: toWei(q.Trade.Amount, token.decimals),
-      }));
+      const rawQuotes = quotes
+        .filter((q) => {
+          if (toWei(q.Trade.Side.Amount, 18) === 0n) {
+            dropRow("token quote");
+            return false;
+          }
+          return true;
+        })
+        .map((q) => ({
+          tx: q.Transaction.Hash.toLowerCase() as Hex,
+          kind: "swap" as const,
+          eth: toWei(q.Trade.Side.Amount, 18),
+          tokens: toWei(q.Trade.Amount, token.decimals),
+        }));
       return { transfers: rawTransfers, quotes: rawQuotes, toBlock };
     } catch {
       return this.rpc.activity(token, fromBlock);

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BitqueryProvider } from "../../../lib/providers/bitquery.ts";
-import { buildProfile } from "../../../lib/profile/profile.ts";
 import { looksLikeAddress } from "../../../lib/read/launches.ts";
 import { Cache } from "../../../lib/cache.ts";
 import { cachePath } from "../../../lib/site/live";
@@ -26,9 +25,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       for (const t of byToken.get(token) ?? []) bal += t.kind === "buy" ? t.tokens : -t.tokens;
       return bal > 0n ? bal : 0n;
     };
-    const ethWei = await provider.walletEthWei(wallet);
-    const profile = buildProfile(wallet, byToken, remainingOf, ethWei);
-    cache.saveProfile(wallet, JSON.stringify(profile));
+    const { walletProfile } = await import("../../../lib/read/wallet.ts");
+    const profile = await walletProfile(provider, cache, wallet);
 
     const fmt = (v: number | null, d = 1) => (v === null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}%`);
     const tokens = [...byToken.entries()]

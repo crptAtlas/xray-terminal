@@ -1,37 +1,56 @@
 import type { Cache } from "../cache.ts";
 import type { BitqueryProvider } from "../providers/bitquery.ts";
-import { buildProfile, type Profile } from "../profile/profile.ts";
+import { buildPositions, profileFromPositions, type PositionSummary, type Profile } from "../profile/profile.ts";
 
 /**
- * Wallet profile through the global 24h cache. remainingOf comes from the
- * wallet's own trade ledger (buys minus sells), which is what the cube can
- * answer without one balance query per token.
+ * Wallet profiles through the global 24h cache. The cache stores per-token
+ * position summaries plus the ETH balance, so a profile can be folded with
+ * any token excluded (the token being scanned never feeds its own holders'
+ * profiles - see lib/profile/profile.ts). remainingOf comes from the
+ * wallet's own trade ledger (buys minus sells).
  */
+
+interface CachedWallet {
+  positions: PositionSummary[];
+  ethWei: string;
+}
+
+function readCached(cache: Cache, wallet: string): CachedWallet | null {
+  const raw = cache.freshProfile(wallet);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<CachedWallet>;
+    if (!Array.isArray(parsed.positions) || typeof parsed.ethWei !== "string") return null; // old format
+    return parsed as CachedWallet;
+  } catch {
+    return null;
+  }
+}
+
+const ledgerRemaining = (byToken: Map<string, { kind: string; tokens: bigint }[]>) => (token: string): bigint => {
+  let bal = 0n;
+  for (const t of byToken.get(token) ?? []) {
+    bal += t.kind === "buy" ? t.tokens : -t.tokens;
+  }
+  return bal > 0n ? bal : 0n;
+};
 
 export async function walletProfile(
   provider: BitqueryProvider,
   cache: Cache,
   wallet: string,
+  excludeToken?: string,
 ): Promise<Profile> {
-  const cached = cache.freshProfile(wallet);
-  if (cached) return JSON.parse(cached) as Profile;
+  const cached = readCached(cache, wallet);
+  if (cached) return profileFromPositions(wallet, cached.positions, BigInt(cached.ethWei), excludeToken);
 
   const [byToken, ethWei] = await Promise.all([
     provider.walletTrades(wallet),
     provider.walletEthWei(wallet),
   ]);
-
-  const remainingOf = (token: string): bigint => {
-    let bal = 0n;
-    for (const t of byToken.get(token) ?? []) {
-      bal += t.kind === "buy" ? t.tokens : -t.tokens;
-    }
-    return bal > 0n ? bal : 0n;
-  };
-
-  const profile = buildProfile(wallet, byToken, remainingOf, ethWei);
-  cache.saveProfile(wallet, JSON.stringify(profile));
-  return profile;
+  const positions = buildPositions(byToken, ledgerRemaining(byToken));
+  cache.saveProfile(wallet, JSON.stringify({ positions, ethWei: ethWei.toString() } satisfies CachedWallet));
+  return profileFromPositions(wallet, positions, ethWei, excludeToken);
 }
 
 /**
@@ -45,13 +64,14 @@ export async function walletProfilesBatch(
   cache: Cache,
   wallets: string[],
   deadlineMs: number,
+  excludeToken?: string,
 ): Promise<Map<string, Profile>> {
   const out = new Map<string, Profile>();
   const deadline = Date.now() + deadlineMs;
   const misses: string[] = [];
   for (const w of wallets) {
-    const cached = cache.freshProfile(w);
-    if (cached) out.set(w, JSON.parse(cached) as Profile);
+    const cached = readCached(cache, w);
+    if (cached) out.set(w, profileFromPositions(w, cached.positions, BigInt(cached.ethWei), excludeToken));
     else misses.push(w);
   }
   const CHUNK = 100;
@@ -68,14 +88,10 @@ export async function walletProfilesBatch(
       failures = 0;
       for (const w of chunk) {
         const byToken = byWallet.get(w.toLowerCase()) ?? new Map();
-        const remainingOf = (token: string): bigint => {
-          let bal = 0n;
-          for (const t of byToken.get(token) ?? []) bal += t.kind === "buy" ? t.tokens : -t.tokens;
-          return bal > 0n ? bal : 0n;
-        };
-        const profile = buildProfile(w, byToken, remainingOf, ethWei.get(w.toLowerCase()) ?? 0n);
-        cache.saveProfile(w, JSON.stringify(profile));
-        out.set(w, profile);
+        const positions = buildPositions(byToken, ledgerRemaining(byToken));
+        const eth = ethWei.get(w.toLowerCase()) ?? 0n;
+        cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString() } satisfies CachedWallet));
+        out.set(w, profileFromPositions(w, positions, eth, excludeToken));
       }
     } catch (err) {
       failures++;

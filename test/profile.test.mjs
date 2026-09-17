@@ -43,3 +43,33 @@ test("empty history", () => {
   assert.equal(p.winrate, null);
   assert.equal(p.avgPnlPerTrade, null);
 });
+
+test("the scanned token is excluded from the profile: insiders get no credit from their own launch", async () => {
+  const { buildPositions, profileFromPositions } = await import("../lib/profile/profile.ts");
+  const byToken = new Map([
+    // huge win on the scanned token itself
+    ["0xscanned", [buy(T(100), E(0.01)), sell(T(100), E(2))]],
+    // modest record elsewhere
+    ["0xother1", [buy(T(100), E(1)), sell(T(100), E(1.2))]],
+    ["0xother2", [buy(T(100), E(1)), sell(T(100), E(0.8))]],
+  ]);
+  const positions = buildPositions(byToken, () => 0n);
+  const withIt = profileFromPositions("0xw", positions, 0n);
+  const withoutIt = profileFromPositions("0xw", positions, 0n, "0xscanned");
+  assert.equal(withIt.trades, 3);
+  assert.equal(withoutIt.trades, 2);
+  assert.ok(withIt.avgPnlPerTrade > 1000, "insider pump inflates the naive profile");
+  assert.equal(withoutIt.avgPnlPerTrade, 0); // (+20 - 20) / 2
+  assert.equal(Math.round(withoutIt.winrate * 10) / 10, 33.3); // 1 / (2 + 1)
+});
+
+test("badges still judge the full record including the scanned token", async () => {
+  const { buildPositions, profileFromPositions } = await import("../lib/profile/profile.ts");
+  // 6 ETH realized on the scanned token alone -> RICH holds even when the
+  // shown stats exclude it
+  const byToken = new Map([["0xscanned", [buy(T(100), E(1)), sell(T(100), E(7))]]]);
+  const positions = buildPositions(byToken, () => 0n);
+  const p = profileFromPositions("0xw", positions, 0n, "0xscanned");
+  assert.equal(p.trades, 0); // shown stats exclude the token
+  assert.deepEqual(p.badges, ["rich"]); // the badge does not
+});

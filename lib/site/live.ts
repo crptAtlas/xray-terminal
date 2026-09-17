@@ -50,6 +50,7 @@ export interface LiveScan {
   exited: { wallets: number; avgPnl: string | null };
   flags: { dust: number; unknownBasis: number; unknownSupplyPct: string; infra: number };
   totalHolders: number;
+  profilesRead?: number; // set by the profile phase; 0 means mode B is rate-limited out
   source: { label: string; requests: number; seconds: number };
   card: CardData;
 }
@@ -197,9 +198,11 @@ function withProfiles(
     };
   });
   const wr = aggregates.avgWinrate;
+  const profilesRead = [...profiles.values()].filter((p) => !p.notRead).length;
   return {
     ...scan,
     holders,
+    profilesRead,
     verdict: {
       ...scan.verdict,
       winrate: wr === null ? null : wr.toFixed(0) + "%",

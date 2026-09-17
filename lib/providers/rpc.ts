@@ -186,8 +186,12 @@ export class RpcProvider implements Provider {
     for (const l of curveLogs) {
       const decoded = decodeEventLog({ abi: curveAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
       if (decoded.eventName === "CurveBuy") {
-        const a = decoded.args as { quoteIn: bigint; tokensOut: bigint };
-        quotes.push({ tx: l.transactionHash, kind: "curveBuy", eth: a.quoteIn, tokens: a.tokensOut });
+        // spec 3.1: fees and the opening tax are not part of cost basis -
+        // quoteIn includes them, so strip them to the clean swap amount
+        // (this also matches what the trade cubes report)
+        const a = decoded.args as { quoteIn: bigint; tokensOut: bigint; fee: bigint; tax: bigint };
+        const eth = a.quoteIn - a.fee - a.tax;
+        quotes.push({ tx: l.transactionHash, kind: "curveBuy", eth: eth > 0n ? eth : a.quoteIn, tokens: a.tokensOut });
       } else {
         const a = decoded.args as { tokensIn: bigint; quoteOut: bigint };
         quotes.push({ tx: l.transactionHash, kind: "curveSell", eth: a.quoteOut, tokens: a.tokensIn });

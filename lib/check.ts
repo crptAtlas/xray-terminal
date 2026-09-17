@@ -75,7 +75,9 @@ export async function* check(
   if (!(provider instanceof BitqueryProvider)) return;
   const wallets = snapshot.holders.slice(0, opts.profileLimit ?? 1000).map((h) => h.wallet);
   onStage({ agent: "tracer", status: "start" });
-  const profiles = await walletProfilesBatch(provider, cache, wallets, opts.profileDeadlineMs ?? 60_000);
+  // the scanned token itself is excluded from every profile: insiders of
+  // this launch must not decorate their stats with it
+  const profiles = await walletProfilesBatch(provider, cache, wallets, opts.profileDeadlineMs ?? 60_000, snapshot.meta.address);
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }

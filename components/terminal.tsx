@@ -221,6 +221,7 @@ export function Terminal() {
         pnlNum: live.verdict.pnlNum,
         median: live.verdict.median,
         inProfit: live.verdict.inProfit as number | null,
+        profilesRead: live.profilesRead ?? null,
         bandCoverage: live.bandCoverage as string | null,
         winrate: live.verdict.winrate,
         counted: String(live.verdict.counted),
@@ -246,6 +247,7 @@ export function Terminal() {
       pnlNum: parseFloat(G.pnl.replace("−", "-")) as number | null,
       median: null as string | null,
       inProfit: null as number | null,
+      profilesRead: null as number | null,
       bandCoverage: null as string | null,
       winrate: G.winrate as string | null,
       counted: G.counted,
@@ -560,7 +562,15 @@ export function Terminal() {
                 D.winrate === null ? "var(--bone-dark)" : wrPos >= 55 ? "var(--profit)" : wrPos >= 45 ? "var(--neutral)" : "var(--loss)",
                 wrPos,
                 ["0", "33", "66", "100"],
-                D.winrate === null ? <>reading wallet histories · fills in on repeat scans</> : <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades</>,
+                D.winrate !== null ? (
+                  <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades</>
+                ) : D.profilesRead === 0 ? (
+                  <>wallet profiles unavailable - rate-limited · running on public RPC data</>
+                ) : D.profilesRead !== null ? (
+                  <>{D.profilesRead} wallets read · none with 2+ closed trades yet</>
+                ) : (
+                  <>reading wallet histories · fills in on repeat scans</>
+                ),
                 isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" },
               )}
             </div>
