@@ -10,7 +10,7 @@ import { CardLightbox, useCardActions, useCardUrl } from "./share-card";
 import { AgentGif } from "./motion";
 
 // The terminal. Live queries stream real engine stages over SSE from
-// /api/scan/stream (mode A today: pnl, bands, header, grade, card; mode B
+// /api/scan/stream (phase 1: pnl, bands, header, grade, card; phase 2
 // will fill winrate, badges and profiles). The design prototype's demo
 // tokens ($MARROW and friends) still run on fixtures so the interface can
 // be toured offline.
@@ -353,7 +353,7 @@ export function Terminal() {
           <span>reads public state only - no wallet connect, no signing · Robinhood Chain · Pons V2</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 6, height: 6, background: "var(--accent)", display: "inline-block", boxShadow: "0 0 8px #78DCFF" }} />
-            <span className="tabular" style={{ color: "var(--text)" }}>mode A · public RPC · no keys</span>
+            <span className="tabular" style={{ color: "var(--text)" }}>public RPC · no keys</span>
           </span>
         </div>
 

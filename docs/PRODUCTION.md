@@ -43,7 +43,7 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 ## Badge and grade definitions (the engine's, already implemented)
 
-- **SMART**: chain-wide record, mode B data: `trades >= 30` closed
+- **SMART**: chain-wide record: `trades >= 30` closed
   positions and `avg_pnl_per_trade >= +25%` and `winrate >= 55%`
   (winrate = wins / (trades + 1)). Thresholds in `lib/profile/badges.ts`.
 - **WHALE**: total wallet balance worth `>= $10,000` - native ETH plus
@@ -58,7 +58,7 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 | # | Item | Unlocks | Where it goes |
 |---|---|---|---|
-| 1 | ~~`BITQUERY_TOKEN`~~ DONE: live on Vercel and locally. Only accelerates phase 1 on fresh tokens now; profiles run on the free RPC through the local trade index, full history | fast phase 1 | Vercel env var + `.env` locally |
+| 1 | ~~data API key~~ NOT NEEDED: the whole engine runs on the public RPC plus the local trade index - phase 1, profiles, wallet page, full history | everything | - |
 | 2 | Domain (e.g. buy the one you want, point it at Vercel) | real URL instead of xray-xi-puce.vercel.app, OG links | Vercel → Domains |
 | 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | `components/ca-block.tsx`, `CHART_URL` in `app/page.tsx` |
 | 4 | X / Telegram / public GitHub links | header and footer links | `components/header.tsx`, `components/footer.tsx` |
@@ -75,7 +75,7 @@ the engine's local JSON API and formats the answer.
 - `/check <ca|ticker>` - runs a scan, replies with the share card PNG
   and the text verdict (avg pnl, bands, grade), buttons: open in
   terminal, recheck.
-- `/wallet <address>` - mode B profile: avg pnl / trade, winrate,
+- `/wallet <address>` - wallet profile: avg pnl / trade, winrate,
   closed trades, badges.
 - `/watch <ca>` - re-checks every N minutes, messages when the grade
   changes band.
@@ -87,10 +87,9 @@ Needed to build it: nothing beyond items 1 and 5 above.
 ## Site status
 
 M1-M6 and the engine wiring are done: `/api/scan/stream` drives the
-terminal with the real mode A engine (SSE stage events, pnl bands,
+terminal with the real engine (SSE stage events, pnl bands,
 grade, live share card), `/api/card` renders the OG image server-side,
 the home page runs the full walk-and-talk animation, `/holders` is
-built (fixture result until mode B) and reduced-motion falls back to
+built (fixture result until the live wiring) and reduced-motion falls back to
 still frames. What remains needs the owner: the items in the table
-above, then flipping `/holders` and the winrate columns live once
-`BITQUERY_TOKEN` exists.
+above.

@@ -50,7 +50,7 @@ export interface LiveScan {
   exited: { wallets: number; avgPnl: string | null };
   flags: { dust: number; unknownBasis: number; unknownSupplyPct: string; infra: number; firstTrades?: string };
   totalHolders: number;
-  profilesRead?: number; // set by the profile phase; 0 means mode B is rate-limited out
+  profilesRead?: number; // set by the profile phase; 0 means wallet histories were unreachable
   source: { label: string; requests: number; seconds: number };
   card: CardData;
 }
@@ -133,7 +133,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
       infra: s.excluded.infra,
     },
     totalHolders: holding.length,
-    source: { label: "rpc · mode A", requests, seconds },
+    source: { label: "rpc", requests, seconds },
     card: {
       ticker: `$${s.meta.symbol}`,
       addr: s.meta.address,
@@ -175,7 +175,7 @@ export async function resolveQuery(q: string, cache: Cache): Promise<ResolveOutc
   };
 }
 
-/** Fold the profile phase (mode B) into a finished phase-1 scan. */
+/** Fold the profile phase into a finished phase-1 scan. */
 function withProfiles(
   scan: LiveScan,
   profiles: Map<string, Profile>,

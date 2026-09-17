@@ -12,12 +12,12 @@ import type { HolderRow } from "../read/token.ts";
  * they get their own `exited` line, unweighted. A dead token where everyone
  * exited shows no current average - the exited line carries the story.
  *
- * avg_winrate needs wallet profiles (2+ chain-wide trades), so in rpc mode
- * the winrate side stays null.
+ * avg_winrate needs wallet profiles (2+ chain-wide trades); it fills in
+ * during the profile phase and stays null before it.
  */
 
-// The slice of a wallet profile the aggregates need. Full profiles live in
-// lib/profile/profile.ts (mode B); rpc mode has none.
+// The slice of a wallet profile the aggregates need. Full profiles live
+// in lib/profile/profile.ts.
 export interface ProfileLite {
   trades: number;
   winrate: number | null;
