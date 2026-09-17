@@ -122,6 +122,27 @@ input {
   }
 }
 
+/* narrow screens */
+@media (max-width: 1040px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .hero-film {
+    display: none !important;
+  }
+  .how-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 700px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .font-tiny.hero-title {
+    font-size: 48px !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

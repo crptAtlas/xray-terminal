@@ -23,9 +23,9 @@ test("token trades roundtrip and incremental synced block", () => {
   c.appendTrades(meta.address, [
     { wallet: "0xa", kind: "buy", tokens: 10n, eth: 5n, block: 200n, tx: "0x9" },
   ]);
-  assert.deepEqual(c.tokenState(meta.address), { syncedBlock: 500n });
+  assert.deepEqual(c.tokenState(meta.address), { syncedBlock: 500n, createdBlock: 100n });
   c.saveToken(meta, 900n);
-  assert.deepEqual(c.tokenState(meta.address), { syncedBlock: 900n });
+  assert.deepEqual(c.tokenState(meta.address), { syncedBlock: 900n, createdBlock: 100n });
   const trades = c.loadTrades(meta.address);
   assert.equal(trades.length, 1);
   assert.deepEqual(trades[0], { wallet: "0xa", kind: "buy", tokens: 10n, eth: 5n, block: 200n, tx: "0x9" });

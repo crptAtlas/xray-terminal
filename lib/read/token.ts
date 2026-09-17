@@ -54,7 +54,8 @@ export async function tokenSnapshot(
   onStage: StageReporter = () => {},
 ): Promise<TokenSnapshot> {
   onStage({ agent: "scanner", status: "start" });
-  const meta = await provider.tokenMeta(address);
+  const known = cache.tokenState(address.toLowerCase());
+  const meta = await provider.tokenMeta(address, known?.createdBlock ? { createdBlock: known.createdBlock } : undefined);
 
   // incremental sync: cached trades + only the new blocks
   const state = cache.tokenState(meta.address);

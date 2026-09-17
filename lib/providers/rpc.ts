@@ -72,7 +72,7 @@ export class RpcProvider implements Provider {
     this.client = client ?? makeClient();
   }
 
-  async tokenMeta(address: Hex): Promise<TokenMeta> {
+  async tokenMeta(address: Hex, hint?: { createdBlock?: bigint }): Promise<TokenMeta> {
     const addr = address.toLowerCase() as Hex;
     const launchedRaw = (await this.client.readContract({
       address: ADDR.factory as Hex,
@@ -111,7 +111,7 @@ export class RpcProvider implements Provider {
       phase = { kind: "graduated" };
     }
 
-    const createdBlock = await this.findLaunchBlock(addr);
+    const createdBlock = hint?.createdBlock ?? (await this.findLaunchBlock(addr));
 
     return {
       address: addr,
@@ -233,6 +233,39 @@ export class RpcProvider implements Provider {
     return out;
   }
 
+  // The latest pool swap, found by scanning backwards in widening windows
+  // and memoized per token per provider instance: priceNowEth and
+  // liquidityEth both need it, and a day-wide scan for it was the single
+  // biggest request sink on graduated tokens.
+  private lastSwapMemo = new Map<string, Promise<{ sqrtPriceX96: bigint; liquidity: bigint } | null>>();
+
+  private lastSwap(token: TokenMeta): Promise<{ sqrtPriceX96: bigint; liquidity: bigint } | null> {
+    const memo = this.lastSwapMemo.get(token.address);
+    if (memo) return memo;
+    const p = (async () => {
+      if (!token.pool) return null;
+      const toBlock = await this.client.getBlockNumber();
+      for (const span of [20_000n, 160_000n, CHAIN.blocksPerDay]) {
+        const fromBlock = toBlock > span ? toBlock - span : 0n;
+        const swaps = await getLogsAdaptive(this.client, {
+          address: ADDR.poolManager as Hex,
+          topics: [SWAP_TOPIC as Hex, token.pool],
+          fromBlock,
+          toBlock,
+        }, { parallel: 2 });
+        const last = swaps[swaps.length - 1];
+        if (last) {
+          const decoded = decodeEventLog({ abi: poolManagerAbi, topics: last.topics as [Hex, ...Hex[]], data: last.data });
+          return decoded.args as { sqrtPriceX96: bigint; liquidity: bigint };
+        }
+        if (fromBlock === 0n) break;
+      }
+      return null;
+    })();
+    this.lastSwapMemo.set(token.address, p);
+    return p;
+  }
+
   async priceNowEth(token: TokenMeta): Promise<number> {
     if (token.phase.kind === "curve") {
       const [quoteReserve, tokenReserve] = (await this.client.readContract({
@@ -243,23 +276,10 @@ export class RpcProvider implements Provider {
       if (tokenReserve === 0n) return 0;
       return Number(quoteReserve) / Number(tokenReserve);
     }
-    // Graduated: price from the most recent swap in the last day of blocks.
-    const toBlock = await this.client.getBlockNumber();
-    const fromBlock = toBlock > CHAIN.blocksPerDay ? toBlock - CHAIN.blocksPerDay : 0n;
-    const swaps = token.pool
-      ? await getLogsAdaptive(this.client, {
-          address: ADDR.poolManager as Hex,
-          topics: [SWAP_TOPIC as Hex, token.pool],
-          fromBlock,
-          toBlock,
-        })
-      : [];
-    const last = swaps[swaps.length - 1];
+    const last = await this.lastSwap(token);
     if (!last) return 0;
-    const decoded = decodeEventLog({ abi: poolManagerAbi, topics: last.topics as [Hex, ...Hex[]], data: last.data });
-    const a = decoded.args as { sqrtPriceX96: bigint };
     // price(c1 per c0) = (sqrtP / 2^96)^2; convert to ETH per token.
-    const ratio = Number(a.sqrtPriceX96) / 2 ** 96;
+    const ratio = Number(last.sqrtPriceX96) / 2 ** 96;
     const p = ratio * ratio;
     const tokenIsC0 = token.address.toLowerCase() < ADDR.weth;
     return tokenIsC0 ? p : 1 / p;
@@ -275,25 +295,13 @@ export class RpcProvider implements Provider {
     }
     // Graduated: the locker holds one full-range position; approximate the
     // ETH side as L * sqrtP / 2^96 from the latest swap.
-    const toBlock = await this.client.getBlockNumber();
-    const fromBlock = toBlock > CHAIN.blocksPerDay ? toBlock - CHAIN.blocksPerDay : 0n;
-    const swaps = token.pool
-      ? await getLogsAdaptive(this.client, {
-          address: ADDR.poolManager as Hex,
-          topics: [SWAP_TOPIC as Hex, token.pool],
-          fromBlock,
-          toBlock,
-        })
-      : [];
-    const last = swaps[swaps.length - 1];
+    const last = await this.lastSwap(token);
     if (!last) return 0n;
-    const decoded = decodeEventLog({ abi: poolManagerAbi, topics: last.topics as [Hex, ...Hex[]], data: last.data });
-    const a = decoded.args as { sqrtPriceX96: bigint; liquidity: bigint };
     const tokenIsC0 = token.address.toLowerCase() < ADDR.weth;
     if (tokenIsC0) {
-      return (a.liquidity * a.sqrtPriceX96) / 2n ** 96n;
+      return (last.liquidity * last.sqrtPriceX96) / 2n ** 96n;
     }
-    return (a.liquidity * 2n ** 96n) / a.sqrtPriceX96;
+    return (last.liquidity * 2n ** 96n) / last.sqrtPriceX96;
   }
 
   stats(): { label: string; requests: number } {

@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AGENTS, GRADES, PICKS, pnlColor, cardDataFor, makeRows } from "../lib/site/fixtures";
-import type { Grade } from "../lib/site/types";
+import type { LiveScan } from "../lib/site/live";
+import type { CardData, Grade } from "../lib/site/types";
 import { CardLightbox, useCardActions, useCardUrl } from "./share-card";
+import { AgentGif } from "./motion";
 
-// The terminal. A faithful port of design/XRAY Terminal.dc.html: the view
-// state machine (empty / pick / running / result / three errors), the
-// six-stage loader, the verdict with gauges and winrate bands, the holders
-// table and the share card. Fixture data until the engine is wired in.
+// The terminal. Live queries stream real engine stages over SSE from
+// /api/scan/stream (mode A today: pnl, bands, header, grade, card; mode B
+// will fill winrate, badges and profiles). The design prototype's demo
+// tokens ($MARROW and friends) still run on fixtures so the interface can
+// be toured offline.
 
 type View = "empty" | "pick" | "running" | "result" | "error-notpons" | "error-young" | "error-nodata";
 
@@ -33,6 +36,21 @@ const ERRS: Record<string, [string, string, string]> = {
 };
 
 const DEMO_ADDR = "0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41";
+const STAGE_INDEX: Record<string, number> = { scanner: 0, ledger: 1, tracer: 2, auditor: 3, sorter: 4, flagger: 5 };
+
+interface StageState {
+  status: "idle" | "start" | "done" | "skip";
+  detail?: string;
+}
+
+interface PickRow {
+  addr: string;
+  addrFull?: string;
+  age: string;
+  stage: string;
+  mcap: string;
+  holders: string;
+}
 
 function useIsMobile(): boolean {
   const [m, setM] = useState(false);
@@ -46,29 +64,48 @@ function useIsMobile(): boolean {
   return m;
 }
 
+const freshStages = (): StageState[] => AGENTS.map(() => ({ status: "idle" }));
+
 export function Terminal() {
   const params = useSearchParams();
-  const grade = (["healthy", "cracked", "shattered"].includes(params.get("grade") ?? "") ? params.get("grade") : "healthy") as Grade;
-  const G = GRADES[grade];
-  const initialQ = params.get("q") ?? "";
+  const fixtureGrade = (["healthy", "cracked", "shattered"].includes(params.get("grade") ?? "") ? params.get("grade") : "healthy") as Grade;
+  const G = GRADES[fixtureGrade];
+  const initialQ = params.get("q") ?? params.get("token") ?? "";
   const initialView = (params.get("view") as View) ?? null;
 
   const [view, setView] = useState<View>("empty");
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(0); // fixture demo runs
   const [query, setQuery] = useState(initialQ);
   const [loaded, setLoaded] = useState(10);
   const [copied, setCopied] = useState(false);
   const [linked, setLinked] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
+  const [live, setLive] = useState<LiveScan | null>(null);
+  const [liveStages, setLiveStages] = useState<StageState[]>(freshStages);
+  const [livePicks, setLivePicks] = useState<PickRow[] | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [isLiveRun, setIsLiveRun] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const es = useRef<EventSource | null>(null);
   const isMobile = useIsMobile();
 
-  const cardData = useMemo(() => cardDataFor(grade), [grade]);
+  const cardData: CardData = useMemo(() => (live ? live.card : cardDataFor(fixtureGrade)), [live, fixtureGrade]);
   const cardUrl = useCardUrl(cardData);
-  const { copied: copiedImg, copy: copyImage, download: downloadImage } = useCardActions(cardData, "xray-MARROW.png");
+  const cardFile = `xray-${cardData.ticker.replace("$", "")}.png`;
+  const { copied: copiedImg, copy: copyImage, download: downloadImage } = useCardActions(cardData, cardFile);
 
-  const start = useCallback(() => {
+  const stopAll = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
+    if (es.current) {
+      es.current.close();
+      es.current = null;
+    }
+  }, []);
+
+  const startFixture = useCallback(() => {
+    stopAll();
+    setIsLiveRun(false);
+    setLive(null);
     setView("running");
     setStep(0);
     setLoaded(0);
@@ -83,20 +120,75 @@ export function Terminal() {
         return s + 1;
       });
     }, 1600);
-  }, []);
+  }, [stopAll]);
+
+  const startLive = useCallback(
+    (q: string) => {
+      stopAll();
+      setIsLiveRun(true);
+      setLive(null);
+      setLiveError(null);
+      setLivePicks(null);
+      setLiveStages(freshStages());
+      setView("running");
+      setLoaded(10);
+      const src = new EventSource(`/api/scan/stream?token=${encodeURIComponent(q)}`);
+      es.current = src;
+      src.addEventListener("stage", (e) => {
+        const ev = JSON.parse((e as MessageEvent).data) as { agent: string; status: "start" | "done" | "skip"; detail?: string };
+        const idx = STAGE_INDEX[ev.agent];
+        if (idx === undefined) return;
+        setLiveStages((s) => {
+          const next = s.slice();
+          next[idx] = { status: ev.status, detail: ev.detail };
+          return next;
+        });
+      });
+      src.addEventListener("picks", (e) => {
+        setLivePicks(JSON.parse((e as MessageEvent).data) as PickRow[]);
+        setView("pick");
+        src.close();
+      });
+      src.addEventListener("result", (e) => {
+        setLive(JSON.parse((e as MessageEvent).data) as LiveScan);
+        setView("result");
+        src.close();
+      });
+      src.addEventListener("error", (e) => {
+        const data = (e as MessageEvent).data as string | undefined;
+        if (data) {
+          const err = JSON.parse(data) as { kind: string; message: string };
+          setLiveError(err.message);
+          setView(err.kind === "notpons" ? "error-notpons" : "error-nodata");
+        } else {
+          setLiveError("connection lost - press scan again");
+          setView("error-nodata");
+        }
+        src.close();
+      });
+    },
+    [stopAll],
+  );
 
   const scan = useCallback(
     (raw?: string) => {
       const q = (raw ?? query).trim();
       setQuery(q);
-      if (!q) return start();
-      if (/^0x/i.test(q) && q.length < 42) return setView("error-notpons");
-      if (/young|new|min/i.test(q)) return setView("error-young");
+      const bare = q.replace(/^\$/, "").toUpperCase();
+      if (!q) return startFixture();
+      // prototype demo triggers keep working offline
+      if (q.toLowerCase() === DEMO_ADDR) return startFixture();
+      if (bare === "MARROW") {
+        setLivePicks(null);
+        setIsLiveRun(false);
+        return setView("pick");
+      }
+      if (/young|^new$|min/i.test(q)) return setView("error-young");
       if (/nodata|timeout/i.test(q)) return setView("error-nodata");
-      if (!/^0x/i.test(q)) return setView("pick");
-      start();
+      if (/^0x/i.test(q) && q.length < 42) return setView("error-notpons");
+      startLive(q);
     },
-    [query, start],
+    [query, startFixture, startLive],
   );
 
   useEffect(() => {
@@ -106,9 +198,7 @@ export function Terminal() {
     } else if (initialQ) {
       scan(initialQ);
     }
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
+    return stopAll;
     // run once on mount with the url params
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -118,27 +208,74 @@ export function Terminal() {
   const isError = view.startsWith("error");
   const isPick = view === "pick";
   const err = ERRS[view] ?? ["", "", ""];
-  const rows = useMemo(() => makeRows(G.bias).slice(0, loaded), [G.bias, loaded]);
-  const total = 1043;
+  const errBody = liveError && isError ? liveError : err[1];
 
-  const showHeader = (isRunning && step >= 1) || isResult;
-  const showScore = (isRunning && step >= 4) || isResult;
-  const showGroups = (isRunning && step >= 5) || isResult;
-  const showTable = isResult;
+  // ---- view model: the live payload or the design fixtures ----
+  const fixtureRows = useMemo(() => makeRows(G.bias), [G.bias]);
+  const D = useMemo(() => {
+    if (live) {
+      return {
+        token: live.token,
+        pnl: live.verdict.pnl as string | null,
+        pnlNum: live.verdict.pnlNum,
+        winrate: live.verdict.winrate,
+        counted: String(live.verdict.counted),
+        traced: live.verdict.traced === null ? null : String(live.verdict.traced),
+        gradeColor: live.card.gradeColor,
+        dead: live.dead,
+        bands: live.bands.map((b) => ({ range: b.range, color: pnlColor(b.mid), supply: b.supply + "%", wallets: b.wallets, avg: b.avg, avgColor: b.avg.startsWith("+") ? "var(--profit)" : b.avg === "—" ? "var(--text-dim)" : "var(--loss)" })),
+        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "—", avgColor: "var(--text-dim)", winrate: r.winrate ?? "—", badges: r.badges })),
+        exited: { wallets: String(live.exited.wallets), pnl: live.exited.avgPnl ?? "—", pnlColor: live.exited.avgPnl?.startsWith("+") ? "var(--profit)" : "var(--loss)", wr: "—" },
+        flags: [
+          ["dust", String(live.flags.dust)],
+          ["unknown cost basis", `${live.flags.unknownBasis} (${live.flags.unknownSupplyPct} supply)`],
+          ["infrastructure", String(live.flags.infra)],
+          ["first-ever trades", "needs mode B"],
+        ] as [string, string][],
+        total: String(live.totalHolders),
+        source: live.source as { label: string; requests: number; seconds: number } | null,
+      };
+    }
+    return {
+      token: { ticker: "$MARROW", address: DEMO_ADDR, age: "3h 12m", stage: "graduated", mcap: "$412k", liquidity: "$58k", vol24h: "$1.21M", holders: "1 043" },
+      pnl: G.pnl as string | null,
+      pnlNum: parseFloat(G.pnl.replace("−", "-")) as number | null,
+      winrate: G.winrate as string | null,
+      counted: G.counted,
+      traced: G.traced as string | null,
+      gradeColor: G.color,
+      dead: false,
+      bands: G.groups.map((x) => ({ range: x[2], color: pnlColor(x[3]), supply: x[0] + "%", wallets: x[1], avg: x[4], avgColor: x[4].startsWith("+") ? "var(--profit)" : "var(--loss)" })),
+      rows: fixtureRows.map((r) => ({ addr: r.addr, addrFull: undefined as string | undefined, supply: r.supply, pnl: r.pnl, pnlColor: r.pnlColor, avg: r.avg, avgColor: r.avgColor, winrate: r.winrate, badges: r.badges })),
+      exited: { wallets: G.exited, pnl: G.exitPnl, pnlColor: G.exitColor, wr: G.exitWr },
+      flags: [
+        ["dust", "214"],
+        ["unknown cost basis", "87"],
+        ["infrastructure", "6"],
+        ["first-ever trades", "312"],
+      ] as [string, string][],
+      total: G.total,
+      source: null as { label: string; requests: number; seconds: number } | null,
+    };
+  }, [live, G, fixtureRows]);
 
-  const pnlPos = Math.max(0, Math.min(100, (parseFloat(G.pnl.replace("−", "-")) + 100) / 3));
-  const wrPos = parseFloat(G.winrate);
-  const glowColor = G.color + "55";
+  const rows = D.rows.slice(0, loaded);
+  const picks: PickRow[] = livePicks ?? PICKS;
 
-  const stageIdx = Math.min(step, 5);
-  const groups = G.groups.map((x) => ({
-    range: x[2],
-    color: pnlColor(x[3]),
-    supply: x[0] + "%",
-    wallets: x[1],
-    avg: x[4],
-    avgColor: x[4].startsWith("+") ? "var(--profit)" : "var(--loss)",
-  }));
+  // loader: fixture demo runs on `step`; live runs on real stage events
+  const liveDone = liveStages.filter((s) => s.status === "done" || s.status === "skip").length;
+  const liveActiveIdx = liveStages.findIndex((s) => s.status === "start");
+  const stageIdx = isLiveRun ? (liveActiveIdx >= 0 ? liveActiveIdx : Math.min(liveDone, 5)) : Math.min(step, 5);
+  const progress = isRunning ? (isLiveRun ? Math.round((liveDone / 6) * 100) : Math.round((step / 6) * 100)) : 0;
+
+  const showHeader = isResult || (!isLiveRun && isRunning && step >= 1);
+  const showScore = (isResult || (!isLiveRun && isRunning && step >= 4)) && !D.dead;
+  const showGroups = (isResult || (!isLiveRun && isRunning && step >= 5)) && !D.dead;
+  const showTable = isResult && !D.dead;
+
+  const pnlPos = D.pnlNum === null ? 0 : Math.max(0, Math.min(100, (D.pnlNum + 100) / 3));
+  const wrPos = D.winrate === null ? 0 : parseFloat(D.winrate);
+  const glowColor = D.gradeColor + "55";
 
   const smallBtn: React.CSSProperties = {
     fontFamily: "inherit",
@@ -152,7 +289,7 @@ export function Terminal() {
 
   const metric = (
     label: string,
-    value: string,
+    value: string | null,
     pos: number,
     scale: [string, string, string, string],
     across: React.ReactNode,
@@ -160,14 +297,16 @@ export function Terminal() {
   ) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0, ...extraStyle }}>
       <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".14em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: G.color, letterSpacing: "-.03em", textShadow: `0 0 18px ${G.color},0 0 40px ${glowColor}`, whiteSpace: "nowrap" }}>{value}</div>
+      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: value === null ? "var(--bone-dark)" : D.gradeColor, letterSpacing: "-.03em", textShadow: value === null ? "none" : `0 0 18px ${D.gradeColor},0 0 40px ${glowColor}`, whiteSpace: "nowrap" }}>{value ?? "—"}</div>
       <div style={{ position: "relative", height: 8, marginTop: 6 }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", gap: 2 }}>
           <div style={{ flex: 1, background: "rgba(255,96,92,.35)" }} />
           <div style={{ flex: 1, background: "rgba(255,214,64,.35)" }} />
           <div style={{ flex: 1, background: "rgba(96,240,128,.35)" }} />
         </div>
-        <div style={{ position: "absolute", top: -5, bottom: -5, left: `${pos}%`, width: 4, marginLeft: -2, background: "var(--bone-bright)", boxShadow: "0 0 10px rgba(230,252,255,.9)", transition: "left 1s ease" }} />
+        {value !== null && (
+          <div style={{ position: "absolute", top: -5, bottom: -5, left: `${pos}%`, width: 4, marginLeft: -2, background: "var(--bone-bright)", boxShadow: "0 0 10px rgba(230,252,255,.9)", transition: "left 1s ease" }} />
+        )}
       </div>
       <div className="tabular" style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--bone-dark)" }}>
         {scale.map((s) => (
@@ -204,24 +343,26 @@ export function Terminal() {
           <span>reads public state only - no wallet connect, no signing · Robinhood Chain · Pons V2</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 6, height: 6, background: "var(--accent)", display: "inline-block", boxShadow: "0 0 8px #78DCFF" }} />
-            <span className="tabular" style={{ color: "var(--text)" }}>12 408</span> tokens checked
+            <span className="tabular" style={{ color: "var(--text)" }}>mode A · public RPC · no keys</span>
           </span>
         </div>
 
         {isPick && (
           <div className="tabular" style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", fontSize: 13 }}>
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 12 }}>4 launches use this ticker - pick one</div>
-            {PICKS.map((p) => (
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 12 }}>
+              {picks.length} launches use this ticker - pick one
+            </div>
+            {picks.map((p) => (
               <div
                 key={p.addr}
-                onClick={() => scan(DEMO_ADDR)}
+                onClick={() => scan(p.addrFull ?? DEMO_ADDR)}
                 style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border)", cursor: "pointer", alignItems: "center" }}
               >
                 <span style={{ color: "var(--bone-light)" }}>{p.addr}</span>
                 <span style={{ color: "var(--text)" }}>{p.age}</span>
                 <span style={{ color: "var(--text-dim)" }}>{p.stage}</span>
                 <span style={{ textAlign: "right", color: "var(--text)" }}>{p.mcap}</span>
-                <span style={{ textAlign: "right", color: "var(--text)" }}>{p.holders} holders</span>
+                <span style={{ textAlign: "right", color: "var(--text)" }}>{p.holders}</span>
               </div>
             ))}
           </div>
@@ -231,12 +372,13 @@ export function Terminal() {
           <div style={{ border: "1px solid var(--loss)", background: "var(--bg-panel)", padding: "14px 16px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ fontSize: 13, color: "var(--loss)", fontWeight: 700 }}>{err[0]}</div>
-              <div style={{ fontSize: 12, color: "var(--text)" }}>{err[1]}</div>
+              <div style={{ fontSize: 12, color: "var(--text)" }}>{errBody}</div>
             </div>
             <button
               onClick={() => {
                 setView("empty");
                 setQuery("");
+                setLiveError(null);
               }}
               style={{ fontFamily: "inherit", fontSize: 12, background: "transparent", color: "var(--accent)", border: "1px solid var(--border)", padding: "8px 14px", cursor: "pointer" }}
             >
@@ -255,17 +397,19 @@ export function Terminal() {
                 {isRunning ? AGENTS[stageIdx]!.name : "IDLE"}
               </span>
               <span style={{ color: "var(--bone-light)" }}>
-                {isRunning ? AGENTS[stageIdx]!.cap : isError ? "nothing to run" : "paste a token to start the run"}
+                {isRunning ? (isLiveRun ? liveStages[stageIdx]?.detail ?? AGENTS[stageIdx]!.cap : AGENTS[stageIdx]!.cap) : isError ? "nothing to run" : "paste a token to start the run"}
               </span>
             </span>
             <span className="tabular" style={{ color: "var(--text)" }}>
-              {isRunning ? Math.round((step / 6) * 100) : 0}% · {isRunning ? `stage ${Math.min(step + 1, 6)} / 6` : "waiting"}
+              {progress}% · {isRunning ? `stage ${Math.min(stageIdx + 1, 6)} / 6` : "waiting"}
             </span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3,minmax(0,1fr))" : "repeat(6,minmax(0,1fr))", gap: 8 }}>
             {AGENTS.map((a, i) => {
-              const done = isRunning && i < step;
-              const active = isRunning && i === step;
+              const st = isLiveRun ? liveStages[i]!.status : isRunning ? (i < step ? "done" : i === step ? "start" : "idle") : "idle";
+              const done = st === "done";
+              const active = isRunning && st === "start";
+              const skipped = st === "skip";
               return (
                 <div
                   key={a.name}
@@ -280,14 +424,15 @@ export function Terminal() {
                     justifyContent: "center",
                     animation: active ? "glow 1.2s ease-in-out infinite" : "none",
                     transition: "border-color .4s",
+                    opacity: skipped ? 0.45 : 1,
                   }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={a.src} alt="" style={{ width: 56, height: 62, display: "block", marginTop: -10, opacity: done || active ? 1 : 0.3, transition: "opacity .6s", filter: active ? "drop-shadow(0 0 10px rgba(120,220,255,.9))" : "none" }} />
+                  <AgentGif src={a.src} style={{ width: 56, height: 62, display: "block", marginTop: -10, opacity: done || active ? 1 : 0.3, transition: "opacity .6s", filter: active ? "drop-shadow(0 0 10px rgba(120,220,255,.9))" : "none" }} />
                   {active && (
                     <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent,#E6FCFF 30%,#E6FCFF 70%,transparent)", boxShadow: "0 0 10px #78DCFF", animation: "expose 1.2s linear infinite" }} />
                   )}
                   {done && <div style={{ position: "absolute", top: 4, right: 6, fontSize: 11, fontWeight: 700, color: "var(--profit)" }}>✓</div>}
+                  {skipped && <div style={{ position: "absolute", top: 4, right: 6, fontSize: 9, letterSpacing: ".1em", color: "var(--bone-dark)" }}>MODE B</div>}
                   <div style={{ position: "absolute", left: 6, bottom: 4, fontSize: 9, letterSpacing: ".14em", color: done ? "var(--bone-light)" : active ? "var(--bone-bright)" : "var(--bone-dark)" }}>
                     0{i + 1} {a.name}
                   </div>
@@ -296,7 +441,7 @@ export function Terminal() {
             })}
           </div>
           <div style={{ height: 3, background: "var(--bg-deep)", border: "1px solid var(--border)", position: "relative" }}>
-            <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${isRunning ? Math.round((step / 6) * 100) : 0}%`, background: "var(--accent)", boxShadow: "0 0 10px rgba(120,220,255,.8)", transition: "width 1.5s linear" }} />
+            <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${progress}%`, background: "var(--accent)", boxShadow: "0 0 10px rgba(120,220,255,.8)", transition: "width 1.5s linear" }} />
           </div>
         </div>
       )}
@@ -311,7 +456,8 @@ export function Terminal() {
             paste a contract address or a ticker - six agents rebuild every holder&apos;s book and tell you who is in profit, who is underwater, and whether they can trade at all.
           </div>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-            try: <a href="#" onClick={(e) => { e.preventDefault(); scan(DEMO_ADDR); }}>0x7a3f…9c41</a> ·{" "}
+            live scans read the public RPC and take 10-60s · demo tour:{" "}
+            <a href="#" onClick={(e) => { e.preventDefault(); scan(DEMO_ADDR); }}>0x7a3f…9c41</a> ·{" "}
             <a href="#" onClick={(e) => { e.preventDefault(); scan("MARROW"); }}>$MARROW</a> ·{" "}
             <a href="#" onClick={(e) => { e.preventDefault(); scan("young"); }}>a token launched 2 min ago</a>
           </div>
@@ -324,11 +470,13 @@ export function Terminal() {
           <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, gridColumn: "1/-1", borderBottom: "1px solid var(--border)" }}>
             <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>token</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-              <span className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>$MARROW</span>
-              <a href="#" style={{ fontSize: 12, color: "var(--bone-light)" }}>0x7a3f19c0…9c41</a>
+              <span className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>{D.token.ticker}</span>
+              <a href={`https://robinhood.blockscout.com/token/${D.token.address}`} target="_blank" rel="noopener" style={{ fontSize: 12, color: "var(--bone-light)" }}>
+                {D.token.address.slice(0, 10)}…{D.token.address.slice(-4)}
+              </a>
               <button
                 onClick={() => {
-                  void navigator.clipboard.writeText(DEMO_ADDR);
+                  void navigator.clipboard.writeText(D.token.address);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1200);
                 }}
@@ -339,12 +487,12 @@ export function Terminal() {
             </div>
           </div>
           {[
-            ["age", "3h 12m"],
-            ["stage", "graduated"],
-            ["mcap", "$412k"],
-            ["liquidity", "$58k"],
-            ["vol 24h", "$1.21M"],
-            ["holders", "1 043"],
+            ["age", D.token.age],
+            ["stage", D.token.stage],
+            ["mcap", D.token.mcap],
+            ["liquidity", D.token.liquidity],
+            ["vol 24h", D.token.vol24h],
+            ["holders", D.token.holders],
           ].map(([t, v]) => (
             <div key={t} style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)", marginRight: -1, marginBottom: -1 }}>
               <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>{t}</div>
@@ -354,13 +502,46 @@ export function Terminal() {
         </div>
       )}
 
+      {/* dead token */}
+      {isResult && D.dead && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "minmax(0,1fr) 520px", gap: 12, alignItems: "start" }}>
+          <div style={{ border: "1px solid var(--loss)", background: "var(--bg-panel)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16, justifyContent: "center", minWidth: 0, boxSizing: "border-box", height: isMobile ? "auto" : 520 }}>
+            <div className="font-tiny" style={{ fontSize: 48, lineHeight: 1.1, color: "var(--loss)", textShadow: "0 0 24px rgba(255,96,92,.6)" }}>TOKEN IS DEAD</div>
+            <div style={{ fontSize: 16, color: "var(--text)" }}>You&apos;re too early or too late.</div>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+              fewer than 10 wallets still hold this token · exited: {D.exited.wallets} wallets, avg pnl here <span style={{ color: D.exited.pnlColor }}>{D.exited.pnl}</span>
+            </div>
+            {D.source && (
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>source {D.source.label} · {D.source.requests} requests · {D.source.seconds.toFixed(1)}s</div>
+            )}
+          </div>
+          <div
+            onClick={() => cardUrl && setCardOpen(true)}
+            style={{ position: "relative", width: isMobile ? "100%" : 520, height: isMobile ? "auto" : 520, aspectRatio: isMobile ? "1/1" : undefined, border: "1px solid var(--loss)", background: "var(--bg-deep)", cursor: "zoom-in", overflow: "hidden", boxSizing: "border-box" }}
+          >
+            {cardUrl ? (
+              <div role="img" aria-label="XRAY share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-dim)" }}>rendering card…</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* verdict */}
       {showScore && (
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "minmax(0,1fr) 520px", gap: 12, alignItems: "start" }}>
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, justifyContent: "space-between", minWidth: 0, boxSizing: "border-box", height: isMobile ? "auto" : 520, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "repeat(2,minmax(0,1fr))", gap: 0 }}>
-              {metric("avg holder pnl", G.pnl, pnlPos, ["−100%", "0", "+100%", "+200%"], <>across <span style={{ color: "var(--text)" }}>{G.counted}</span> holders</>, { paddingRight: isMobile ? 0 : 24 })}
-              {metric("avg winrate", G.winrate, wrPos, ["0", "33", "66", "100"], <>across <span style={{ color: "var(--text)" }}>{G.traced}</span> holders · ≥ 5 past trades</>, isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" })}
+              {metric("avg holder pnl", D.pnl, pnlPos, ["−100%", "0", "+100%", "+200%"], <>across <span style={{ color: "var(--text)" }}>{D.counted}</span> holders</>, { paddingRight: isMobile ? 0 : 24 })}
+              {metric(
+                "avg winrate",
+                D.winrate,
+                wrPos,
+                ["0", "33", "66", "100"],
+                D.winrate === null ? <>unlocks with mode B · Bitquery</> : <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders · ≥ 5 past trades</>,
+                isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" },
+              )}
             </div>
             {showGroups && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid var(--border)", paddingTop: 20 }}>
@@ -368,7 +549,7 @@ export function Terminal() {
                   <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>WHO HOLDS THE SUPPLY</div>
                   <div style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis" }}>pnl bands · bar = share of supply</div>
                 </div>
-                {groups.map((gr) => (
+                {D.bands.map((gr) => (
                   <div key={gr.range} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <div className="tabular" style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, whiteSpace: "nowrap" }}>
                       <span style={{ paddingRight: 4 }}>
@@ -384,6 +565,7 @@ export function Terminal() {
                     </div>
                   </div>
                 ))}
+                {D.bands.length === 0 && <div style={{ fontSize: 12, color: "var(--text-dim)" }}>no dense pnl bands on this token</div>}
               </div>
             )}
           </div>
@@ -421,11 +603,15 @@ export function Terminal() {
                 </div>
                 {rows.map((r) => (
                   <div key={r.addr} style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .9fr 1.1fr .8fr 1.2fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", alignItems: "center" }}>
-                    <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
+                    {r.addrFull ? (
+                      <a href={`https://robinhood.blockscout.com/address/${r.addrFull}`} target="_blank" rel="noopener" style={{ color: "var(--bone-light)" }}>{r.addr}</a>
+                    ) : (
+                      <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
+                    )}
                     <span style={{ textAlign: "center", color: "var(--text)" }}>{r.supply}</span>
                     <span style={{ textAlign: "center", color: r.pnlColor }}>{r.pnl}</span>
                     <span style={{ textAlign: "center", color: r.avgColor }}>{r.avg}</span>
-                    <span style={{ textAlign: "center", color: "var(--text)" }}>{r.winrate}</span>
+                    <span style={{ textAlign: "center", color: r.winrate === "—" ? "var(--text-dim)" : "var(--text)" }}>{r.winrate}</span>
                     <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                       {r.badges.map((b) => (
                         <span key={b.text} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b.color}`, color: b.color, padding: "2px 6px" }}>{b.text}</span>
@@ -440,7 +626,7 @@ export function Terminal() {
                 {rows.map((r) => (
                   <div key={r.addr} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                      <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
+                      <span style={{ color: "var(--bone-light)" }}>{r.addr}</span>
                       <span style={{ color: "var(--text)" }}>{r.supply} supply</span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -458,26 +644,21 @@ export function Terminal() {
               </div>
             )}
             <div style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", borderTop: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{loaded ? `showing ${loaded} of ${total}` : `${total} holders - table collapsed`}</span>
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>showing {Math.min(loaded, D.rows.length)} of {D.total}</span>
               <button onClick={() => setLoaded((l) => Math.min(40, l + 10))} style={smallBtn}>
-                {loaded ? "load 10 more" : "load first 10"}
+                load 10 more
               </button>
             </div>
           </div>
 
           <div className="tabular" style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "14px 24px", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
-            <span style={{ color: "var(--text-dim)" }}>exited fully: <span style={{ color: "var(--text)" }}>{G.exited}</span> wallets</span>
-            <span style={{ color: "var(--text-dim)" }}>their avg pnl here <span style={{ color: G.exitColor }}>{G.exitPnl}</span></span>
-            <span style={{ color: "var(--text-dim)" }}>their winrate overall <span style={{ color: "var(--text)" }}>{G.exitWr}</span></span>
+            <span style={{ color: "var(--text-dim)" }}>exited fully: <span style={{ color: "var(--text)" }}>{D.exited.wallets}</span> wallets</span>
+            <span style={{ color: "var(--text-dim)" }}>their avg pnl here <span style={{ color: D.exited.pnlColor }}>{D.exited.pnl}</span></span>
+            <span style={{ color: "var(--text-dim)" }}>their winrate overall <span style={{ color: "var(--text)" }}>{D.exited.wr}</span></span>
           </div>
 
           <div className="tabular" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 1, background: "var(--border)", border: "1px solid var(--border)", fontSize: 12 }}>
-            {[
-              ["dust", "214"],
-              ["unknown cost basis", "87"],
-              ["infrastructure", "6"],
-              ["first-ever trades", "312"],
-            ].map(([t, v]) => (
+            {D.flags.map(([t, v]) => (
               <div key={t} style={{ background: "var(--bg-panel)", padding: "12px 16px", display: "flex", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ color: "var(--text-dim)" }}>{t}</span>
                 <span style={{ color: "var(--text)" }}>{v}</span>
@@ -487,7 +668,7 @@ export function Terminal() {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
-              top 1000 holders only · <a href="#" onClick={(e) => { e.preventDefault(); start(); }}>recompute over all {G.total} holders</a> - takes several minutes
+              {D.source ? `source ${D.source.label} · ${D.source.requests} requests · ${D.source.seconds.toFixed(1)}s` : <>demo fixture data · <a href="#" onClick={(e) => { e.preventDefault(); startFixture(); }}>replay the run</a></>}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={() => cardUrl && setCardOpen(true)} style={smallBtn}>preview card</button>
@@ -495,7 +676,8 @@ export function Terminal() {
               <button onClick={downloadImage} style={smallBtn}>download png</button>
               <button
                 onClick={() => {
-                  void navigator.clipboard.writeText(location.href);
+                  const url = live ? `${location.origin}/terminal?token=${live.token.address}` : location.href;
+                  void navigator.clipboard.writeText(url);
                   setLinked(true);
                   setTimeout(() => setLinked(false), 1200);
                 }}

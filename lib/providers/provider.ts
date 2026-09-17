@@ -46,7 +46,7 @@ export interface TokenActivity {
 export interface Provider {
   readonly name: "rpc" | "bitquery";
   readonly supportsProfiles: boolean;
-  tokenMeta(address: Hex): Promise<TokenMeta>;
+  tokenMeta(address: Hex, hint?: { createdBlock?: bigint }): Promise<TokenMeta>;
   /** All token movement and quotes from `fromBlock` (inclusive) to the tip. */
   activity(token: TokenMeta, fromBlock: bigint): Promise<TokenActivity>;
   balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>>;

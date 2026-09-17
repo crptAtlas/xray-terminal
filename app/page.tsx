@@ -1,5 +1,5 @@
 import { CaBlock } from "../components/ca-block";
-import { EngineLog } from "../components/engine-log";
+import { AgentsAtWork } from "../components/agents-at-work";
 import { HeroInput } from "../components/hero-input";
 import { VerdictPanel } from "../components/verdict-panel";
 
@@ -58,14 +58,6 @@ function Stat({ title, value, sub, bright }: { title: string; value: string; sub
   );
 }
 
-const STATIONS = [
-  { n: "01", name: "SCANNER", gif: "work-scanner.gif" },
-  { n: "02", name: "LEDGER", gif: "work-ledger.gif" },
-  { n: "03", name: "TRACER", gif: "work-tracer.gif" },
-  { n: "04", name: "AUDITOR", gif: "work-auditor.gif" },
-  { n: "05", name: "SORTER", gif: "work-sorter.gif" },
-  { n: "06", name: "FLAGGER", gif: "work-flagger.gif" },
-];
 
 const HOW = [
   { n: "01", name: "SCANNER", sub: "pulls every trade", body: "every buy and sell of the token, straight off chain. no wallet connect, no signature.", line: <>18 920 trades · 1 043 holders · from block 59 570 827 · <a href="#">blockscout</a></> },
@@ -86,13 +78,13 @@ export default function Home() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 96, paddingTop: 40 }}>
       {/* hero */}
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 440px", gap: 48, alignItems: "center", position: "relative" }}>
+      <section className="hero-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 440px", gap: 48, alignItems: "center", position: "relative" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
           <div style={{ fontSize: 12, color: "var(--bone-mid)", letterSpacing: ".14em", textTransform: "uppercase" }}>
             holder pnl terminal · Robinhood Chain · Pons V2 · read-only
           </div>
           <div
-            className="font-tiny"
+            className="font-tiny hero-title"
             style={{ fontSize: 72, lineHeight: 0.95, color: "var(--bone-bright)", letterSpacing: ".02em", animation: "breathe 4s ease-in-out infinite", textWrap: "balance" }}
           >
             SEE THE BONES OF ANY TOKEN.
@@ -110,7 +102,7 @@ export default function Home() {
             </span>
           </div>
         </div>
-        <div style={{ position: "relative", width: 440, height: 510, flexShrink: 0, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="hero-film" style={{ position: "relative", width: 440, height: 510, flexShrink: 0, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ position: "relative", width: 392, height: 462, overflow: "hidden", background: "var(--bg-deep)" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/logo-film.gif" alt="XRAY film" style={{ position: "absolute", left: -56, top: -35, width: 560, height: 560, display: "block", maxWidth: "none" }} />
@@ -129,7 +121,7 @@ export default function Home() {
       </section>
 
       {/* stat grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", border: "1px solid var(--border)", background: "var(--bg-panel)", boxShadow: "0 0 40px rgba(120,220,255,.08)", marginTop: -32 }}>
+      <div className="stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", border: "1px solid var(--border)", background: "var(--bg-panel)", boxShadow: "0 0 40px rgba(120,220,255,.08)", marginTop: -32 }}>
         <Stat title="tokens checked" value="12 408" sub="since 2026-08-01" />
         <Stat title="wallets in the book" value="338 112" sub="addresses with a Pons record" />
         <Stat title="launches a day" value="1 940" sub="Pons V2 · 7-day average" />
@@ -149,37 +141,11 @@ export default function Home() {
             the film travels station to station. every line in the log is the shape of a real row the terminal produces.
           </div>
         </div>
-        <div style={{ border: "1px solid var(--border)", background: "var(--sprite-bg)", boxShadow: "0 0 48px rgba(120,220,255,.1)", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <EngineLog />
-          <div style={{ position: "relative", padding: "28px 12px 20px", overflow: "hidden" }}>
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: "calc(58% + 8px)",
-                height: 2,
-                background: "repeating-linear-gradient(90deg,#78DCFF 0 12px,transparent 12px 32px)",
-                opacity: 0.35,
-                animation: "flow .6s linear infinite",
-              }}
-            />
-            <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", columnGap: 8 }}>
-              {STATIONS.map((s) => (
-                <div key={s.name} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "8px 4px", border: "1px solid transparent" }}>
-                  <div style={{ fontSize: 10, letterSpacing: ".14em", color: "var(--bone-mid)" }}>{s.n}</div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/assets/${s.gif}`} alt="" style={{ width: 112, height: 124, display: "block" }} />
-                  <div className="font-tiny" style={{ fontSize: 16, lineHeight: 1, color: "var(--bone-light)" }}>{s.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <AgentsAtWork />
       </section>
 
       {/* how it works + verdict */}
-      <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 380px", gap: 48, alignItems: "start" }}>
+      <section className="how-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 380px", gap: 48, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div>
             <div style={label}>one scan · six stages · one verdict</div>

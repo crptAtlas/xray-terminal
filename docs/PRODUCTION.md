@@ -77,11 +77,13 @@ the engine's local JSON API and formats the answer.
 
 Needed to build it: nothing beyond items 1 and 5 above.
 
-## Remaining site milestones (design prompt)
+## Site status
 
-- M3: `/api/card` OG route (server canvas) + `generateMetadata` on
-  `/terminal?token=…`.
-- M4: home page walk-and-talk agent animation (`spawn()` port).
-- M5: `/holders` page.
-- M6: mobile pass, `prefers-reduced-motion`, metadata, domain.
-- Engine wiring: swap fixture routes for `check()` (this file, top).
+M1-M6 and the engine wiring are done: `/api/scan/stream` drives the
+terminal with the real mode A engine (SSE stage events, pnl bands,
+grade, live share card), `/api/card` renders the OG image server-side,
+the home page runs the full walk-and-talk animation, `/holders` is
+built (fixture result until mode B) and reduced-motion falls back to
+still frames. What remains needs the owner: the items in the table
+above, then flipping `/holders` and the winrate columns live once
+`BITQUERY_TOKEN` exists.

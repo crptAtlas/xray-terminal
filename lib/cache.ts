@@ -53,6 +53,7 @@ export class Cache {
   constructor(path?: string) {
     this.db = new Database(path ?? defaultCachePath());
     this.db.pragma("journal_mode = WAL");
+    this.db.pragma("busy_timeout = 5000");
     this.db.exec(SCHEMA);
   }
 
@@ -60,11 +61,13 @@ export class Cache {
     this.db.close();
   }
 
-  tokenState(address: string): { syncedBlock: bigint } | null {
+  tokenState(address: string): { syncedBlock: bigint; createdBlock: bigint | null } | null {
     const row = this.db
-      .prepare("SELECT synced_block FROM tokens WHERE address = ?")
-      .get(address.toLowerCase()) as { synced_block: string } | undefined;
-    return row ? { syncedBlock: BigInt(row.synced_block) } : null;
+      .prepare("SELECT synced_block, created_block FROM tokens WHERE address = ?")
+      .get(address.toLowerCase()) as { synced_block: string; created_block: string | null } | undefined;
+    return row
+      ? { syncedBlock: BigInt(row.synced_block), createdBlock: row.created_block ? BigInt(row.created_block) : null }
+      : null;
   }
 
   saveToken(meta: TokenMeta, syncedBlock: bigint): void {
