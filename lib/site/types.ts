@@ -27,8 +27,8 @@ export interface ScanVerdict {
 
 export interface ScanBand {
   supply: number;
-  wrFrom: number;
-  wrTo: number;
+  pnlFrom: number;
+  pnlTo: number;
   wallets: number;
   avgPnl: string;
 }
@@ -84,5 +84,5 @@ export interface CardData {
   gradeLabel: string;
   hint: string;
   time: string;
-  groups: { supply: number; wr: number; wallets: number }[];
+  groups: { supply: number; range: string; mid: number; wallets: number }[];
 }

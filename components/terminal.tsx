@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AGENTS, GRADES, PICKS, bandColor, cardDataFor, makeRows } from "../lib/site/fixtures";
+import { AGENTS, GRADES, PICKS, pnlColor, cardDataFor, makeRows } from "../lib/site/fixtures";
 import type { Grade } from "../lib/site/types";
 import { CardLightbox, useCardActions, useCardUrl } from "./share-card";
 
@@ -132,12 +132,12 @@ export function Terminal() {
 
   const stageIdx = Math.min(step, 5);
   const groups = G.groups.map((x) => ({
-    wr: `${x[2]}–${x[2] + 5}%`,
-    color: bandColor(x[2]),
+    range: x[2],
+    color: pnlColor(x[3]),
     supply: x[0] + "%",
     wallets: x[1],
-    avg: x[3],
-    avgColor: x[3].startsWith("+") ? "var(--profit)" : "var(--loss)",
+    avg: x[4],
+    avgColor: x[4].startsWith("+") ? "var(--profit)" : "var(--loss)",
   }));
 
   const smallBtn: React.CSSProperties = {
@@ -366,14 +366,14 @@ export function Terminal() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid var(--border)", paddingTop: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, whiteSpace: "nowrap" }}>
                   <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>WHO HOLDS THE SUPPLY</div>
-                  <div style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis" }}>winrate bands · bar = share of supply</div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis" }}>pnl bands · bar = share of supply</div>
                 </div>
                 {groups.map((gr) => (
-                  <div key={gr.wr} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div key={gr.range} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <div className="tabular" style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, whiteSpace: "nowrap" }}>
                       <span style={{ paddingRight: 4 }}>
                         <span style={{ color: gr.color, fontWeight: 700 }}>{gr.supply} of supply</span>
-                        <span style={{ color: "var(--text)" }}> · winrate <span style={{ color: gr.color }}>{gr.wr}</span></span>
+                        <span style={{ color: "var(--text)" }}> · pnl <span style={{ color: gr.color }}>{gr.range}</span></span>
                       </span>
                       <span style={{ color: "var(--text-dim)", flexShrink: 0 }}>
                         <span style={{ color: "var(--text)" }}>{gr.wallets} wallets</span> · avg pnl <span style={{ color: gr.avgColor }}>{gr.avg}</span>

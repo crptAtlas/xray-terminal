@@ -3,7 +3,7 @@ import type { CardData } from "./types";
 // Renders the 1080x1080 XRAY share card to a canvas. A one-to-one typed
 // port of design/card.js - keep the drawing code in step with it.
 
-const BAND = (wr: number): string => (wr >= 55 ? "#60F080" : wr >= 45 ? "#FFD640" : "#FF605C");
+const PNL = (v: number): string => (v > 20 ? "#60F080" : v < -20 ? "#FF605C" : "#FFD640");
 
 const cache: Record<string, Promise<HTMLImageElement>> = {};
 function img(src: string): Promise<HTMLImageElement> {
@@ -134,13 +134,13 @@ export async function renderCard(d: CardData): Promise<HTMLCanvasElement> {
   x.font = '500 32px "JetBrains Mono"';
   d.groups.forEach((g, i) => {
     const y = 464 + i * 56;
-    x.fillStyle = BAND(g.wr);
-    glow(BAND(g.wr), 10);
+    x.fillStyle = PNL(g.mid);
+    glow(PNL(g.mid), 10);
     x.fillText(`${g.supply}% of supply`, 72, y);
     noglow();
     const w = x.measureText(`${g.supply}% of supply`).width;
     x.fillStyle = "#D9D9D9";
-    x.fillText(` · winrate ${g.wr}–${g.wr + 5}% · ${g.wallets} wallets`, 72 + w, y);
+    x.fillText(` · pnl ${g.range} · ${g.wallets} wallets`, 72 + w, y);
   });
   // grade
   x.fillStyle = gc;
@@ -174,8 +174,7 @@ export async function renderCard(d: CardData): Promise<HTMLCanvasElement> {
   x.fillText("Terminal", 72, 988);
   x.fillStyle = "#6E8291";
   x.font = '400 22px "JetBrains Mono"';
-  x.fillText("xray.tools", 72, 1020);
-  x.fillText(d.time, 72, 1050);
+  x.fillText(d.time, 72, 1024);
   return c;
 }
 
