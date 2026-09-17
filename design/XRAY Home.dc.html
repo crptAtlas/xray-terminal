@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiny5&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#040A12;color:#D9D9D9;font-family:'JetBrains Mono',monospace;-webkit-font-smoothing:antialiased}
+a{color:#78DCFF;text-decoration:none}a:hover{color:#E6FCFF;text-shadow:0 0 10px rgba(120,220,255,.8)}
+img{image-rendering:pixelated}
+input{font-family:inherit}
+@keyframes glow{0%,100%{box-shadow:0 0 0 1px #78DCFF,0 0 18px rgba(120,220,255,.35),inset 0 0 24px rgba(120,220,255,.06)}50%{box-shadow:0 0 0 1px #9EE0F7,0 0 36px rgba(120,220,255,.7),inset 0 0 32px rgba(120,220,255,.12)}}
+@keyframes sweep{0%{top:-2px;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:100%;opacity:0}}
+@keyframes flow{to{background-position:-32px 0}}
+@keyframes run{from{left:-80px}to{left:100%}}
+@keyframes runback{from{left:100%}to{left:-80px}}
+@keyframes film{from{left:-28px;opacity:0}5%{opacity:1}95%{opacity:1}to{left:100%;opacity:0}}
+@keyframes runframes{to{background-position:-456px 0}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes breathe{0%,100%{text-shadow:0 0 14px rgba(120,220,255,.55),0 0 48px rgba(120,220,255,.25)}50%{text-shadow:0 0 22px rgba(158,224,247,.9),0 0 72px rgba(120,220,255,.45)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;background:#040A12;overflow:hidden">
+<div style="position:absolute;inset:0;pointer-events:none;background:linear-gradient(#16324A22 1px,transparent 1px) 0 0/100% 48px,linear-gradient(90deg,#16324A22 1px,transparent 1px) 0 0/48px 100%"></div>
+<div style="position:absolute;left:50%;top:-320px;width:1400px;height:900px;transform:translateX(-50%);pointer-events:none;background:radial-gradient(ellipse at center,rgba(120,220,255,.16) 0%,rgba(120,220,255,.05) 35%,transparent 70%)"></div>
+<div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 4px)"></div>
+<div style="position:relative;max-width:1180px;margin:0 auto;padding:0 24px 64px;display:flex;flex-direction:column;gap:96px">
+
+<div style="display:flex;flex-direction:column;gap:64px">
+<header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #16324A;flex-wrap:wrap">
+  <a href="XRAY Home.dc.html" style="display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none" style-hover="text-shadow:none">
+    <span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#0A1626;border:1px solid #2A546E;box-shadow:0 0 12px rgba(120,220,255,.25)"><img src="assets/cage.png" alt="" style="width:24px;height:29px;display:block;filter:drop-shadow(0 0 6px rgba(120,220,255,.8))"></span>
+    <span style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF;letter-spacing:.06em;text-shadow:0 0 12px rgba(120,220,255,.6)">XRAY</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:5px 10px;color:#D9D9D9"><span style="width:6px;height:6px;background:#60F080;display:inline-block;box-shadow:0 0 8px #60F080;animation:pulse 1.6s ease-in-out infinite"></span>LIVE ENGINE</span>
+  </a>
+  <nav style="display:flex;gap:28px;align-items:center">
+    <a href="XRAY Terminal.dc.html" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">terminal</a>
+    <a href="XRAY Holders.dc.html" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">holders</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">X</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">github</a>
+  </nav>
+</header>
+
+<section style="display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:48px;align-items:center;position:relative">
+  <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+    <div style="font-size:12px;color:#5CA2C4;letter-spacing:.14em;text-transform:uppercase">holder pnl terminal · Robinhood Chain · Pons V2 · read-only</div>
+    <div style="font-family:Tiny5,monospace;font-size:72px;line-height:.95;color:#E6FCFF;letter-spacing:.02em;animation:breathe 4s ease-in-out infinite;text-wrap:balance">SEE THE BONES OF ANY TOKEN.</div>
+    <div style="font-size:16px;line-height:1.6;color:#D9D9D9;max-width:600px;text-wrap:pretty">who in it is in profit, who is underwater - and whether those wallets can trade at all. six agents rebuild every holder's book and check its record across every other Pons token.</div>
+    <div style="display:flex;border:1px solid #2A546E;background:#0A1626;max-width:680px;box-shadow:0 0 0 1px rgba(120,220,255,.08),0 0 32px rgba(120,220,255,.12)" style-focus="border-color:#78DCFF">
+      <span style="padding:16px 0 16px 18px;font-size:15px;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8)">&gt;</span>
+      <input value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ onKey }}" placeholder="paste a contract address or a ticker" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:#E6FCFF;font-size:15px;padding:16px 12px" />
+      <a href="XRAY Terminal.dc.html" style="display:flex;align-items:center;font-size:14px;font-weight:700;letter-spacing:.12em;background:#78DCFF;color:#040A12;padding:0 32px;text-decoration:none;box-shadow:0 0 24px rgba(120,220,255,.45)" style-hover="background:#E6FCFF;text-shadow:none;box-shadow:0 0 40px rgba(120,220,255,.8)">SCAN</a>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;color:#6E8291;flex-wrap:wrap;max-width:680px">
+      <span>reads public state only · no wallet connect · nothing signed</span>
+      <span style="display:inline-flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#78DCFF;display:inline-block;box-shadow:0 0 8px #78DCFF"></span><span style="color:#E6FCFF;font-variant-numeric:tabular-nums">{{ scanned }}</span> tokens checked</span>
+    </div>
+  </div>
+  <div style="position:relative;width:440px;height:510px;flex-shrink:0;border:1px solid #16324A;display:flex;align-items:center;justify-content:center">
+    <div style="position:relative;width:392px;height:462px;overflow:hidden;background:#040A12"><img src="assets/logo-film.gif" alt="XRAY film" style="position:absolute;left:-56px;top:-35px;width:560px;height:560px;display:block;max-width:none"></div>
+    <div style="position:absolute;top:8px;right:12px;font-size:10px;letter-spacing:.14em;color:#5CA2C4;text-transform:uppercase">kV 78 · mA 60</div>
+    <div style="position:absolute;bottom:8px;left:12px;font-size:10px;letter-spacing:.14em;color:#5CA2C4;text-transform:uppercase">film 001 · brand mark</div>
+    <div style="position:absolute;top:-1px;left:-1px;width:22px;height:22px;border-top:2px solid #78DCFF;border-left:2px solid #78DCFF"></div>
+    <div style="position:absolute;top:-1px;right:-1px;width:22px;height:22px;border-top:2px solid #78DCFF;border-right:2px solid #78DCFF"></div>
+    <div style="position:absolute;bottom:-1px;left:-1px;width:22px;height:22px;border-bottom:2px solid #78DCFF;border-left:2px solid #78DCFF"></div>
+    <div style="position:absolute;bottom:-1px;right:-1px;width:22px;height:22px;border-bottom:2px solid #78DCFF;border-right:2px solid #78DCFF"></div>
+  </div>
+</section>
+
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #16324A;background:#0A1626;box-shadow:0 0 40px rgba(120,220,255,.08)">
+  <div style="background:#0A1626;padding:24px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #16324A;margin-right:-1px;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap">tokens checked</div><div style="font-weight:700;font-size:40px;line-height:1;color:#78DCFF;text-shadow:0 0 18px rgba(120,220,255,.7);font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap">12 408</div><div style="font-size:12px;color:#6E8291;white-space:nowrap">since 2026-08-01</div></div>
+  <div style="background:#0A1626;padding:24px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #16324A;margin-right:-1px;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap">wallets in the book</div><div style="font-weight:700;font-size:40px;line-height:1;color:#78DCFF;text-shadow:0 0 18px rgba(120,220,255,.7);font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap">338 112</div><div style="font-size:12px;color:#6E8291">addresses with a Pons record</div></div>
+  <div style="background:#0A1626;padding:24px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #16324A;margin-right:-1px;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap">launches a day</div><div style="font-weight:700;font-size:40px;line-height:1;color:#78DCFF;text-shadow:0 0 18px rgba(120,220,255,.7);font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap">1 940</div><div style="font-size:12px;color:#6E8291">Pons V2 · 7-day average</div></div>
+  <div style="background:#0A1626;padding:24px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #16324A;margin-right:-1px;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap">keys held</div><div style="font-weight:700;font-size:40px;line-height:1;color:#E6FCFF;text-shadow:0 0 18px rgba(120,220,255,.5);white-space:nowrap">0</div><div style="font-size:12px;color:#6E8291">no accounts · no signing</div></div>
+</div>
+</div>
+
+<section style="display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap">
+    <div><div style="font-size:12px;color:#5CA2C4;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">live visualization · one full scan every ~14 seconds</div><div style="font-family:Tiny5,monospace;font-size:40px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">AGENTS <span style="color:#78DCFF">AT WORK</span></div></div>
+    <div style="font-size:12px;color:#6E8291;max-width:420px;text-align:right;text-wrap:pretty">the film travels station to station. every line in the log is the shape of a real row the terminal produces.</div>
+  </div>
+  <div style="border:1px solid #16324A;background:#081420;box-shadow:0 0 48px rgba(120,220,255,.1);position:relative;overflow:hidden;display:flex;flex-direction:column">
+    <div style="display:flex;flex-direction:column;font-size:12px;line-height:1.7;height:196px;overflow:hidden;padding:14px 20px 0;border-bottom:1px solid #16324A">
+      <div style="display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;margin-bottom:6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6E8291"><span>engine log</span><span style="display:inline-flex;align-items:center;gap:8px"><span style="width:6px;height:6px;background:#60F080;display:inline-block;box-shadow:0 0 8px #60F080"></span>{{ scanningTicker }}</span></div>
+      <sc-for list="{{ log }}" as="l" hint-placeholder-count="0">
+        <div style="display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;color:{{ l.color }};opacity:{{ l.op }};font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:{{ l.tagColor }};text-shadow:{{ l.shadow }}">{{ l.tag }}</span><span style="overflow:hidden;text-overflow:ellipsis">{{ l.text }}</span></div>
+      </sc-for>
+      <div style="color:#78DCFF"><span style="display:inline-block;width:8px;height:14px;background:#78DCFF;vertical-align:-2px;box-shadow:0 0 8px #78DCFF;animation:blink 1s steps(1) infinite"></span></div>
+    </div>
+    <div style="position:relative;padding:28px 12px 20px;overflow:hidden">
+      <div style="position:absolute;left:0;right:0;top:calc(58% + 8px);height:2px;background:repeating-linear-gradient(90deg,#78DCFF 0 12px,transparent 12px 32px);opacity:.35;animation:flow .6s linear infinite"></div>
+      <div style="position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));column-gap:8px">
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d0.border }};animation:{{ d0.anim }};background:{{ d0.bg }}"><sc-if value="{{ d0.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d0.bl }};right:{{ d0.br }};transform:{{ d0.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d0.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">01</div><img src="assets/work-scanner.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d0.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d0.tag }}">SCANNER</div></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d1.border }};animation:{{ d1.anim }};background:{{ d1.bg }}"><sc-if value="{{ d1.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d1.bl }};right:{{ d1.br }};transform:{{ d1.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d1.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">02</div><img src="assets/work-ledger.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d1.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d1.tag }}">LEDGER</div></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d2.border }};animation:{{ d2.anim }};background:{{ d2.bg }}"><sc-if value="{{ d2.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d2.bl }};right:{{ d2.br }};transform:{{ d2.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d2.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">03</div><img src="assets/work-tracer.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d2.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d2.tag }}">TRACER</div></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d3.border }};animation:{{ d3.anim }};background:{{ d3.bg }}"><sc-if value="{{ d3.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d3.bl }};right:{{ d3.br }};transform:{{ d3.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d3.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">04</div><img src="assets/work-auditor.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d3.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d3.tag }}">AUDITOR</div></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d4.border }};animation:{{ d4.anim }};background:{{ d4.bg }}"><sc-if value="{{ d4.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d4.bl }};right:{{ d4.br }};transform:{{ d4.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d4.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">05</div><img src="assets/work-sorter.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d4.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d4.tag }}">SORTER</div></div>
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 4px;border:1px solid transparent;border-color:{{ d5.border }};animation:{{ d5.anim }};background:{{ d5.bg }}"><sc-if value="{{ d5.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:-22px;left:{{ d5.bl }};right:{{ d5.br }};transform:{{ d5.bt }};z-index:6;background:#040A12;border:1px solid #78DCFF;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5)">{{ d5.bubble }}</div></sc-if><div style="font-size:10px;letter-spacing:.14em;color:#5CA2C4">06</div><img src="assets/work-flagger.gif" alt="" style="width:112px;height:124px;display:block;opacity:{{ d5.op }};transition:opacity .6s"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:{{ d5.tag }}">FLAGGER</div></div>
+      </div>
+      <div style="position:absolute;top:69px;left:{{ w0.left }};margin-left:{{ w0.ml }};width:76px;height:104px;z-index:3;opacity:{{ w0.op }};transition:{{ w0.transition }};pointer-events:none"><sc-if value="{{ w0.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w0.bl }};right:{{ w0.br }};transform:{{ w0.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w0.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">SCANNER</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w0.anim }};transform:{{ w0.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+      <div style="position:absolute;top:69px;left:{{ w1.left }};margin-left:{{ w1.ml }};width:76px;height:104px;z-index:3;opacity:{{ w1.op }};transition:{{ w1.transition }};pointer-events:none"><sc-if value="{{ w1.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w1.bl }};right:{{ w1.br }};transform:{{ w1.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w1.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">LEDGER</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w1.anim }};transform:{{ w1.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+      <div style="position:absolute;top:69px;left:{{ w2.left }};margin-left:{{ w2.ml }};width:76px;height:104px;z-index:3;opacity:{{ w2.op }};transition:{{ w2.transition }};pointer-events:none"><sc-if value="{{ w2.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w2.bl }};right:{{ w2.br }};transform:{{ w2.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w2.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">TRACER</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w2.anim }};transform:{{ w2.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+      <div style="position:absolute;top:69px;left:{{ w3.left }};margin-left:{{ w3.ml }};width:76px;height:104px;z-index:3;opacity:{{ w3.op }};transition:{{ w3.transition }};pointer-events:none"><sc-if value="{{ w3.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w3.bl }};right:{{ w3.br }};transform:{{ w3.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w3.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">AUDITOR</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w3.anim }};transform:{{ w3.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+      <div style="position:absolute;top:69px;left:{{ w4.left }};margin-left:{{ w4.ml }};width:76px;height:104px;z-index:3;opacity:{{ w4.op }};transition:{{ w4.transition }};pointer-events:none"><sc-if value="{{ w4.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w4.bl }};right:{{ w4.br }};transform:{{ w4.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w4.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">SORTER</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w4.anim }};transform:{{ w4.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+      <div style="position:absolute;top:69px;left:{{ w5.left }};margin-left:{{ w5.ml }};width:76px;height:104px;z-index:3;opacity:{{ w5.op }};transition:{{ w5.transition }};pointer-events:none"><sc-if value="{{ w5.hasBubble }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;bottom:132px;left:{{ w5.bl }};right:{{ w5.br }};transform:{{ w5.bt }};background:#040A12;border:1px solid #9EE0F7;color:#E6FCFF;font-size:12px;font-weight:500;padding:6px 10px;white-space:nowrap;box-shadow:0 0 16px rgba(120,220,255,.5);z-index:6">{{ w5.bubble }}</div></sc-if><div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#78DCFF;text-shadow:0 0 8px rgba(120,220,255,.8);white-space:nowrap">FLAGGER</div><div style="width:76px;height:104px;background:url(assets/run-sheet.png) 0 0/456px 104px no-repeat;image-rendering:pixelated;animation:{{ w5.anim }};transform:{{ w5.flip }};filter:drop-shadow(0 0 10px rgba(120,220,255,.8))"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="how" style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:48px;align-items:start">
+  <div style="display:flex;flex-direction:column;gap:24px">
+    <div><div style="font-size:12px;color:#5CA2C4;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">one scan · six stages · one verdict</div><div style="font-family:Tiny5,monospace;font-size:40px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">HOW IT WORKS</div></div>
+    <div style="display:flex;flex-direction:column;border:1px solid #16324A;background:#0A1626">
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">01</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">SCANNER <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">pulls every trade</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">every buy and sell of the token, straight off chain. no wallet connect, no signature.</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums">18 920 trades · 1 043 holders · from block 59 570 827 · <a href="#">blockscout</a></div></div></div>
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">02</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">LEDGER <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">rebuilds each book</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">what each wallet paid, what it took out, what still sits there at current price.</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums">0x3f9a…c21e · in 2.10 ETH · out 0.90 ETH · holds 4.21% · pnl <span style="color:#60F080">+184.2%</span></div></div></div>
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">03</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">TRACER <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">follows the wallets</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">the same addresses across every other Pons token they touched. history, not vibes.</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums">0x3f9a…c21e → $FEMUR $RIBCAGE $CALCIUM +16 more · 212 wallets with ≥ 5 past trades</div></div></div>
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">04</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">AUDITOR <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">grades the traders</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">average pnl per trade and winrate, wallet by wallet. says how many wallets each number rests on.</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums">0x3f9a…c21e · avg <span style="color:#60F080">+38.4%</span> / trade · winrate 67% over 48 → <span style="color:#78DCFF">SMART</span></div></div></div>
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">05</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">SORTER <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">bands the holders</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">holders grouped by winrate, five points wide, at most three groups - so you read "31% of supply sits with traders who win 60–65% of the time".</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums"><span style="color:#60F080">31.2%</span> supply · wr 60–65 · 188 wallets &nbsp; <span style="color:#FFD640">22.9%</span> · wr 50–55 · 302 &nbsp; <span style="color:#FF605C">18.4%</span> · wr 35–40 · 553</div></div></div>
+      <div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:20px;padding:20px 24px"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#040A12;background:#78DCFF;width:48px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(120,220,255,.5)">06</div><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">FLAGGER <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6E8291">cleans the sample</span></div><div style="font-size:13px;line-height:1.6;color:#D9D9D9">dust, transfers-in, infrastructure and first-ever trades are counted, shown, and kept out of the averages.</div><div style="font-size:12px;color:#5CA2C4;font-variant-numeric:tabular-nums">dust 214 · transfers-in 87 · infra 6 · first trades 312</div></div></div>
+    </div>
+  </div>
+  <div style="position:sticky;top:24px;display:flex;flex-direction:column;gap:24px">
+    <div><div style="font-size:12px;color:#5CA2C4;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">share card · $MARROW · 2026-09-16</div><div style="font-family:Tiny5,monospace;font-size:40px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">VERDICT</div></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+    <div onClick="{{ openCard }}" style="position:relative;width:100%;aspect-ratio:1;border:1px solid #16324A;background:#040A12;cursor:zoom-in;overflow:hidden;box-shadow:0 0 0 1px rgba(120,220,255,.08),0 0 40px rgba(120,220,255,.12)">
+      <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ false }}"><div role="img" aria-label="XRAY share card for $MARROW" style="{{ cardStyle }}"></div></sc-if>
+      <sc-if value="{{ noCard }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#6E8291">rendering card…</div></sc-if>
+      <div style="position:absolute;right:10px;bottom:10px;font-size:10px;letter-spacing:.14em;color:#5CA2C4;text-transform:uppercase;background:rgba(4,10,18,.8);padding:4px 8px;border:1px solid #16324A">click to enlarge</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onClick="{{ copyImage }}" style="font-family:inherit;font-size:12px;letter-spacing:.08em;background:transparent;color:#78DCFF;border:1px solid #2A546E;padding:10px 12px;cursor:pointer" style-hover="border-color:#78DCFF;box-shadow:0 0 16px rgba(120,220,255,.3)">{{ copyImgLabel }}</button>
+      <button onClick="{{ downloadImage }}" style="font-family:inherit;font-size:12px;letter-spacing:.08em;background:transparent;color:#78DCFF;border:1px solid #2A546E;padding:10px 12px;cursor:pointer" style-hover="border-color:#78DCFF;box-shadow:0 0 16px rgba(120,220,255,.3)">DOWNLOAD PNG</button>
+    </div>
+    <a href="XRAY Terminal.dc.html" style="font-size:12px;color:#9EE0F7">open $MARROW in the terminal →</a>
+    <div style="font-size:11px;color:#6E8291;line-height:1.6">numbers rest on 956 wallets with known cost basis and 212 with ≥ 5 past Pons trades. every row links its wallet on Blockscout.</div>
+  </div></div>
+</section>
+<sc-if value="{{ cardOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeCard }}" style="position:fixed;inset:0;z-index:50;background:rgba(4,10,18,.92);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:24px">
+    <div role="img" aria-label="XRAY share card" style="{{ lightboxStyle }}"></div>
+    <div style="position:absolute;top:20px;right:24px;font-size:12px;letter-spacing:.14em;color:#6E8291">ESC · click anywhere to close</div>
+  </div>
+</sc-if>
+
+<section style="display:flex;flex-direction:column;gap:24px">
+  <div><div style="font-size:12px;color:#5CA2C4;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">one skeleton per token · the film shows the fracture</div><div style="font-family:Tiny5,monospace;font-size:40px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">GRADES</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+    <div style="border:1px solid #16324A;background:#040A12;padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,rgba(96,240,128,.14),transparent 60%)"></div><img src="assets/h-healthy.png" alt="" style="position:relative;width:200px;height:200px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(96,240,128,.7))"><div style="position:relative;font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#60F080;text-shadow:0 0 18px rgba(96,240,128,.8)">HEALTHY</div><div style="position:relative;font-size:13px;color:#D9D9D9">holders are in profit and they win elsewhere too</div></div>
+    <div style="border:1px solid #16324A;background:#040A12;padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,rgba(255,214,64,.12),transparent 60%)"></div><img src="assets/h-cracked.png" alt="" style="position:relative;width:200px;height:200px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(255,214,64,.6))"><div style="position:relative;font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#FFD640;text-shadow:0 0 18px rgba(255,214,64,.7)">CRACKED</div><div style="position:relative;font-size:13px;color:#D9D9D9">flat book, average traders - could go either way</div></div>
+    <div style="border:1px solid #16324A;background:#040A12;padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,rgba(255,96,92,.14),transparent 60%)"></div><img src="assets/h-shattered.png" alt="" style="position:relative;width:200px;height:200px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(255,96,92,.7))"><div style="position:relative;font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#FF605C;text-shadow:0 0 18px rgba(255,96,92,.8)">SHATTERED</div><div style="position:relative;font-size:13px;color:#D9D9D9">most holders underwater and they lose everywhere else</div></div>
+  </div>
+</section>
+
+<section style="border:1px solid #2A546E;background:#0A1626;padding:32px;display:flex;flex-direction:column;gap:20px;box-shadow:0 0 0 1px rgba(120,220,255,.08),0 0 48px rgba(120,220,255,.12)">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap"><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">OFFICIAL CA</div><div style="font-size:12px;color:#6E8291">one contract. verify every character.</div></div>
+  <div style="display:flex;border:1px solid #16324A;background:#040A12;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:0;padding:16px 20px;font-size:14px;color:#E6FCFF;word-break:break-all;font-variant-numeric:tabular-nums"><span style="color:#78DCFF">$XRAY</span> · 0xe4a71f0c9b3d28e6a5f1047cb92d3e8f61a0c7b9</span>
+    <button onClick="{{ onCopyCa }}" style="font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.12em;background:transparent;color:#78DCFF;border:none;border-left:1px solid #16324A;padding:16px 24px;cursor:pointer;outline:none" style-hover="color:#E6FCFF;text-shadow:0 0 10px rgba(120,220,255,.8)">{{ caLabel }}</button>
+  </div>
+  <div style="display:flex;gap:8px;font-size:12px;flex-wrap:wrap"><a href="#" style="border:1px solid #16324A;padding:8px 14px;letter-spacing:.08em" style-hover="border-color:#78DCFF">TRADE</a><a href="#" style="border:1px solid #16324A;padding:8px 14px;letter-spacing:.08em" style-hover="border-color:#78DCFF">DEXSCREENER</a><a href="#" style="border:1px solid #16324A;padding:8px 14px;letter-spacing:.08em" style-hover="border-color:#78DCFF">BLOCKSCOUT</a></div>
+</section>
+
+<section style="border:1px solid #16324A;background:#0A1626;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:20px 24px;flex-wrap:wrap"><div style="display:flex;gap:12px;align-items:baseline"><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF;text-shadow:0 0 14px rgba(120,220,255,.5)">$XRAY <span style="color:#78DCFF">CHART</span></div><div style="font-size:12px;color:#6E8291">live · via GeckoTerminal · read-only</div></div><sc-if value="{{ hasChart }}" hint-placeholder-val="{{ false }}"><a href="{{ chartOpenUrl }}" target="_blank" rel="noopener" style="font-size:12px">open on GeckoTerminal →</a></sc-if></div>
+  <div style="height:440px;background:#040A12;border-top:1px solid #16324A;position:relative">
+    <sc-if value="{{ hasChart }}" hint-placeholder-val="{{ false }}">{{ chartFrame }}</sc-if>
+    <sc-if value="{{ noChart }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:repeating-linear-gradient(0deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px),repeating-linear-gradient(90deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px)"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#2A546E">LIVE CHART LOADS HERE AT LAUNCH</div><div style="font-size:12px;color:#6E8291">pool embed url goes into tweaks → chartUrl</div></div></sc-if>
+  </div>
+</section>
+
+<footer style="display:flex;justify-content:space-between;gap:16px;padding-top:24px;border-top:1px solid #16324A;font-size:12px;color:#6E8291;flex-wrap:wrap">
+  <span style="display:inline-flex;gap:12px;align-items:center"><img src="assets/lightbox.png" alt="" style="width:24px;height:24px;display:block"><a href="#" style="color:#6E8291">x</a><a href="#" style="color:#6E8291">github</a><a href="#" style="color:#6E8291">telegram</a><span>· read-only, holds no keys</span></span>
+  <span>XRAY · no accounts · no promises · Robinhood Chain</span>
+</footer>
+
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;chartUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;https://www.geckoterminal.com/eth/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640?embed=1&amp;info=0&amp;swaps=0&amp;grayscale=0&amp;light_chart=0&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;chart&quot;},&quot;reducedMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const TOK = [
+  { t: '$MARROW', a: '0x7a3f…9c41', tr: '18 920', h: '1 043', w: '0x3f9a…c21e', inE: '2.10', outE: '0.90', sup: '4.21%', pnl: '+184.2%', pc: '#60F080', others: '$FEMUR $RIBCAGE $CALCIUM +16', traced: '212', avg: '+38.4%', wr: '67%', tag: 'SMART', bands: '60–65% · 31.2% supply · 188 wallets | 50–55% · 22.9% · 302 | 35–40% · 18.4% · 553', fl: 'dust 214 · transfers-in 87 · infra 6 · first trades 312', verdict: 'HEALTHY', vc: '#60F080', vp: '+38.4%', vw: '58%' },
+  { t: '$TIBIA', a: '0x91cc…07ad', tr: '2 114', h: '312', w: '0xb02c…77d1', inE: '0.40', outE: '0.00', sup: '0.63%', pnl: '−41.7%', pc: '#FF605C', others: '$HUMERUS $OSSIFY +3', traced: '61', avg: '−12.0%', wr: '31%', tag: 'no badge', bands: '55–60% · 4.2% supply · 31 wallets | 40–45% · 15.7% · 190 | 25–30% · 61.0% · 690', fl: 'dust 88 · transfers-in 12 · infra 2 · first trades 140', verdict: 'SHATTERED', vc: '#FF605C', vp: '−31.7%', vw: '36%' },
+  { t: '$FEMUR', a: '0x2be0…f302', tr: '7 480', h: '287', w: '0x5d1e…a904', inE: '1.20', outE: '1.35', sup: '1.02%', pnl: '+12.4%', pc: '#FFD640', others: '$MARROW $PATELLA +9', traced: '104', avg: '+6.2%', wr: '49%', tag: 'RICH', bands: '55–60% · 12.1% supply · 96 wallets | 45–50% · 38.6% · 410 | 30–35% · 27.3% · 388', fl: 'dust 41 · transfers-in 20 · infra 1 · first trades 77', verdict: 'CRACKED', vc: '#FFD640', vp: '+4.1%', vw: '47%' },
+];
+const C = '#78DCFF', S = '0 0 8px rgba(120,220,255,.7)';
+function script(k) {
+  return [
+    [0, 'SCANNER', `${k.t} · ${k.a} · fetching swaps from block 59 570 827`, C],
+    [0, 'SCANNER', `${k.tr} trades pulled · ${k.h} holders`, C],
+    [1, 'LEDGER', `${k.w} · in ${k.inE} ETH · out ${k.outE} ETH · holds ${k.sup}`, C],
+    [1, 'LEDGER', `${k.w} · pnl here ${k.pnl}`, k.pc],
+    [2, 'TRACER', `${k.w} → ${k.others} more tokens`, C],
+    [2, 'TRACER', `${k.traced} wallets with ≥ 5 past Pons trades`, C],
+    [3, 'AUDITOR', `${k.w} · avg ${k.avg} / trade · winrate ${k.wr} → ${k.tag}`, C],
+    [4, 'SORTER', `winrate bands · ${k.bands}`, C],
+    [5, 'FLAGGER', k.fl, C],
+    [6, 'VERDICT', `${k.t} · ${k.verdict} · avg pnl ${k.vp} · winrate ${k.vw}`, k.vc],
+  ];
+}
+const N = 6; const deskX = k => (k + 0.5) / N * 100;
+const TALK = [
+  [0, 1, ['18 920 trades in. all yours.', 'on it. rebuilding books.']],
+  [1, 3, ['0x3f9a…c21e · in 2.1 out 0.9 - your read?', 'wr 67% over 48. smart money.']],
+  [2, 4, ['212 traced. bands ready?', '60–65 holds 31% of supply.']],
+  [5, 1, ['214 dust wallets - drop them.', 'dropped. 87 unknown basis left.']],
+  [4, 3, ['band 35–40 is heavy.', 'they lose elsewhere too.']],
+  [3, 5, ['first-ever trades?', '312. kept out of the averages.']],
+  [2, 0, ['need the swaps before block 59.57M', 'pulling them now.']],
+  [0, 5, ['3 wallets look like infra.', 'flagged. never averaged.']],
+  [4, 1, ['who holds the top 1%?', '14 wallets. 9 of them smart.']],
+  [3, 2, ['same wallet on $FEMUR?', 'yes - exited at 2.1x.']],
+];
+class Component extends DCLogic {
+  state = { i: 0, tok: 0, log: [], ca: false, query: '', scanned: 12408, cardUrl: '', cardOpen: false, copied: '',
+    ag: Array.from({ length: N }, (_, k) => ({ mode: 'desk', x: deskX(k), off: -60, dur: 0, flip: false, bubble: '', host: -1 })), deskBubble: Array(N).fill('') };
+  cardData = { ticker: '$MARROW', addr: '0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41', pnl: '+38.4%', winrate: '58%', grade: 'healthy', gradeColor: '#60F080', gradeLabel: 'HEALTHY', hint: 'holders in profit and they know how to trade', time: '2026-09-16 16:29 UTC', groups: [{ supply: 31.2, wr: 60, wallets: 188 }, { supply: 22.9, wr: 50, wallets: 302 }, { supply: 18.4, wr: 35, wallets: 553 }] };
+  timers = [];
+  later(fn, ms) { const t = setTimeout(fn, ms); this.timers.push(t); return t; }
+  componentDidMount() {
+    this.onResize = () => this.forceUpdate(); window.addEventListener('resize', this.onResize); requestAnimationFrame(() => this.forceUpdate()); this.ro = new ResizeObserver(() => this.forceUpdate()); this.ro.observe(document.documentElement);
+    this.onKey = e => { if (e.key === 'Escape') this.setState({ cardOpen: false }); }; window.addEventListener('keydown', this.onKey);
+    import('./card.js').then(m => { this.card = m; return m.renderCard(this.cardData); }).then(c => this.setState({ cardUrl: c.toDataURL('image/png') })).catch(e => console.warn('card', e));
+    this.t = setInterval(() => this.setState(s => {
+      const sc = script(TOK[s.tok]); const line = sc[s.i];
+      const log = [...s.log, { tag: line[1], text: line[2], stage: line[0], color: line[0] === 6 ? line[3] : '#D9D9D9', tagColor: line[3], shadow: line[0] === 6 ? `0 0 10px ${line[3]}` : 'none' }].slice(-7);
+      let i = s.i + 1, tok = s.tok, scanned = s.scanned; if (i >= sc.length) { i = 0; tok = (tok + 1) % TOK.length; scanned += 1; }
+      return { i, tok, log, scanned };
+    }), 1400);
+    this.later(() => this.spawn(), 800);
+    this.sp = setInterval(() => this.spawn(), 2600);
+  }
+  componentWillUnmount() { clearInterval(this.t); clearInterval(this.sp); this.ro && this.ro.disconnect(); this.timers.forEach(clearTimeout); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); }
+  patch(k, p) { this.setState(s => { const ag = s.ag.slice(); ag[k] = { ...ag[k], ...p }; return { ag }; }); }
+  spawn() {
+    if (this.props.reducedMotion) return;
+    const ag = this.state.ag; const away = ag.filter(a => a.mode !== 'desk').length; if (away >= 2 || Math.random() < .3) return;
+    const busy = new Set(); ag.forEach((a, k) => { if (a.mode !== 'desk') { busy.add(k); busy.add(a.host); } });
+    const pool = TALK.filter(([a, b]) => !busy.has(a) && !busy.has(b)); if (!pool.length) return;
+    const [k, j, lines] = pool[Math.floor(Math.random() * pool.length)];
+    const from = deskX(k), to = deskX(j); const side = k < j ? -1 : 1; const dur = Math.max(1200, Math.abs(to - from) * 55);
+    this.patch(k, { mode: 'walk', x: to, off: side * 104, dur, flip: to < from, host: j, bubble: '' });
+    this.later(() => { this.patch(k, { mode: 'talk', bubble: lines[0], flip: side > 0 }); }, dur);
+    this.later(() => { this.setState(s => { const deskBubble = s.deskBubble.slice(); deskBubble[j] = lines[1]; return { deskBubble }; }); this.patch(k, { bubble: '' }); }, dur + 1800);
+    this.later(() => { this.setState(s => { const deskBubble = s.deskBubble.slice(); deskBubble[j] = ''; return { deskBubble }; }); this.patch(k, { mode: 'walk', x: from, off: -60, dur, flip: from < to }); }, dur + 3600);
+    this.later(() => { this.patch(k, { mode: 'desk', host: -1, flip: false }); }, dur + 3600 + dur);
+  }
+  renderVals() {
+    const { log, scanned, ag, deskBubble } = this.state;
+    const chartUrl = this.props.chartUrl ?? 'https://www.geckoterminal.com/eth/pools/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640?embed=1&info=0&swaps=0&grayscale=0&light_chart=0';
+    const chartFrame = chartUrl ? (this.chartEl && this.chartEl.props.src === chartUrl ? this.chartEl : (this.chartEl = React.createElement('iframe', { key: chartUrl, src: chartUrl, title: '$XRAY chart', loading: 'lazy', style: { position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', display: 'block' } }))) : null; const rm = this.props.reducedMotion ?? false;
+    const hosting = new Set(ag.filter(a => a.mode === 'talk').map(a => a.host));
+    const out = { hasChart: !!chartUrl, noChart: !chartUrl, chartFrame, chartOpenUrl: chartUrl.split('?')[0], log: log.map((l, idx, arr) => ({ ...l, op: 0.45 + 0.55 * ((idx + 1) / arr.length) })), scanningTicker: 'scanning ' + TOK[this.state.tok].t,
+      scanned: scanned.toLocaleString('fr-FR').replace(/\u202f/g, ' '), query: this.state.query,
+      onQuery: e => this.setState({ query: e.target.value }), onKey: e => { if (e.key === 'Enter') location.href = 'XRAY Terminal.dc.html'; },
+      cardStyle: { width: '100%', height: '100%', backgroundImage: `url(${this.state.cardUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' },
+      lightboxStyle: { width: 'min(90vw,90vh)', height: 'min(90vw,90vh)', backgroundImage: `url(${this.state.cardUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid #2A546E', boxShadow: '0 0 0 1px rgba(120,220,255,.1),0 0 80px rgba(120,220,255,.25)' },
+      cardUrl: this.state.cardUrl, hasCard: !!this.state.cardUrl, noCard: !this.state.cardUrl, cardOpen: this.state.cardOpen,
+      openCard: () => { if (this.state.cardUrl) this.setState({ cardOpen: true }); }, closeCard: () => this.setState({ cardOpen: false }),
+      copyImgLabel: this.state.copied || 'COPY IMAGE',
+      copyImage: () => { if (!this.card) return; this.card.copyCard(this.cardData).then(() => this.setState({ copied: 'COPIED' })).catch(() => this.setState({ copied: 'NOT ALLOWED' })).then(() => setTimeout(() => this.setState({ copied: '' }), 1400)); },
+      downloadImage: () => { if (this.card) this.card.downloadCard(this.cardData, 'xray-MARROW.png'); },
+      caLabel: this.state.ca ? 'COPIED' : 'COPY CA', onCopyCa: () => { this.setState({ ca: true }); setTimeout(() => this.setState({ ca: false }), 1200); } };
+    const anchor = x => x > 70 ? { bl: 'auto', br: '0', bt: 'none' } : x < 20 ? { bl: '0', br: 'auto', bt: 'none' } : { bl: '50%', br: 'auto', bt: 'translateX(-50%)' };
+    ag.forEach((a, k) => {
+      const host = hosting.has(k); const away = a.mode !== 'desk';
+      out['d' + k] = { border: host ? '#78DCFF' : 'transparent', bg: host ? 'rgba(120,220,255,.06)' : 'transparent', anim: host && !rm ? 'glow 1.2s ease-in-out infinite' : 'none', op: away ? .3 : 1, tag: host ? '#E6FCFF' : '#9EE0F7', bubble: deskBubble[k], hasBubble: !!deskBubble[k], ...anchor(deskX(k)) };
+      out['w' + k] = { left: a.x + '%', ml: (a.off - 38) + 'px', op: away ? 1 : 0, transition: (a.mode === 'walk' && !rm) ? `left ${a.dur}ms linear, margin-left ${a.dur}ms linear, opacity .3s` : 'opacity .3s', anim: a.mode === 'walk' && !rm ? 'runframes .54s steps(6) infinite' : 'none', flip: a.flip ? 'scaleX(-1)' : 'none', bubble: a.bubble, hasBubble: !!a.bubble, ...anchor(a.x + a.off / 12) };
+    });
+    return out;
+  }
+}
+</script>
+</body>
+</html>

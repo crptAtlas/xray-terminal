@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiny5&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#040A12;color:#D9D9D9;font-family:'JetBrains Mono',monospace;-webkit-font-smoothing:antialiased}
+a{color:#78DCFF;text-decoration:none}a:hover{color:#E6FCFF;text-shadow:0 0 10px rgba(120,220,255,.8)}
+img{image-rendering:pixelated}
+input{font-family:inherit}
+@keyframes glow{0%,100%{box-shadow:0 0 0 1px #78DCFF,0 0 18px rgba(120,220,255,.35),inset 0 0 24px rgba(120,220,255,.06)}50%{box-shadow:0 0 0 1px #9EE0F7,0 0 36px rgba(120,220,255,.7),inset 0 0 32px rgba(120,220,255,.12)}}
+@keyframes expose{from{top:-2px}to{top:100%}}
+@media (max-width:1040px){#verdict-grid{grid-template-columns:minmax(0,1fr)!important}#verdict-card{width:100%!important;height:auto!important;aspect-ratio:1/1}#verdict-panel{height:auto!important;min-height:0!important}#verdict-panel .num{font-size:48px!important}}
+@media (max-width:640px){#verdict-panel .metrics{grid-template-columns:minmax(0,1fr)!important}#verdict-panel .metrics > div{border-left:none!important;padding-left:0!important}}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;background:#040A12">
+<div style="position:absolute;left:50%;top:-360px;width:1400px;height:800px;transform:translateX(-50%);pointer-events:none;background:radial-gradient(ellipse at center,rgba(120,220,255,.14) 0%,rgba(120,220,255,.04) 35%,transparent 70%)"></div><div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 4px)"></div>
+<div style="position:relative;max-width:1180px;margin:0 auto;padding:0 24px 80px;display:flex;flex-direction:column;gap:24px">
+
+<header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #16324A;flex-wrap:wrap">
+  <a href="XRAY Home.dc.html" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none">
+    <span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#0A1626;border:1px solid #2A546E;box-shadow:0 0 12px rgba(120,220,255,.25)"><img src="assets/cage.png" alt="" style="width:24px;height:29px;display:block;filter:drop-shadow(0 0 6px rgba(120,220,255,.8))"></span>
+    <span style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF;letter-spacing:.06em;text-shadow:0 0 12px rgba(120,220,255,.6)">XRAY</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#D9D9D9"><span style="width:6px;height:6px;background:#60F080;display:inline-block;box-shadow:0 0 8px #60F080"></span>LIVE</span>
+  </a>
+  <nav style="display:flex;gap:28px;align-items:center">
+    <a href="XRAY Terminal.dc.html" style="color:#E6FCFF;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;text-shadow:0 0 10px rgba(120,220,255,.8);" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">terminal</a>
+    <a href="XRAY Holders.dc.html" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">holders</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">X</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">github</a>
+  </nav>
+</header>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+  <div style="display:flex;gap:0;border:1px solid {{ inputBorder }};background:#0A1626">
+    <span style="padding:14px 0 14px 16px;font-size:14px;color:#5CA2C4">&gt;</span>
+    <input value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ onKey }}" placeholder="paste a contract address or a ticker" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:#E6FCFF;font-size:14px;padding:14px 12px" />
+    <button onClick="{{ onScan }}" style="font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.08em;background:{{ btnBg }};color:#040A12;border:none;padding:0 28px;cursor:pointer;box-shadow:0 0 24px rgba(120,220,255,.4)" style-hover="background:#E6FCFF;box-shadow:0 0 40px rgba(120,220,255,.8)">{{ btnLabel }}</button>
+  </div>
+  <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;color:#6E8291;flex-wrap:wrap">
+    <span>reads public state only - no wallet connect, no signing · Robinhood Chain · Pons V2</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:6px;height:6px;background:#78DCFF;display:inline-block;box-shadow:0 0 8px #78DCFF"></span><span style="color:#D9D9D9;font-variant-numeric:tabular-nums">12 408</span> tokens checked</span>
+  </div>
+  <sc-if value="{{ isPick }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid #16324A;background:#0A1626;font-size:13px;font-variant-numeric:tabular-nums">
+      <div style="padding:10px 16px;border-bottom:1px solid #16324A;color:#6E8291;font-size:12px">4 launches use this ticker - pick one</div>
+      <sc-for list="{{ picks }}" as="p" hint-placeholder-count="3">
+        <div onClick="{{ onPick }}" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid #16324A;cursor:pointer;align-items:center" style-hover="background:#0D1C30">
+          <span style="color:#9EE0F7">{{ p.addr }}</span><span style="color:#D9D9D9">{{ p.age }}</span><span style="color:#6E8291">{{ p.stage }}</span><span style="text-align:right;color:#D9D9D9">{{ p.mcap }}</span><span style="text-align:right;color:#D9D9D9">{{ p.holders }} holders</span>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid #FF605C;background:#0A1626;padding:14px 16px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:13px;color:#FF605C;font-weight:700">{{ errTitle }}</div><div style="font-size:12px;color:#D9D9D9">{{ errBody }}</div></div>
+      <button onClick="{{ onReset }}" style="font-family:inherit;font-size:12px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:8px 14px;cursor:pointer" style-hover="border-color:#78DCFF">{{ errAction }}</button>
+    </div>
+  </sc-if>
+</div>
+
+<sc-if value="{{ showLoader }}" hint-placeholder-val="{{ true }}">
+<div style="border:1px solid #16324A;background:#0A1626;padding:14px 20px 14px;display:flex;flex-direction:column;gap:12px">
+  <div style="display:flex;justify-content:space-between;gap:16px;font-size:12px;color:#6E8291;flex-wrap:wrap;align-items:baseline">
+    <span style="display:inline-flex;gap:10px;align-items:baseline"><span style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#E6FCFF;text-shadow:0 0 10px rgba(120,220,255,.6)">{{ stageName }}</span><span style="color:#9EE0F7">{{ stageCaption }}</span></span>
+    <span style="color:#D9D9D9;font-variant-numeric:tabular-nums">{{ progressPct }}% · {{ progressLabel }}</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">
+    <sc-for list="{{ stages }}" as="s" hint-placeholder-count="6">
+      <div style="position:relative;height:104px;background:#081420;border:1px solid {{ s.border }};overflow:hidden;display:flex;align-items:center;justify-content:center;animation:{{ s.anim }};transition:border-color .4s">
+        <sc-if value="{{ s.is_scanner }}" hint-placeholder-val="{{ false }}"><img src="assets/work-scanner.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if><sc-if value="{{ s.is_ledger }}" hint-placeholder-val="{{ false }}"><img src="assets/work-ledger.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if><sc-if value="{{ s.is_tracer }}" hint-placeholder-val="{{ false }}"><img src="assets/work-tracer.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if><sc-if value="{{ s.is_auditor }}" hint-placeholder-val="{{ false }}"><img src="assets/work-auditor.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if><sc-if value="{{ s.is_sorter }}" hint-placeholder-val="{{ false }}"><img src="assets/work-sorter.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if><sc-if value="{{ s.is_flagger }}" hint-placeholder-val="{{ false }}"><img src="assets/work-flagger.gif" alt="" style="width:56px;height:62px;display:block;margin-top:-10px;opacity:{{ s.cageOp }};transition:opacity .6s;filter:{{ s.filter }}"></sc-if>
+        <sc-if value="{{ s.active }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#E6FCFF 30%,#E6FCFF 70%,transparent);box-shadow:0 0 10px #78DCFF;animation:expose 1.2s linear infinite"></div></sc-if>
+        <sc-if value="{{ s.done }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:4px;right:6px;font-size:11px;font-weight:700;color:#60F080">✓</div></sc-if>
+        <div style="position:absolute;left:6px;bottom:4px;font-size:9px;letter-spacing:.14em;color:{{ s.color }}">0{{ s.n }} {{ s.name }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="height:3px;background:#040A12;border:1px solid #16324A;position:relative"><div style="position:absolute;top:0;bottom:0;left:0;width:{{ progressPct }}%;background:#78DCFF;box-shadow:0 0 10px rgba(120,220,255,.8);transition:width 1.5s linear"></div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px dashed #16324A;padding:48px 24px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#2A546E">NOTHING ON THE FILM YET</div>
+    <div style="font-size:13px;color:#6E8291">paste a contract address or a ticker - six agents rebuild every holder's book and tell you who is in profit, who is underwater, and whether they can trade at all.</div>
+    <div style="font-size:12px;color:#6E8291">try: <a href="#" onClick="{{ onTryAddr }}">0x7a3f…9c41</a> · <a href="#" onClick="{{ onTryTicker }}">$MARROW</a> · <a href="#" onClick="{{ onTryYoung }}">a token launched 2 min ago</a></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ showHeader }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid #16324A;background:#0A1626;display:grid;grid-template-columns:repeat({{ statCols }},minmax(0,1fr))">
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;grid-column:1/-1;border-bottom:1px solid #16324A"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">token</div><div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">$MARROW</span><a href="#" style="font-size:12px;color:#9EE0F7">0x7a3f19c0…9c41</a><button onClick="{{ onCopy }}" style="font-family:inherit;font-size:11px;background:transparent;color:#6E8291;border:1px solid #16324A;padding:2px 6px;cursor:pointer" style-hover="color:#78DCFF;border-color:#78DCFF">{{ copyLabel }}</button></div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">age</div><div style="font-size:14px;color:#D9D9D9;font-variant-numeric:tabular-nums">3h 12m</div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">stage</div><div style="font-size:14px;color:#D9D9D9;white-space:nowrap">graduated</div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">mcap</div><div style="font-size:14px;color:#D9D9D9;font-variant-numeric:tabular-nums">$412k</div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">liquidity</div><div style="font-size:14px;color:#D9D9D9;font-variant-numeric:tabular-nums">$58k</div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">vol 24h</div><div style="font-size:14px;color:#D9D9D9;font-variant-numeric:tabular-nums">$1.21M</div></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid #16324A;border-bottom:1px solid #16324A;margin-right:-1px;margin-bottom:-1px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">holders</div><div style="font-size:14px;color:#D9D9D9;font-variant-numeric:tabular-nums">1 043</div></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showScore }}" hint-placeholder-val="{{ false }}">
+<div id="verdict-grid" style="display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:12px;align-items:start">
+  <div id="verdict-panel" style="border:1px solid #16324A;background:#0A1626;padding:24px 28px;display:flex;flex-direction:column;gap:20px;justify-content:space-between;min-width:0;box-sizing:border-box;height:520px;overflow:hidden">
+    <div class="metrics" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0">
+      <div style="display:flex;flex-direction:column;gap:10px;padding-right:24px;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">avg holder pnl</div><div class="num" style="font-weight:700;font-size:56px;line-height:1;color:{{ g.color }};font-variant-numeric:tabular-nums;letter-spacing:-.03em;text-shadow:0 0 18px {{ g.color }},0 0 40px {{ g.glow }};white-space:nowrap">{{ g.pnl }}</div><div style="position:relative;height:8px;margin-top:6px"><div style="position:absolute;inset:0;display:flex;gap:2px"><div style="flex:1;background:rgba(255,96,92,.35)"></div><div style="flex:1;background:rgba(255,214,64,.35)"></div><div style="flex:1;background:rgba(96,240,128,.35)"></div></div><div style="position:absolute;top:-5px;bottom:-5px;left:{{ g.pnlPos }};width:4px;margin-left:-2px;background:#E6FCFF;box-shadow:0 0 10px rgba(230,252,255,.9);transition:left 1s ease"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:#2A546E;font-variant-numeric:tabular-nums"><span>−100%</span><span>0</span><span>+100%</span><span>+200%</span></div><div style="font-size:12px;color:#6E8291;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">across <span style="color:#D9D9D9">{{ g.counted }}</span> holders</div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;padding-left:24px;border-left:1px solid #16324A;min-width:0"><div style="font-size:11px;color:#6E8291;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">avg winrate</div><div class="num" style="font-weight:700;font-size:56px;line-height:1;color:{{ g.color }};font-variant-numeric:tabular-nums;letter-spacing:-.03em;text-shadow:0 0 18px {{ g.color }},0 0 40px {{ g.glow }};white-space:nowrap">{{ g.winrate }}</div><div style="position:relative;height:8px;margin-top:6px"><div style="position:absolute;inset:0;display:flex;gap:2px"><div style="flex:1;background:rgba(255,96,92,.35)"></div><div style="flex:1;background:rgba(255,214,64,.35)"></div><div style="flex:1;background:rgba(96,240,128,.35)"></div></div><div style="position:absolute;top:-5px;bottom:-5px;left:{{ g.wrPos }};width:4px;margin-left:-2px;background:#E6FCFF;box-shadow:0 0 10px rgba(230,252,255,.9);transition:left 1s ease"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:#2A546E;font-variant-numeric:tabular-nums"><span>0</span><span>33</span><span>66</span><span>100</span></div><div style="font-size:12px;color:#6E8291;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">across <span style="color:#D9D9D9">{{ g.traced }}</span> holders · ≥ 5 past trades</div></div>
+    </div>
+    <sc-if value="{{ showGroups }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid #16324A;padding-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;white-space:nowrap"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">WHO HOLDS THE SUPPLY</div><div style="font-size:11px;color:#6E8291;overflow:hidden;text-overflow:ellipsis">winrate bands · bar = share of supply</div></div>
+      <sc-for list="{{ groups }}" as="gr" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums"><span style="padding-right:4px"><span style="color:{{ gr.color }};font-weight:700">{{ gr.supply }} of supply</span><span style="color:#D9D9D9"> · winrate <span style="color:{{ gr.color }}">{{ gr.wr }}</span></span></span><span style="color:#6E8291;flex-shrink:0"><span style="color:#D9D9D9">{{ gr.wallets }} wallets</span> · avg pnl <span style="color:{{ gr.avgColor }}">{{ gr.avg }}</span></span></div>
+          <div style="height:10px;background:#040A12;border:1px solid #16324A;position:relative"><div style="position:absolute;top:0;bottom:0;left:0;width:{{ gr.supply }};background:{{ gr.color }};transition:width 1s ease"></div></div>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+  </div>
+  <div onClick="{{ openCard }}" id="verdict-card" style="position:relative;width:520px;height:520px;border:1px solid #78DCFF;background:#040A12;cursor:zoom-in;overflow:hidden;box-sizing:border-box;box-shadow:0 0 0 1px rgba(120,220,255,.15),0 0 48px rgba(120,220,255,.25)">
+    <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ false }}"><div role="img" aria-label="XRAY share card" style="{{ cardStyle }}"></div></sc-if>
+    <sc-if value="{{ noCard }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#6E8291">rendering card…</div></sc-if>
+    <div style="position:absolute;right:8px;bottom:8px;font-size:9px;letter-spacing:.14em;color:#5CA2C4;text-transform:uppercase;background:rgba(4,10,18,.85);padding:3px 6px;border:1px solid #16324A;white-space:nowrap">click to enlarge</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showTable }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid #16324A;background:#0A1626;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:20px 24px;flex-wrap:wrap"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">HOLDERS</div><div style="font-size:12px;color:#6E8291">sorted by share of supply · every address opens on Blockscout</div></div>
+  <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+    <sc-if value="{{ notMobile }}" hint-placeholder-val="{{ true }}">
+    <div style="font-size:13px;font-variant-numeric:tabular-nums;border-top:1px solid #16324A">
+      <div style="display:grid;grid-template-columns:1.4fr .8fr .9fr 1.1fr .8fr 1.2fr;gap:12px;padding:10px 24px;border-bottom:1px solid #16324A;font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase"><span>wallet</span><span style="text-align:center">supply</span><span style="text-align:center">pnl here</span><span style="text-align:center">avg pnl / trade</span><span style="text-align:center">winrate</span><span></span></div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+        <div style="display:grid;grid-template-columns:1.4fr .8fr .9fr 1.1fr .8fr 1.2fr;gap:12px;padding:10px 24px;border-bottom:1px solid #16324A;align-items:center" style-hover="background:#0D1C30">
+          <a href="XRAY Holders.dc.html" style="color:#9EE0F7">{{ r.addr }}</a><span style="text-align:center;color:#D9D9D9">{{ r.supply }}</span><span style="text-align:center;color:{{ r.pnlColor }}">{{ r.pnl }}</span><span style="text-align:center;color:{{ r.avgColor }}">{{ r.avg }}</span><span style="text-align:center;color:#D9D9D9">{{ r.winrate }}</span>
+          <span style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap"><sc-for list="{{ r.badges }}" as="b" hint-placeholder-count="0"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid {{ b.color }};color:{{ b.color }};padding:2px 6px">{{ b.text }}</span></sc-for></span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+    <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;border-top:1px solid #16324A;font-size:12px;font-variant-numeric:tabular-nums">
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+        <div style="padding:12px 16px;border-bottom:1px solid #16324A;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;gap:8px"><a href="XRAY Holders.dc.html" style="color:#9EE0F7">{{ r.addr }}</a><span style="color:#D9D9D9">{{ r.supply }} supply</span></div>
+          <div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#6E8291">pnl here <span style="color:{{ r.pnlColor }}">{{ r.pnl }}</span></span><span style="color:#6E8291">avg <span style="color:{{ r.avgColor }}">{{ r.avg }}</span></span><span style="color:#6E8291">wr <span style="color:#D9D9D9">{{ r.winrate }}</span></span></div>
+          <span style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ r.badges }}" as="b" hint-placeholder-count="0"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid {{ b.color }};color:{{ b.color }};padding:2px 6px">{{ b.text }}</span></sc-for></span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+  </sc-if>
+  <div style="padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #16324A">
+    <span style="font-size:12px;color:#6E8291">{{ rowsLabel }}</span>
+    <button onClick="{{ onMore }}" style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:8px 14px;cursor:pointer" style-hover="border-color:#78DCFF">{{ moreLabel }}</button>
+  </div>
+</div>
+
+<div style="border:1px solid #16324A;background:#0A1626;padding:14px 24px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:13px;font-variant-numeric:tabular-nums">
+  <span style="color:#6E8291">exited fully: <span style="color:#D9D9D9">{{ g.exited }}</span> wallets</span>
+  <span style="color:#6E8291">their avg pnl here <span style="color:{{ g.exitColor }}">{{ g.exitPnl }}</span></span>
+  <span style="color:#6E8291">their winrate overall <span style="color:#D9D9D9">{{ g.exitWr }}</span></span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:#16324A;border:1px solid #16324A;font-size:12px;font-variant-numeric:tabular-nums">
+  <div style="background:#0A1626;padding:12px 16px;display:flex;justify-content:space-between;gap:8px"><span style="color:#6E8291">dust</span><span style="color:#D9D9D9">214</span></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;justify-content:space-between;gap:8px"><span style="color:#6E8291">unknown cost basis</span><span style="color:#D9D9D9">87</span></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;justify-content:space-between;gap:8px"><span style="color:#6E8291">infrastructure</span><span style="color:#D9D9D9">6</span></div>
+  <div style="background:#0A1626;padding:12px 16px;display:flex;justify-content:space-between;gap:8px"><span style="color:#6E8291">first-ever trades</span><span style="color:#D9D9D9">312</span></div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+  <div style="font-size:12px;color:#6E8291">top 1000 holders only · <a href="#" onClick="{{ onFull }}">recompute over all {{ g.total }} holders</a> - takes several minutes</div>
+  <div style="display:flex;gap:8px">
+    <button onClick="{{ openCard }}" style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:10px 16px;cursor:pointer" style-hover="border-color:#78DCFF">preview card</button>
+    <button onClick="{{ copyImage }}" style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:10px 16px;cursor:pointer" style-hover="border-color:#78DCFF">{{ copyImgLabel }}</button>
+    <button onClick="{{ downloadImage }}" style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:10px 16px;cursor:pointer" style-hover="border-color:#78DCFF">download png</button>
+    <button onClick="{{ onCopyLink }}" style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:10px 16px;cursor:pointer" style-hover="border-color:#78DCFF">{{ linkLabel }}</button>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ cardOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeCard }}" style="position:fixed;inset:0;z-index:50;background:rgba(4,10,18,.92);display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:24px">
+    <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ false }}"><div role="img" aria-label="XRAY share card" style="{{ lightboxStyle }}"></div></sc-if>
+    <sc-if value="{{ noCard }}" hint-placeholder-val="{{ true }}"><div style="font-size:13px;color:#6E8291">rendering card…</div></sc-if>
+    <div style="position:absolute;top:20px;right:24px;font-size:12px;letter-spacing:.14em;color:#6E8291">ESC · click anywhere to close</div>
+  </div>
+</sc-if>
+
+<footer style="display:flex;justify-content:space-between;gap:16px;padding-top:24px;border-top:1px solid #16324A;font-size:12px;color:#6E8291;flex-wrap:wrap;margin-top:auto">
+  <span style="display:inline-flex;gap:12px;align-items:center"><a href="#" style="color:#6E8291">x</a><a href="#" style="color:#6E8291">github</a><a href="#" style="color:#6E8291">telegram</a><span>· read-only, holds no keys</span></span>
+  <span>XRAY - who is in profit, who is underwater, and can they trade at all · Robinhood Chain</span>
+</footer>
+
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty&quot;,&quot;pick&quot;,&quot;running&quot;,&quot;result&quot;,&quot;error-notpons&quot;,&quot;error-young&quot;,&quot;error-nodata&quot;],&quot;default&quot;:&quot;result&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;state&quot;},&quot;grade&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;healthy&quot;,&quot;cracked&quot;,&quot;shattered&quot;],&quot;default&quot;:&quot;healthy&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;state&quot;},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:4,&quot;step&quot;:0.5,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;demo&quot;},&quot;reducedMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;demo&quot;}}">
+const AGENTS = [
+  { name: 'SCANNER', src: 'assets/work-scanner.gif', cap: 'pulling every trade of this token', done: '1 043 holders · 18 920 trades', run: 'pulling trades…' },
+  { name: 'LEDGER', src: 'assets/work-ledger.gif', cap: "rebuilding each wallet's book", done: '1 043 books rebuilt', run: 'rebuilding books…' },
+  { name: 'TRACER', src: 'assets/work-tracer.gif', cap: 'following the same wallets across other tokens', done: '212 wallets traced', run: 'reading wallet histories, this usually takes ~20s…' },
+  { name: 'AUDITOR', src: 'assets/work-auditor.gif', cap: 'avg pnl and winrate, wallet by wallet', done: 'winrate for 212 · pnl for 956', run: 'auditing…' },
+  { name: 'SORTER', src: 'assets/work-sorter.gif', cap: 'banding holders by winrate', done: '3 bands · 72.5% of supply', run: 'banding…' },
+  { name: 'FLAGGER', src: 'assets/work-flagger.gif', cap: 'dust, transfers in, first-ever trades', done: '619 flagged', run: 'flagging…' },
+];
+const GRADES = {
+  healthy: { label: 'HEALTHY', color: '#60F080', sprite: 'h-healthy.png', pnl: '+38.4%', winrate: '58%', counted: '956', traced: '212', hint: 'holders in profit and they know how to trade', exited: '188', exitPnl: '+61.0%', exitColor: '#60F080', exitWr: '63%', total: '1 043',
+    groups: [[31.2, 188, 60, '+41.0%'], [22.9, 302, 50, '+8.2%'], [18.4, 553, 35, '−12.5%']], bias: 1 },
+  cracked: { label: 'CRACKED', color: '#FFD640', sprite: 'h-cracked.png', pnl: '+4.1%', winrate: '47%', counted: '901', traced: '176', hint: 'flat book, average traders - could go either way', exited: '264', exitPnl: '+12.3%', exitColor: '#60F080', exitWr: '49%', total: '1 043',
+    groups: [[12.1, 96, 55, '+14.0%'], [38.6, 410, 45, '+2.1%'], [27.3, 388, 30, '−9.8%']], bias: 0 },
+  shattered: { label: 'SHATTERED', color: '#FF605C', sprite: 'h-shattered.png', pnl: '−31.7%', winrate: '36%', counted: '874', traced: '141', hint: 'most holders underwater and they lose elsewhere too', exited: '402', exitPnl: '−22.8%', exitColor: '#FF605C', exitWr: '38%', total: '1 043',
+    groups: [[4.2, 31, 55, '+6.0%'], [15.7, 190, 40, '−18.3%'], [61.0, 690, 25, '−44.1%']], bias: -1 },
+};
+const BAND = wr => wr >= 55 ? '#60F080' : wr >= 45 ? '#FFD640' : '#FF605C';
+const HEX = '0123456789abcdef';
+function rnd(seed) { let s = seed; return () => { s = (s * 16807 + 11) % 2147483647; return s / 2147483647; }; }
+function makeRows(bias) {
+  const r = rnd(42 + bias * 7); const rows = [];
+  for (let i = 0; i < 40; i++) {
+    let a = '0x'; for (let k = 0; k < 4; k++) a += HEX[Math.floor(r() * 16)]; a += '…'; for (let k = 0; k < 4; k++) a += HEX[Math.floor(r() * 16)];
+    const supply = Math.max(0.05, 6.2 * Math.pow(0.85, i) * (0.7 + r() * .6));
+    const pnl = (r() - 0.5 + bias * 0.25) * 240; const avg = (r() - 0.5 + bias * 0.2) * 80; const wr = Math.round(30 + r() * 45 + bias * 8);
+    const badges = [];
+    if (wr >= 55) badges.push({ text: 'SMART', color: '#78DCFF' });
+    if (supply >= 1) badges.push({ text: 'WHALE', color: '#FFD640' });
+    if (!badges.length && r() > .6) badges.push({ text: r() > .5 ? 'FIRST TRADE' : 'TRANSFER IN', color: '#6E8291' });
+    const col = v => v > 20 ? '#60F080' : v < -20 ? '#FF605C' : '#FFD640';
+    const fmt = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
+    rows.push({ addr: a, supply: supply.toFixed(2) + '%', pnl: fmt(pnl), pnlColor: col(pnl), avg: fmt(avg), avgColor: col(avg), winrate: wr + '%', badges });
+  }
+  return rows;
+}
+const PICKS = [
+  { addr: '0x7a3f19c0…9c41', age: '3h 12m', stage: 'graduated · V4', mcap: '$412k', holders: '1 043' },
+  { addr: '0x2be0d7a1…f302', age: '6d 4h', stage: 'graduated · V4', mcap: '$38k', holders: '287' },
+  { addr: '0x91cc40e8…07ad', age: '41m', stage: 'curve · 62%', mcap: '$9.1k', holders: '64' },
+  { addr: '0xd4407b19…5e6f', age: '19d', stage: 'dead', mcap: '$310', holders: '12' },
+];
+class Component extends DCLogic {
+  constructor(p) { super(p); const v = p.view ?? 'result'; this.state = { view: v, step: v === 'result' ? 6 : 0, query: v === 'empty' ? '' : '0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41', loaded: 10, copied: false, linked: false, cardUrl: '', cardOpen: false, copiedImg: '' }; }
+  cardData(G) { return { ticker: '$MARROW', addr: '0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41', pnl: G.pnl, winrate: G.winrate, grade: G.label.toLowerCase(), gradeColor: G.color, gradeLabel: G.label, hint: G.hint, time: '2026-09-16 16:29 UTC', groups: G.groups.map(x => ({ supply: x[0], wr: x[2], wallets: x[1] })) }; }
+  renderCard() { const G = GRADES[this.props.grade ?? 'healthy'] ?? GRADES.healthy; const key = G.label; if (this.cardKey === key) return; this.cardKey = key; this.setState({ cardUrl: '' }); import('./card.js').then(m => { this.card = m; return m.renderCard(this.cardData(G)); }).then(c => this.setState({ cardUrl: c.toDataURL('image/png') })).catch(e => console.warn('card', e)); }
+  componentDidMount() { this.onResize = () => this.forceUpdate(); window.addEventListener('resize', this.onResize); requestAnimationFrame(() => this.forceUpdate()); setTimeout(() => this.forceUpdate(), 300); this.ro = new ResizeObserver(() => this.forceUpdate()); this.ro.observe(document.documentElement); this.onKeyEsc = e => { if (e.key === 'Escape') this.setState({ cardOpen: false }); }; window.addEventListener('keydown', this.onKeyEsc); this.renderCard(); if (this.state.view === 'running') this.start(); }
+  componentWillUnmount() { clearInterval(this.t); this.ro && this.ro.disconnect(); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKeyEsc); }
+  componentDidUpdate(prev) { if (prev.view !== this.props.view) this.setView(this.props.view ?? 'result'); if (prev.grade !== this.props.grade) this.renderCard(); }
+  setView(v) { clearInterval(this.t); if (v === 'running') { this.setState({ view: 'running', step: 0, loaded: 0 }); this.start(); } else this.setState({ view: v, step: v === 'result' ? 6 : 0, loaded: 10 }); }
+  start() {
+    clearInterval(this.t); const speed = this.props.speed ?? 1;
+    this.t = setInterval(() => this.setState(s => { const n = s.step + 1; if (n >= 6) { clearInterval(this.t); return { step: 6, view: 'result', loaded: 10 }; } return { step: n }; }), 1600 / speed);
+  }
+  scan(q) {
+    q = (q ?? this.state.query).trim(); this.setState({ query: q });
+    if (!q) return this.setView('running');
+    if (/^0x/i.test(q) && q.length < 42) return this.setView('error-notpons');
+    if (/young|new|min/i.test(q)) return this.setView('error-young');
+    if (/nodata|timeout/i.test(q)) return this.setView('error-nodata');
+    if (!/^0x/i.test(q)) return this.setView('pick');
+    this.setView('running');
+  }
+  renderVals() {
+    if (!this.cardKey && !this.cardScheduled) { this.cardScheduled = true; setTimeout(() => this.renderCard(), 0); }
+    const { view, step, query, loaded } = this.state; 
+    const isMobile = typeof matchMedia === 'function' && window.innerWidth > 0 ? matchMedia('(max-width:760px)').matches : false;
+    const gk = this.props.grade ?? 'healthy'; const G = GRADES[gk] ?? GRADES.healthy;
+    const isRunning = view === 'running', isResult = view === 'result', isError = view.startsWith('error'), isPick = view === 'pick', isEmpty = view === 'empty' || isPick || isError;
+    const rm = this.props.reducedMotion ?? false;
+    const agents = AGENTS.map((a, i) => {
+      const st = isRunning ? (i < step ? 'done' : i === step ? 'work' : 'idle') : isResult ? 'done' : 'idle';
+      return { name: a.name, ['is_' + a.name.toLowerCase()]: true, done: st === 'done',
+        opacity: st === 'work' ? 1 : st === 'done' ? .7 : .35, filter: st === 'idle' ? 'grayscale(1)' : st === 'work' ? 'drop-shadow(0 0 14px rgba(120,220,255,.9))' : 'none',
+        border: st === 'work' ? '#78DCFF' : '#16324A', anim: st === 'work' && !rm ? 'glow 1.6s ease-in-out infinite' : 'none',
+        titleColor: st === 'work' ? '#E6FCFF' : st === 'done' ? '#9EE0F7' : '#2A546E',
+        caption: st === 'work' ? a.cap : st === 'done' ? a.done : '', capColor: st === 'work' ? '#9EE0F7' : '#D9D9D9' };
+    });
+    const activeIdx = isRunning ? Math.min(step, 5) : isResult ? 5 : 0;
+    const errs = { 'error-notpons': ['not a Pons token', 'this address is not a token launched through Pons V2 on Robinhood Chain. paste the token contract, not a wallet or a pair.', 'clear'], 'error-young': ['too young to read', 'the token is 2 minutes old - fewer than ten trades on the book. come back after five minutes.', 'retry'], 'error-nodata': ['chain data did not arrive', 'the indexer timed out on this token. nothing is cached - press scan again.', 'retry'] };
+    const e = errs[view] ?? ['', '', ''];
+    const rows = makeRows(G.bias).slice(0, loaded);
+    const total = 1043;
+    return {
+      statCols: isMobile ? 3 : 6,   query, isRunning, isEmpty: view === 'empty', isPick, isError, isMobile, notMobile: !isMobile,
+      inputBorder: isError ? '#FF605C' : isRunning ? '#5CA2C4' : '#16324A',
+      btnBg: isRunning ? '#5CA2C4' : '#78DCFF', btnLabel: isRunning ? 'SCANNING' : 'SCAN',
+      onQuery: ev => this.setState({ query: ev.target.value }), onKey: ev => { if (ev.key === 'Enter') this.scan(); },
+      onScan: () => this.scan(), onReset: () => this.setState({ view: 'empty', query: '' }),
+      onTryAddr: ev => { ev.preventDefault(); this.scan('0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41'); },
+      onTryTicker: ev => { ev.preventDefault(); this.scan('MARROW'); },
+      onTryYoung: ev => { ev.preventDefault(); this.scan('young'); },
+      picks: PICKS, onPick: () => this.scan('0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41'),
+      errTitle: e[0], errBody: e[1], errAction: e[2],
+      showAgentGrid: !isMobile, showAgentMobile: isMobile, agents, active: agents[activeIdx], stepLabel: (activeIdx + 1) + ' / 6',
+      runLabel: AGENTS[Math.min(step, 5)].run,
+      showLoader: !isResult, stageName: isResult ? 'VERDICT' : isRunning ? AGENTS[Math.min(step, 5)].name : 'IDLE', stageCaption: isResult ? 'six frames exposed - full film below' : isRunning ? AGENTS[Math.min(step, 5)].cap : (isError ? 'nothing to run' : 'paste a token to start the run'),
+      progressPct: isResult ? 100 : isRunning ? Math.round(step / 6 * 100) : 0, progressLabel: isResult ? 'done in 14.2s' : isRunning ? `stage ${Math.min(step + 1, 6)} / 6` : 'waiting',
+      runnerMl: isResult ? -76 : isRunning ? Math.round(-76 * step / 6) : 0, runnerAnim: isRunning && !rm ? 'runframes .54s steps(6) infinite' : 'none',
+      stages: AGENTS.map((a, i) => { const done = isResult || (isRunning && i < step), active = isRunning && i === step; return { n: i + 1, name: a.name, done, active, ['is_' + a.name.toLowerCase()]: true, color: done ? '#9EE0F7' : active ? '#E6FCFF' : '#2A546E', border: active ? '#78DCFF' : done ? '#2A546E' : '#16324A', anim: active && !rm ? 'glow 1.2s ease-in-out infinite' : 'none', cageOp: done ? 1 : active ? 1 : .3, filter: active ? 'drop-shadow(0 0 10px rgba(120,220,255,.9))' : 'none' }; }),
+      showHeader: (isRunning && step >= 1) || isResult, showScore: (isRunning && step >= 4) || isResult, showGroups: (isRunning && step >= 5) || isResult, showTable: isResult,
+      g: { ...G, pnlPos: Math.max(0, Math.min(100, (parseFloat(G.pnl.replace('−', '-')) + 100) / 3)) + '%', wrPos: parseFloat(G.winrate) + '%', isHealthy: gk === 'healthy', isCracked: gk === 'cracked', isShattered: gk === 'shattered', glow: G.color.replace(')', '').replace('#', '') && G.color + '55' }, groups: G.groups.map(x => ({ wr: x[2] + '–' + (x[2] + 5) + '%', color: BAND(x[2]), supply: x[0] + '%', wallets: x[1], avg: x[3], avgColor: x[3].startsWith('+') ? '#60F080' : '#FF605C' })),
+      rows, hasRows: rows.length > 0, rowsLabel: loaded ? `showing ${loaded} of ${total}` : `${total} holders - table collapsed`, moreLabel: loaded ? 'load 10 more' : 'load first 10',
+      onMore: () => this.setState(s => ({ loaded: Math.min(40, s.loaded + 10) })),
+      copyLabel: this.state.copied ? 'copied' : 'copy', onCopy: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1200); },
+      linkLabel: this.state.linked ? 'link copied' : 'copy link', onCopyLink: () => { this.setState({ linked: true }); setTimeout(() => this.setState({ linked: false }), 1200); },
+      onFull: ev => { ev.preventDefault(); this.setView('running'); },
+      cardStyle: { position: 'absolute', inset: '0', backgroundImage: `url(${this.state.cardUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' },
+      lightboxStyle: { width: 'min(90vw,90vh)', height: 'min(90vw,90vh)', backgroundImage: `url(${this.state.cardUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1px solid #2A546E', boxShadow: '0 0 0 1px rgba(120,220,255,.1),0 0 80px rgba(120,220,255,.25)' },
+      cardUrl: this.state.cardUrl, hasCard: !!this.state.cardUrl, noCard: !this.state.cardUrl, cardOpen: this.state.cardOpen,
+      openCard: () => { this.renderCard(); this.setState({ cardOpen: true }); }, closeCard: () => this.setState({ cardOpen: false }),
+      copyImgLabel: this.state.copiedImg || 'copy image',
+      copyImage: () => { this.renderCard(); if (!this.card) return; this.card.copyCard(this.cardData(G)).then(() => this.setState({ copiedImg: 'copied' })).catch(() => this.setState({ copiedImg: 'not allowed' })).then(() => setTimeout(() => this.setState({ copiedImg: '' }), 1400)); },
+      downloadImage: () => { this.renderCard(); import('./card.js').then(m => m.downloadCard(this.cardData(G), 'xray-MARROW.png')); },
+    };
+  }
+}
+</script>
+</body>
+</html>

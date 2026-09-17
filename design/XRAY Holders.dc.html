@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiny5&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#040A12;color:#D9D9D9;font-family:'JetBrains Mono',monospace;-webkit-font-smoothing:antialiased}
+a{color:#78DCFF;text-decoration:none}a:hover{color:#E6FCFF;text-shadow:0 0 10px rgba(120,220,255,.8)}
+img{image-rendering:pixelated}
+input{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;background:#040A12">
+<div style="position:absolute;left:50%;top:-360px;width:1400px;height:800px;transform:translateX(-50%);pointer-events:none;background:radial-gradient(ellipse at center,rgba(120,220,255,.14) 0%,rgba(120,220,255,.04) 35%,transparent 70%)"></div><div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 4px)"></div>
+<div style="position:relative;max-width:1180px;margin:0 auto;padding:0 24px 80px;display:flex;flex-direction:column;gap:24px;min-height:100vh;box-sizing:border-box">
+
+<header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #16324A;flex-wrap:wrap">
+  <a href="XRAY Home.dc.html" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none">
+    <span style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#0A1626;border:1px solid #2A546E;box-shadow:0 0 12px rgba(120,220,255,.25)"><img src="assets/cage.png" alt="" style="width:24px;height:29px;display:block;filter:drop-shadow(0 0 6px rgba(120,220,255,.8))"></span>
+    <span style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF;letter-spacing:.06em;text-shadow:0 0 12px rgba(120,220,255,.6)">XRAY</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#D9D9D9"><span style="width:6px;height:6px;background:#60F080;display:inline-block;box-shadow:0 0 8px #60F080"></span>LIVE</span>
+  </a>
+  <nav style="display:flex;gap:28px;align-items:center">
+    <a href="XRAY Terminal.dc.html" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">terminal</a>
+    <a href="XRAY Holders.dc.html" style="color:#E6FCFF;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;text-shadow:0 0 10px rgba(120,220,255,.8);" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">holders</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">X</a>
+    <a href="#" style="color:#9EE0F7;height:32px;display:inline-flex;align-items:center;letter-spacing:.08em;text-transform:uppercase;font-size:12px;" style-hover="color:#E6FCFF;text-decoration:none;text-shadow:0 0 12px rgba(120,220,255,1)">github</a>
+  </nav>
+</header>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;padding:16px 0 0">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">ONE WALLET, <span style="color:#78DCFF">READ</span></div>
+    <div style="font-size:14px;line-height:1.6;color:#D9D9D9;max-width:640px;text-wrap:pretty">nothing connects. nothing gets signed. paste a public address and XRAY reads its Pons record the same way a block explorer would - trades, tokens, what each one made or lost.</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><span style="font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#6E8291">no wallet connect</span><span style="font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#6E8291">no signing</span><span style="font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#6E8291">public address only</span></div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+  <div style="display:flex;border:1px solid {{ inputBorder }};background:#0A1626">
+    <span style="padding:14px 0 14px 16px;font-size:14px;color:#5CA2C4">&gt;</span>
+    <input value="{{ query }}" onChange="{{ onQuery }}" onKeyDown="{{ onKey }}" placeholder="paste a public wallet address - 0x..." style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:#E6FCFF;font-size:14px;padding:14px 12px" />
+    <button onClick="{{ onCheck }}" style="font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.08em;background:{{ btnBg }};color:#040A12;border:none;padding:0 28px;cursor:pointer;box-shadow:0 0 24px rgba(120,220,255,.4)" style-hover="background:#E6FCFF;box-shadow:0 0 40px rgba(120,220,255,.8)">{{ btnLabel }}</button>
+  </div>
+  <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+    <div style="border:1px solid #FF605C;background:#0A1626;padding:14px 16px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:13px;color:#FF605C;font-weight:700">not an address</div><div style="font-size:12px;color:#D9D9D9">a wallet address is 42 characters starting with 0x. contracts and ENS names are not supported yet.</div></div>
+      <button onClick="{{ onReset }}" style="font-family:inherit;font-size:12px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:8px 14px;cursor:pointer" style-hover="border-color:#78DCFF">clear</button>
+    </div>
+  </sc-if>
+</div>
+
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px dashed #16324A;padding:48px 24px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center">
+    <img src="assets/lightbox.png" alt="" style="width:96px;height:96px;display:block;opacity:.6">
+    <div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#2A546E">NO WALLET ON THE FILM</div>
+    <div style="font-size:12px;color:#6E8291">try <a href="#" onClick="{{ onTry }}">0x3f9a…c21e</a> - the top holder from the $MARROW scan</div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+  <div style="border:1px solid #78DCFF;background:#0A1626;padding:12px 16px;display:flex;align-items:center;gap:16px">
+    <div style="width:56px;height:62px;background:#081420;flex-shrink:0"><img src="assets/work-tracer.gif" alt="" style="width:56px;height:62px;display:block"></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><div style="font-family:Tiny5,monospace;font-size:16px;line-height:1;color:#E6FCFF">TRACER</div><div style="font-size:12px;color:#9EE0F7">following this wallet across every Pons token it touched…</div></div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isResult }}" hint-placeholder-val="{{ true }}">
+<div style="border:1px solid #16324A;background:#0A1626;padding:16px 20px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><span style="font-weight:700;font-size:18px;line-height:1;color:#E6FCFF;letter-spacing:.02em">0x3f9a71c0…c21e</span><a href="#" style="font-size:12px">blockscout</a><span style="font-size:12px;color:#6E8291">first Pons trade 41 days ago · last trade 2h ago</span></div>
+  <div style="display:flex;gap:6px"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #78DCFF;color:#78DCFF;padding:2px 6px">SMART</span><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #FFD640;color:#FFD640;padding:2px 6px">WHALE</span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:#16324A;border:1px solid #16324A">
+  <div style="background:#0A1626;padding:20px 24px;display:flex;flex-direction:column;gap:8px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">avg pnl per trade</div><div style="font-weight:700;font-size:44px;line-height:1;color:#60F080;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap">+38.4%</div><div style="font-size:12px;color:#6E8291">median +21.0%</div></div>
+  <div style="background:#0A1626;padding:20px 24px;display:flex;flex-direction:column;gap:8px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">winrate</div><div style="font-weight:700;font-size:44px;line-height:1;color:#60F080;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap">67%</div><div style="font-size:12px;color:#6E8291">a trade counts as a win above 0% after fees</div></div>
+  <div style="background:#0A1626;padding:20px 24px;display:flex;flex-direction:column;gap:8px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">closed trades</div><div style="font-weight:700;font-size:44px;line-height:1;color:#E6FCFF;letter-spacing:-.03em">48</div><div style="font-size:12px;color:#6E8291">across 19 tokens · 3 still open</div></div>
+  <div style="background:#0A1626;padding:20px 24px;display:flex;flex-direction:column;gap:8px"><div style="font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase">total profit</div><div style="font-weight:700;font-size:44px;line-height:1;color:#60F080;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap">+14.2 ETH</div><div style="font-size:12px;color:#6E8291">realised, fees deducted · ≈ $61k</div></div>
+</div>
+
+<div style="border:1px solid #16324A;background:#0A1626;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:20px 24px;flex-wrap:wrap"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">PONS TOKENS</div><div style="font-size:12px;color:#6E8291">newest first · grade is the token's current skeleton</div></div>
+  <div style="font-size:13px;font-variant-numeric:tabular-nums;border-top:1px solid #16324A">
+    <div style="display:grid;grid-template-columns:1.2fr 1fr .8fr .9fr .9fr .9fr;gap:12px;padding:10px 24px;border-bottom:1px solid #16324A;font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase"><span>token</span><span>status</span><span style="text-align:right">supply</span><span style="text-align:right">pnl</span><span style="text-align:right">held</span><span style="text-align:right">grade</span></div>
+    <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:1.2fr 1fr .8fr .9fr .9fr .9fr;gap:12px;padding:10px 24px;border-bottom:1px solid #16324A;align-items:center" style-hover="background:#0D1C30">
+        <a href="XRAY Terminal.dc.html" style="color:#9EE0F7">{{ t.name }}</a><span style="color:#6E8291">{{ t.status }}</span><span style="text-align:right;color:#D9D9D9">{{ t.supply }}</span><span style="text-align:right;color:{{ t.pnlColor }}">{{ t.pnl }}</span><span style="text-align:right;color:#D9D9D9">{{ t.held }}</span><span style="text-align:right;color:{{ t.gradeColor }};font-weight:700;font-size:12px;letter-spacing:.08em">{{ t.grade }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="padding:14px 24px;font-size:12px;color:#6E8291">19 tokens · every row opens the token in the terminal · trades on other venues are outside the universe</div>
+</div>
+</sc-if>
+
+<footer style="display:flex;justify-content:space-between;gap:16px;padding-top:24px;border-top:1px solid #16324A;font-size:12px;color:#6E8291;flex-wrap:wrap;margin-top:auto">
+  <span style="display:inline-flex;gap:12px;align-items:center"><a href="#" style="color:#6E8291">x</a><a href="#" style="color:#6E8291">github</a><a href="#" style="color:#6E8291">telegram</a><span>· read-only, holds no keys</span></span>
+  <span>XRAY - who is in profit, who is underwater, and can they trade at all · Robinhood Chain</span>
+</footer>
+
+</div></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty&quot;,&quot;running&quot;,&quot;result&quot;,&quot;error&quot;],&quot;default&quot;:&quot;result&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const TOKENS = [
+  ['$MARROW', 'holding · 3h', '4.21%', 184.2, '3h 12m', 'HEALTHY'],
+  ['$FEMUR', 'exited · 1d', '-', 62.0, '5h 40m', 'CRACKED'],
+  ['$RIBCAGE', 'exited · 2d', '-', -18.3, '22m', 'SHATTERED'],
+  ['$CALCIUM', 'holding · 4d', '0.88%', 31.7, '4d 2h', 'HEALTHY'],
+  ['$PATELLA', 'exited · 6d', '-', 210.5, '1h 05m', 'CRACKED'],
+  ['$TIBIA', 'exited · 9d', '-', -44.0, '9m', 'SHATTERED'],
+  ['$OSSIFY', 'exited · 12d', '-', 12.4, '3h 30m', 'CRACKED'],
+  ['$SKULLCAP', 'holding · 16d', '1.30%', 96.1, '16d', 'HEALTHY'],
+  ['$HUMERUS', 'exited · 20d', '-', -7.9, '48m', 'SHATTERED'],
+  ['$CLAVICLE', 'exited · 27d', '-', 55.2, '2h 10m', 'HEALTHY'],
+];
+const GC = { HEALTHY: '#60F080', CRACKED: '#FFD640', SHATTERED: '#FF605C' };
+class Component extends DCLogic {
+  constructor(p) { super(p); const v = p.view ?? 'result'; this.state = { view: v, query: v === 'empty' ? '' : '0x3f9a71c0e8b2d4a6f51c93e0a7b2d8f4c6e1c21e' }; }
+  componentWillUnmount() { clearTimeout(this.t); }
+  componentDidUpdate(prev) { if (prev.view !== this.props.view) this.setState({ view: this.props.view ?? 'result' }); }
+  check(q) {
+    q = (q ?? this.state.query).trim(); this.setState({ query: q });
+    if (!/^0x[0-9a-f]{40}$/i.test(q)) return this.setState({ view: 'error' });
+    this.setState({ view: 'running' }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ view: 'result' }), 2200);
+  }
+  renderVals() {
+    const { view, query } = this.state;
+    const tokens = TOKENS.map(t => ({ name: t[0], status: t[1], supply: t[2], pnl: (t[3] >= 0 ? '+' : '−') + Math.abs(t[3]).toFixed(1) + '%', pnlColor: t[3] > 20 ? '#60F080' : t[3] < -20 ? '#FF605C' : '#FFD640', held: t[4], grade: t[5], gradeColor: GC[t[5]] }));
+    return { query, tokens, isEmpty: view === 'empty', isRunning: view === 'running', isResult: view === 'result', isError: view === 'error',
+      inputBorder: view === 'error' ? '#FF605C' : view === 'running' ? '#5CA2C4' : '#16324A', btnBg: view === 'running' ? '#5CA2C4' : '#78DCFF', btnLabel: view === 'running' ? 'READING' : 'CHECK',
+      onQuery: e => this.setState({ query: e.target.value }), onKey: e => { if (e.key === 'Enter') this.check(); }, onCheck: () => this.check(),
+      onReset: () => this.setState({ view: 'empty', query: '' }), onTry: e => { e.preventDefault(); this.check('0x3f9a71c0e8b2d4a6f51c93e0a7b2d8f4c6e1c21e'); } };
+  }
+}
+</script>
+</body>
+</html>

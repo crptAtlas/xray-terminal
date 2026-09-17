@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiny5&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#040A12;color:#D9D9D9;font-family:'JetBrains Mono',monospace;-webkit-font-smoothing:antialiased}
+a{color:#78DCFF;text-decoration:none}a:hover{color:#9EE0F7;text-decoration:underline}
+img{image-rendering:pixelated}
+@keyframes glow{0%,100%{box-shadow:0 0 0 1px #78DCFF,0 0 12px rgba(120,220,255,.35)}50%{box-shadow:0 0 0 1px #78DCFF,0 0 22px rgba(120,220,255,.65)}}
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;background:#040A12">
+<div style="position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 4px)"></div>
+<div style="position:relative;max-width:1180px;margin:0 auto;padding:40px 24px 96px;display:flex;flex-direction:column;gap:64px">
+
+<header style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:1px solid #16324A;padding-bottom:24px">
+  <div style="display:flex;align-items:center;gap:16px">
+    <span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#0A1626;border:1px solid #2A546E"><img src="assets/cage.png" alt="" style="width:30px;height:36px;display:block;filter:drop-shadow(0 0 6px rgba(120,220,255,.8))"></span>
+    <div style="font-family:Tiny5,monospace;font-size:48px;line-height:1;color:#E6FCFF;letter-spacing:.04em">XRAY</div>
+    <div style="font-size:11px;color:#6E8291;text-transform:uppercase;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px">design system · v0.1</div>
+  </div>
+  <div style="font-size:12px;color:#6E8291;text-align:right;line-height:1.6">x-ray film, dark only<br>Tiny5 for headers · JetBrains Mono for everything else</div>
+</header>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">PALETTE</div><div style="font-size:13px;color:#6E8291;margin-top:6px">fixed values - nothing else gets introduced</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:#16324A;border:1px solid #16324A">
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#040A12;border:1px solid #16324A"></div><div style="font-size:11px;color:#D9D9D9">bg deep</div><div style="font-size:11px;color:#6E8291">#040A12</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#0A1626;border:1px solid #16324A"></div><div style="font-size:11px;color:#D9D9D9">bg panel</div><div style="font-size:11px;color:#6E8291">#0A1626</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#16324A"></div><div style="font-size:11px;color:#D9D9D9">border / rules</div><div style="font-size:11px;color:#6E8291">#16324A</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#2A546E"></div><div style="font-size:11px;color:#D9D9D9">bone dark</div><div style="font-size:11px;color:#6E8291">#2A546E</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#5CA2C4"></div><div style="font-size:11px;color:#D9D9D9">bone mid</div><div style="font-size:11px;color:#6E8291">#5CA2C4</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#9EE0F7"></div><div style="font-size:11px;color:#D9D9D9">bone light</div><div style="font-size:11px;color:#6E8291">#9EE0F7</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#E6FCFF"></div><div style="font-size:11px;color:#D9D9D9">bone bright</div><div style="font-size:11px;color:#6E8291">#E6FCFF</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#78DCFF"></div><div style="font-size:11px;color:#D9D9D9">accent cyan</div><div style="font-size:11px;color:#6E8291">#78DCFF · buttons, links</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#60F080"></div><div style="font-size:11px;color:#D9D9D9">profit</div><div style="font-size:11px;color:#6E8291">#60F080 · pnl only</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#FFD640"></div><div style="font-size:11px;color:#D9D9D9">neutral</div><div style="font-size:11px;color:#6E8291">#FFD640 · pnl only</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#FF605C"></div><div style="font-size:11px;color:#D9D9D9">loss</div><div style="font-size:11px;color:#6E8291">#FF605C · pnl only</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#D9D9D9"></div><div style="font-size:11px;color:#D9D9D9">text</div><div style="font-size:11px;color:#6E8291">#D9D9D9</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#6E8291"></div><div style="font-size:11px;color:#D9D9D9">text dim</div><div style="font-size:11px;color:#6E8291">#6E8291</div></div>
+    <div style="background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px"><div style="height:56px;background:#081420"></div><div style="font-size:11px;color:#D9D9D9">sprite bg</div><div style="font-size:11px;color:#6E8291">#081420 · under agent gifs only</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;font-size:11px;color:#6E8291">
+    <div style="border:1px solid #16324A;background:#0A1626;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px"><img src="assets/cage.png" alt="" style="width:48px;height:58px;display:block;filter:drop-shadow(0 0 8px rgba(120,220,255,.8))"><span>cage.png · header mark · transparent, sits on #0A1626 tile</span></div>
+    <div style="border:1px solid #16324A;background:#040A12;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px"><img src="assets/logo-film.gif" alt="" style="width:112px;height:112px;display:block"><span>logo-film.gif · hero mark · opaque #040A12 bg, page bg only</span></div>
+    <div style="border:1px solid #16324A;background:#0A1626;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px"><img src="assets/lightbox.png" alt="" style="width:64px;height:64px;display:block"><span>lightbox.png · footer, empty states, share card</span></div>
+  </div>
+</section>
+
+<section style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:48px">
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">TYPE</div><div style="font-size:13px;color:#6E8291;margin-top:6px">tiny5 for wordmark and headers only - numbers always in mono, they must stay legible</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:96px;line-height:1;color:#E6FCFF">XRAY</div><div style="font-size:11px;color:#6E8291;text-align:right">wordmark<br>Tiny5 96</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-weight:700;font-size:64px;line-height:1;color:#60F080;text-shadow:0 0 20px rgba(96,240,128,.7);letter-spacing:-.02em">+184%</div><div style="font-size:11px;color:#6E8291;text-align:right">big number<br>Mono 700 · 64 · glow · never Tiny5</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">HOW IT WORKS</div><div style="font-size:11px;color:#6E8291;text-align:right">section header<br>Tiny5 32 · uppercase</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-family:Tiny5,monospace;font-size:24px;line-height:1;color:#E6FCFF">SCANNER</div><div style="font-size:11px;color:#6E8291;text-align:right">card title<br>Tiny5 24</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-size:16px;line-height:1.5;color:#D9D9D9">reads how holders traded before and whether they can trade at all.</div><div style="font-size:11px;color:#6E8291;text-align:right;flex-shrink:0">body<br>Mono 16 / 1.5</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-size:13px;line-height:1.5;color:#6E8291">six agents, one verdict</div><div style="font-size:11px;color:#6E8291;text-align:right">subhead / caption<br>Mono 13 · lowercase · dim</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #16324A"><div style="font-size:13px;line-height:1.5;color:#D9D9D9;font-variant-numeric:tabular-nums">0x3f9a…c21e &nbsp; 4.21% &nbsp; +38.4%</div><div style="font-size:11px;color:#6E8291;text-align:right">table cell<br>Mono 13 · tabular · right-aligned nums</div></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:16px 20px"><div style="font-size:11px;line-height:1.5;color:#6E8291;letter-spacing:.14em;text-transform:uppercase">LIVE ENGINE</div><div style="font-size:11px;color:#6E8291;text-align:right">label / badge<br>Mono 11 · tracking .14em</div></div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">SPACE &amp; EDGES</div><div style="font-size:13px;color:#6E8291;margin-top:6px">4px base · borders 1-2px · radius ≤ 4px · no shadows</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:flex-end;gap:12px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:4px;height:4px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">4</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:8px;height:8px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">8</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">12</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:16px;height:16px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">16</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:24px;height:24px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">24</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:32px;height:32px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">32</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:48px;height:48px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">48</div></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:64px;height:64px;background:#78DCFF"></div><div style="font-size:11px;color:#6E8291">64</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div style="border:1px solid #16324A;background:#040A12;padding:12px;font-size:11px;color:#6E8291">panel<br>1px #16324A</div>
+        <div style="border:2px solid #5CA2C4;background:#040A12;padding:12px;font-size:11px;color:#D9D9D9">focus / active<br>2px bone mid</div>
+        <div style="border:1px solid #78DCFF;background:#040A12;padding:12px;font-size:11px;color:#78DCFF;border-radius:4px">accent<br>1px cyan · r4 max</div>
+      </div>
+      <div style="font-size:12px;color:#6E8291;line-height:1.6">scan-lines overlay on every page: <span style="color:#D9D9D9">repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 4px)</span></div>
+    </div>
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">BUTTONS &amp; FIELDS</div><div style="font-size:13px;color:#6E8291;margin-top:6px">one accent button per screen</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <button style="font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.08em;background:#78DCFF;color:#040A12;border:1px solid #78DCFF;padding:12px 24px;cursor:pointer" style-hover="background:#9EE0F7;border-color:#9EE0F7">SCAN</button>
+        <button style="font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.08em;background:#5CA2C4;color:#040A12;border:1px solid #5CA2C4;padding:12px 24px;cursor:pointer">SCANNING…</button>
+        <button style="font-family:inherit;font-size:14px;font-weight:700;letter-spacing:.08em;background:transparent;color:#2A546E;border:1px solid #16324A;padding:12px 24px;cursor:not-allowed">SCAN</button>
+        <button style="font-family:inherit;font-size:13px;background:transparent;color:#78DCFF;border:1px solid #16324A;padding:10px 16px;cursor:pointer" style-hover="border-color:#78DCFF">download card</button>
+        <button style="font-family:inherit;font-size:13px;background:transparent;color:#6E8291;border:none;padding:10px 4px;cursor:pointer;text-decoration:underline" style-hover="color:#78DCFF">load 10 more</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;border:1px solid #16324A;background:#040A12"><div style="padding:14px 16px;font-size:14px;color:#6E8291;flex:1">&gt; paste a contract address or a ticker</div></div>
+        <div style="display:flex;border:2px solid #5CA2C4;background:#040A12"><div style="padding:13px 15px;font-size:14px;color:#E6FCFF;flex:1">&gt; 0x3f9a71c0b8e2d4a6f5<span style="display:inline-block;width:8px;height:14px;background:#78DCFF;vertical-align:-2px"></span></div></div>
+        <div style="display:flex;border:1px solid #FF605C;background:#040A12"><div style="padding:14px 16px;font-size:14px;color:#D9D9D9;flex:1">&gt; 0x00000000dead</div><div style="padding:14px 16px;font-size:12px;color:#FF605C">not a Pons token</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">AGENT CELL</div><div style="font-size:13px;color:#6E8291;margin-top:6px">three states · sprite at integer scale · sprite bg #081420 sits inside the panel</div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+    <div style="display:flex;flex-direction:column;gap:8px"><div style="border:1px solid #16324A;background:#0A1626;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:180px;justify-content:center"><img src="assets/work-scanner.gif" alt="" style="width:112px;height:124px;opacity:.35;filter:grayscale(1);display:block"><div style="font-family:Tiny5,monospace;font-size:16px;color:#2A546E">SCANNER</div></div><div style="font-size:11px;color:#6E8291">idle · 35% · grayscale · no caption</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><div style="border:1px solid #78DCFF;background:#0A1626;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:180px;justify-content:center;animation:glow 1.6s ease-in-out infinite"><img src="assets/work-scanner.gif" alt="" style="width:112px;height:124px;display:block"><div style="font-family:Tiny5,monospace;font-size:16px;color:#E6FCFF">SCANNER</div><div style="font-size:11px;color:#9EE0F7;text-align:center">pulling every trade of this token</div></div><div style="font-size:11px;color:#6E8291">working · animated · cyan glow · caption</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><div style="border:1px solid #16324A;background:#0A1626;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:180px;justify-content:center;position:relative"><div style="position:absolute;top:6px;right:8px;font-size:12px;color:#60F080">✓</div><img src="assets/work-scanner.gif" alt="" style="width:112px;height:124px;opacity:.7;display:block"><div style="font-family:Tiny5,monospace;font-size:16px;color:#9EE0F7">SCANNER</div><div style="font-size:11px;color:#D9D9D9;font-variant-numeric:tabular-nums">1 043 holders · 18 920 trades</div></div><div style="font-size:11px;color:#6E8291">done · 70% · check · caption = stage result</div></div>
+  </div>
+</section>
+
+<section style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px">
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">BADGES &amp; LABELS</div><div style="font-size:13px;color:#6E8291;margin-top:6px">status labels for roadmap · smart / whale for holders · live dot</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;background:#60F080;color:#040A12;padding:4px 8px">SHIPPED</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;background:#78DCFF;color:#040A12;padding:4px 8px">NEXT</span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;background:#FFD640;color:#040A12;padding:4px 8px">THE LAB</span>
+        <span style="font-size:11px;color:#6E8291">← roadmap status</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #78DCFF;color:#78DCFF;padding:2px 6px">SMART</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #FFD640;color:#FFD640;padding:2px 6px">WHALE</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #2A546E;color:#6E8291;padding:2px 6px">DUST</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #2A546E;color:#6E8291;padding:2px 6px">INFRA</span>
+        <span style="font-size:11px;color:#6E8291">← holder badges · smart = winrate ≥ 55% over ≥ 10 trades · whale = supply ≥ 1%</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#D9D9D9"><span style="width:6px;height:6px;background:#60F080;display:inline-block"></span>LIVE</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#6E8291">read-only</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;border:1px solid #16324A;padding:4px 8px;color:#6E8291">no signing</span>
+      </div>
+    </div>
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">GRADES</div><div style="font-size:13px;color:#6E8291;margin-top:6px">three skeleton sprites · glow in the grade colour</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #16324A;background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center"><img src="assets/h-healthy.png" alt="" style="width:100px;height:100px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(96,240,128,.7))"><div style="font-family:Tiny5,monospace;font-size:16px;color:#60F080">HEALTHY</div></div>
+      <div style="border:1px solid #16324A;background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center"><img src="assets/h-cracked.png" alt="" style="width:100px;height:100px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(255,214,64,.6))"><div style="font-family:Tiny5,monospace;font-size:16px;color:#FFD640">CRACKED</div></div>
+      <div style="border:1px solid #16324A;background:#0A1626;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center"><img src="assets/h-shattered.png" alt="" style="width:100px;height:100px;display:block;image-rendering:auto;filter:drop-shadow(0 0 18px rgba(255,96,92,.7))"><div style="font-family:Tiny5,monospace;font-size:16px;color:#FF605C">SHATTERED</div></div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">SUPPLY BAND</div><div style="font-size:13px;color:#6E8291;margin-top:6px">share of supply · traders with winrate X–X+5% · wallets · max three bands</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;font-size:12px"><span><span style="color:#60F080;font-weight:700">31.2% of supply</span> · traders with winrate <span style="color:#60F080">60–65%</span></span><span style="color:#6E8291;font-variant-numeric:tabular-nums"><span style="color:#D9D9D9">188 wallets</span> · avg pnl here <span style="color:#60F080">+41.0%</span></span></div><div style="height:12px;background:#040A12;border:1px solid #16324A;position:relative"><div style="position:absolute;inset:0;width:31.2%;background:#60F080"></div></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;font-size:12px"><span><span style="color:#FFD640;font-weight:700">22.9% of supply</span> · traders with winrate <span style="color:#FFD640">50–55%</span></span><span style="color:#6E8291;font-variant-numeric:tabular-nums"><span style="color:#D9D9D9">302 wallets</span> · avg pnl here <span style="color:#60F080">+8.2%</span></span></div><div style="height:12px;background:#040A12;border:1px solid #16324A;position:relative"><div style="position:absolute;inset:0;width:22.9%;background:#FFD640"></div></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;font-size:12px"><span><span style="color:#FF605C;font-weight:700">18.4% of supply</span> · traders with winrate <span style="color:#FF605C">35–40%</span></span><span style="color:#6E8291;font-variant-numeric:tabular-nums"><span style="color:#D9D9D9">553 wallets</span> · avg pnl here <span style="color:#FF605C">−12.5%</span></span></div><div style="height:12px;background:#040A12;border:1px solid #16324A;position:relative"><div style="position:absolute;inset:0;width:18.4%;background:#FF605C"></div></div></div>
+    </div>
+    <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">HOLDER ROW</div><div style="font-size:13px;color:#6E8291;margin-top:6px">mono 13 · numeric columns centred under their header · badges trail</div></div>
+    <div style="border:1px solid #16324A;background:#0A1626;font-size:13px;font-variant-numeric:tabular-nums">
+      <div style="display:grid;grid-template-columns:1.4fr .8fr .9fr 1fr .8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid #16324A;font-size:11px;color:#6E8291;letter-spacing:.08em;text-transform:uppercase"><span>wallet</span><span style="text-align:center">supply</span><span style="text-align:center">pnl here</span><span style="text-align:center">avg pnl / trade</span><span style="text-align:center">winrate</span><span></span></div>
+      <div style="display:grid;grid-template-columns:1.4fr .8fr .9fr 1fr .8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid #16324A;align-items:center" style-hover="background:#0D1C30"><a href="#" style="color:#9EE0F7">0x3f9a…c21e</a><span style="text-align:center;color:#D9D9D9">4.21%</span><span style="text-align:center;color:#60F080">+184.2%</span><span style="text-align:center;color:#60F080">+38.4%</span><span style="text-align:center;color:#D9D9D9">67%</span><span style="display:flex;gap:6px;justify-content:flex-end"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #78DCFF;color:#78DCFF;padding:2px 6px">SMART</span><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #FFD640;color:#FFD640;padding:2px 6px">WHALE</span></span></div>
+      <div style="display:grid;grid-template-columns:1.4fr .8fr .9fr 1fr .8fr 1fr;gap:12px;padding:10px 16px;align-items:center" style-hover="background:#0D1C30"><a href="#" style="color:#9EE0F7">0xb02c…77d1</a><span style="text-align:center;color:#D9D9D9">0.63%</span><span style="text-align:center;color:#FF605C">−41.7%</span><span style="text-align:center;color:#FF605C">−12.0%</span><span style="text-align:center;color:#D9D9D9">31%</span><span style="display:flex;gap:6px;justify-content:flex-end"><span style="font-size:10px;font-weight:700;letter-spacing:.1em;border:1px solid #2A546E;color:#6E8291;padding:2px 6px">FIRST TRADE</span></span></div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div><div style="font-family:Tiny5,monospace;font-size:32px;line-height:1;color:#E6FCFF">RULES</div><div style="font-size:13px;color:#6E8291;margin-top:6px">what never changes</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:#16324A;border:1px solid #16324A;font-size:13px;line-height:1.6">
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">sprites pixelated, integer scale only</div>
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">green / yellow / red mean pnl and grade - nothing else</div>
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">one cyan button per screen</div>
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">borders 1-2px, radius ≤ 4px, shadows never</div>
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">numbers tabular, centred under their column header</div>
+    <div style="background:#0A1626;padding:16px 20px;color:#D9D9D9">reduced-motion: gifs freeze, glow stops</div>
+  </div>
+</section>
+
+</div></div>
+</x-dc>
+</body>
+</html>

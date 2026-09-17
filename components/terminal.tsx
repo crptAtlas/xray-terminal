@@ -1,0 +1,514 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AGENTS, GRADES, PICKS, bandColor, cardDataFor, makeRows } from "../lib/site/fixtures";
+import type { Grade } from "../lib/site/types";
+import { CardLightbox, useCardActions, useCardUrl } from "./share-card";
+
+// The terminal. A faithful port of design/XRAY Terminal.dc.html: the view
+// state machine (empty / pick / running / result / three errors), the
+// six-stage loader, the verdict with gauges and winrate bands, the holders
+// table and the share card. Fixture data until the engine is wired in.
+
+type View = "empty" | "pick" | "running" | "result" | "error-notpons" | "error-young" | "error-nodata";
+
+const ERRS: Record<string, [string, string, string]> = {
+  "error-notpons": [
+    "not a Pons token",
+    "this address is not a token launched through Pons V2 on Robinhood Chain. paste the token contract, not a wallet or a pair.",
+    "clear",
+  ],
+  "error-young": [
+    "too young to read",
+    "the token is 2 minutes old - fewer than ten trades on the book. come back after five minutes.",
+    "retry",
+  ],
+  "error-nodata": [
+    "chain data did not arrive",
+    "the indexer timed out on this token. nothing is cached - press scan again.",
+    "retry",
+  ],
+};
+
+const DEMO_ADDR = "0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41";
+
+function useIsMobile(): boolean {
+  const [m, setM] = useState(false);
+  useEffect(() => {
+    const mq = matchMedia("(max-width:760px)");
+    const upd = () => setM(mq.matches);
+    upd();
+    mq.addEventListener("change", upd);
+    return () => mq.removeEventListener("change", upd);
+  }, []);
+  return m;
+}
+
+export function Terminal() {
+  const params = useSearchParams();
+  const grade = (["healthy", "cracked", "shattered"].includes(params.get("grade") ?? "") ? params.get("grade") : "healthy") as Grade;
+  const G = GRADES[grade];
+  const initialQ = params.get("q") ?? "";
+  const initialView = (params.get("view") as View) ?? null;
+
+  const [view, setView] = useState<View>("empty");
+  const [step, setStep] = useState(0);
+  const [query, setQuery] = useState(initialQ);
+  const [loaded, setLoaded] = useState(10);
+  const [copied, setCopied] = useState(false);
+  const [linked, setLinked] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMobile = useIsMobile();
+
+  const cardData = useMemo(() => cardDataFor(grade), [grade]);
+  const cardUrl = useCardUrl(cardData);
+  const { copied: copiedImg, copy: copyImage, download: downloadImage } = useCardActions(cardData, "xray-MARROW.png");
+
+  const start = useCallback(() => {
+    if (timer.current) clearInterval(timer.current);
+    setView("running");
+    setStep(0);
+    setLoaded(0);
+    timer.current = setInterval(() => {
+      setStep((s) => {
+        if (s + 1 >= 6) {
+          if (timer.current) clearInterval(timer.current);
+          setView("result");
+          setLoaded(10);
+          return 6;
+        }
+        return s + 1;
+      });
+    }, 1600);
+  }, []);
+
+  const scan = useCallback(
+    (raw?: string) => {
+      const q = (raw ?? query).trim();
+      setQuery(q);
+      if (!q) return start();
+      if (/^0x/i.test(q) && q.length < 42) return setView("error-notpons");
+      if (/young|new|min/i.test(q)) return setView("error-young");
+      if (/nodata|timeout/i.test(q)) return setView("error-nodata");
+      if (!/^0x/i.test(q)) return setView("pick");
+      start();
+    },
+    [query, start],
+  );
+
+  useEffect(() => {
+    if (initialView === "result") {
+      setView("result");
+      setStep(6);
+    } else if (initialQ) {
+      scan(initialQ);
+    }
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
+    // run once on mount with the url params
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isRunning = view === "running";
+  const isResult = view === "result";
+  const isError = view.startsWith("error");
+  const isPick = view === "pick";
+  const err = ERRS[view] ?? ["", "", ""];
+  const rows = useMemo(() => makeRows(G.bias).slice(0, loaded), [G.bias, loaded]);
+  const total = 1043;
+
+  const showHeader = (isRunning && step >= 1) || isResult;
+  const showScore = (isRunning && step >= 4) || isResult;
+  const showGroups = (isRunning && step >= 5) || isResult;
+  const showTable = isResult;
+
+  const pnlPos = Math.max(0, Math.min(100, (parseFloat(G.pnl.replace("−", "-")) + 100) / 3));
+  const wrPos = parseFloat(G.winrate);
+  const glowColor = G.color + "55";
+
+  const stageIdx = Math.min(step, 5);
+  const groups = G.groups.map((x) => ({
+    wr: `${x[2]}–${x[2] + 5}%`,
+    color: bandColor(x[2]),
+    supply: x[0] + "%",
+    wallets: x[1],
+    avg: x[3],
+    avgColor: x[3].startsWith("+") ? "var(--profit)" : "var(--loss)",
+  }));
+
+  const smallBtn: React.CSSProperties = {
+    fontFamily: "inherit",
+    fontSize: 13,
+    background: "transparent",
+    color: "var(--accent)",
+    border: "1px solid var(--border)",
+    padding: "10px 16px",
+    cursor: "pointer",
+  };
+
+  const metric = (
+    label: string,
+    value: string,
+    pos: number,
+    scale: [string, string, string, string],
+    across: React.ReactNode,
+    extraStyle: React.CSSProperties,
+  ) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0, ...extraStyle }}>
+      <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".14em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: G.color, letterSpacing: "-.03em", textShadow: `0 0 18px ${G.color},0 0 40px ${glowColor}`, whiteSpace: "nowrap" }}>{value}</div>
+      <div style={{ position: "relative", height: 8, marginTop: 6 }}>
+        <div style={{ position: "absolute", inset: 0, display: "flex", gap: 2 }}>
+          <div style={{ flex: 1, background: "rgba(255,96,92,.35)" }} />
+          <div style={{ flex: 1, background: "rgba(255,214,64,.35)" }} />
+          <div style={{ flex: 1, background: "rgba(96,240,128,.35)" }} />
+        </div>
+        <div style={{ position: "absolute", top: -5, bottom: -5, left: `${pos}%`, width: 4, marginLeft: -2, background: "var(--bone-bright)", boxShadow: "0 0 10px rgba(230,252,255,.9)", transition: "left 1s ease" }} />
+      </div>
+      <div className="tabular" style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--bone-dark)" }}>
+        {scale.map((s) => (
+          <span key={s}>{s}</span>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{across}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* input */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", gap: 0, border: `1px solid ${isError ? "var(--loss)" : isRunning ? "var(--bone-mid)" : "var(--border)"}`, background: "var(--bg-panel)" }}>
+          <span style={{ padding: "14px 0 14px 16px", fontSize: 14, color: "var(--bone-mid)" }}>&gt;</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") scan();
+            }}
+            placeholder="paste a contract address or a ticker"
+            style={{ flex: 1, minWidth: 0, background: "transparent", border: "none", outline: "none", color: "var(--bone-bright)", fontSize: 14, padding: "14px 12px" }}
+          />
+          <button
+            onClick={() => scan()}
+            style={{ fontFamily: "inherit", fontSize: 14, fontWeight: 700, letterSpacing: ".08em", background: isRunning ? "var(--bone-mid)" : "var(--accent)", color: "var(--bg-deep)", border: "none", padding: "0 28px", cursor: "pointer", boxShadow: "0 0 24px rgba(120,220,255,.4)" }}
+          >
+            {isRunning ? "SCANNING" : "SCAN"}
+          </button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 12, color: "var(--text-dim)", flexWrap: "wrap" }}>
+          <span>reads public state only - no wallet connect, no signing · Robinhood Chain · Pons V2</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 6, height: 6, background: "var(--accent)", display: "inline-block", boxShadow: "0 0 8px #78DCFF" }} />
+            <span className="tabular" style={{ color: "var(--text)" }}>12 408</span> tokens checked
+          </span>
+        </div>
+
+        {isPick && (
+          <div className="tabular" style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", fontSize: 13 }}>
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", color: "var(--text-dim)", fontSize: 12 }}>4 launches use this ticker - pick one</div>
+            {PICKS.map((p) => (
+              <div
+                key={p.addr}
+                onClick={() => scan(DEMO_ADDR)}
+                style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr 1fr", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border)", cursor: "pointer", alignItems: "center" }}
+              >
+                <span style={{ color: "var(--bone-light)" }}>{p.addr}</span>
+                <span style={{ color: "var(--text)" }}>{p.age}</span>
+                <span style={{ color: "var(--text-dim)" }}>{p.stage}</span>
+                <span style={{ textAlign: "right", color: "var(--text)" }}>{p.mcap}</span>
+                <span style={{ textAlign: "right", color: "var(--text)" }}>{p.holders} holders</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isError && (
+          <div style={{ border: "1px solid var(--loss)", background: "var(--bg-panel)", padding: "14px 16px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontSize: 13, color: "var(--loss)", fontWeight: 700 }}>{err[0]}</div>
+              <div style={{ fontSize: 12, color: "var(--text)" }}>{err[1]}</div>
+            </div>
+            <button
+              onClick={() => {
+                setView("empty");
+                setQuery("");
+              }}
+              style={{ fontFamily: "inherit", fontSize: 12, background: "transparent", color: "var(--accent)", border: "1px solid var(--border)", padding: "8px 14px", cursor: "pointer" }}
+            >
+              {err[2]}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* stage loader */}
+      {!isResult && (
+        <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "14px 20px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, fontSize: 12, color: "var(--text-dim)", flexWrap: "wrap", alignItems: "baseline" }}>
+            <span style={{ display: "inline-flex", gap: 10, alignItems: "baseline" }}>
+              <span className="font-tiny" style={{ fontSize: 16, lineHeight: 1, color: "var(--bone-bright)", textShadow: "0 0 10px rgba(120,220,255,.6)" }}>
+                {isRunning ? AGENTS[stageIdx]!.name : "IDLE"}
+              </span>
+              <span style={{ color: "var(--bone-light)" }}>
+                {isRunning ? AGENTS[stageIdx]!.cap : isError ? "nothing to run" : "paste a token to start the run"}
+              </span>
+            </span>
+            <span className="tabular" style={{ color: "var(--text)" }}>
+              {isRunning ? Math.round((step / 6) * 100) : 0}% · {isRunning ? `stage ${Math.min(step + 1, 6)} / 6` : "waiting"}
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3,minmax(0,1fr))" : "repeat(6,minmax(0,1fr))", gap: 8 }}>
+            {AGENTS.map((a, i) => {
+              const done = isRunning && i < step;
+              const active = isRunning && i === step;
+              return (
+                <div
+                  key={a.name}
+                  style={{
+                    position: "relative",
+                    height: 104,
+                    background: "var(--sprite-bg)",
+                    border: `1px solid ${active ? "var(--accent)" : done ? "var(--bone-dark)" : "var(--border)"}`,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    animation: active ? "glow 1.2s ease-in-out infinite" : "none",
+                    transition: "border-color .4s",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.src} alt="" style={{ width: 56, height: 62, display: "block", marginTop: -10, opacity: done || active ? 1 : 0.3, transition: "opacity .6s", filter: active ? "drop-shadow(0 0 10px rgba(120,220,255,.9))" : "none" }} />
+                  {active && (
+                    <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg,transparent,#E6FCFF 30%,#E6FCFF 70%,transparent)", boxShadow: "0 0 10px #78DCFF", animation: "expose 1.2s linear infinite" }} />
+                  )}
+                  {done && <div style={{ position: "absolute", top: 4, right: 6, fontSize: 11, fontWeight: 700, color: "var(--profit)" }}>✓</div>}
+                  <div style={{ position: "absolute", left: 6, bottom: 4, fontSize: 9, letterSpacing: ".14em", color: done ? "var(--bone-light)" : active ? "var(--bone-bright)" : "var(--bone-dark)" }}>
+                    0{i + 1} {a.name}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ height: 3, background: "var(--bg-deep)", border: "1px solid var(--border)", position: "relative" }}>
+            <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${isRunning ? Math.round((step / 6) * 100) : 0}%`, background: "var(--accent)", boxShadow: "0 0 10px rgba(120,220,255,.8)", transition: "width 1.5s linear" }} />
+          </div>
+        </div>
+      )}
+
+      {/* empty state */}
+      {view === "empty" && (
+        <div style={{ border: "1px dashed var(--border)", padding: "48px 24px", textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/lightbox.png" alt="" style={{ width: 64, height: 64, display: "block", opacity: 0.8 }} />
+          <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-dark)" }}>NOTHING ON THE FILM YET</div>
+          <div style={{ fontSize: 13, color: "var(--text-dim)", maxWidth: 640 }}>
+            paste a contract address or a ticker - six agents rebuild every holder&apos;s book and tell you who is in profit, who is underwater, and whether they can trade at all.
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+            try: <a href="#" onClick={(e) => { e.preventDefault(); scan(DEMO_ADDR); }}>0x7a3f…9c41</a> ·{" "}
+            <a href="#" onClick={(e) => { e.preventDefault(); scan("MARROW"); }}>$MARROW</a> ·{" "}
+            <a href="#" onClick={(e) => { e.preventDefault(); scan("young"); }}>a token launched 2 min ago</a>
+          </div>
+        </div>
+      )}
+
+      {/* token header */}
+      {showHeader && (
+        <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "grid", gridTemplateColumns: `repeat(${isMobile ? 3 : 6},minmax(0,1fr))` }}>
+          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, gridColumn: "1/-1", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>token</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+              <span className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>$MARROW</span>
+              <a href="#" style={{ fontSize: 12, color: "var(--bone-light)" }}>0x7a3f19c0…9c41</a>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(DEMO_ADDR);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1200);
+                }}
+                style={{ fontFamily: "inherit", fontSize: 11, background: "transparent", color: "var(--text-dim)", border: "1px solid var(--border)", padding: "2px 6px", cursor: "pointer" }}
+              >
+                {copied ? "copied" : "copy"}
+              </button>
+            </div>
+          </div>
+          {[
+            ["age", "3h 12m"],
+            ["stage", "graduated"],
+            ["mcap", "$412k"],
+            ["liquidity", "$58k"],
+            ["vol 24h", "$1.21M"],
+            ["holders", "1 043"],
+          ].map(([t, v]) => (
+            <div key={t} style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)", marginRight: -1, marginBottom: -1 }}>
+              <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>{t}</div>
+              <div className="tabular" style={{ fontSize: 14, color: "var(--text)", whiteSpace: "nowrap" }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* verdict */}
+      {showScore && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "minmax(0,1fr) 520px", gap: 12, alignItems: "start" }}>
+          <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, justifyContent: "space-between", minWidth: 0, boxSizing: "border-box", height: isMobile ? "auto" : 520, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "repeat(2,minmax(0,1fr))", gap: 0 }}>
+              {metric("avg holder pnl", G.pnl, pnlPos, ["−100%", "0", "+100%", "+200%"], <>across <span style={{ color: "var(--text)" }}>{G.counted}</span> holders</>, { paddingRight: isMobile ? 0 : 24 })}
+              {metric("avg winrate", G.winrate, wrPos, ["0", "33", "66", "100"], <>across <span style={{ color: "var(--text)" }}>{G.traced}</span> holders · ≥ 5 past trades</>, isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" })}
+            </div>
+            {showGroups && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid var(--border)", paddingTop: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, whiteSpace: "nowrap" }}>
+                  <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>WHO HOLDS THE SUPPLY</div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", overflow: "hidden", textOverflow: "ellipsis" }}>winrate bands · bar = share of supply</div>
+                </div>
+                {groups.map((gr) => (
+                  <div key={gr.wr} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div className="tabular" style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, whiteSpace: "nowrap" }}>
+                      <span style={{ paddingRight: 4 }}>
+                        <span style={{ color: gr.color, fontWeight: 700 }}>{gr.supply} of supply</span>
+                        <span style={{ color: "var(--text)" }}> · winrate <span style={{ color: gr.color }}>{gr.wr}</span></span>
+                      </span>
+                      <span style={{ color: "var(--text-dim)", flexShrink: 0 }}>
+                        <span style={{ color: "var(--text)" }}>{gr.wallets} wallets</span> · avg pnl <span style={{ color: gr.avgColor }}>{gr.avg}</span>
+                      </span>
+                    </div>
+                    <div style={{ height: 10, background: "var(--bg-deep)", border: "1px solid var(--border)", position: "relative" }}>
+                      <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: gr.supply, background: gr.color, transition: "width 1s ease" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div
+            onClick={() => cardUrl && setCardOpen(true)}
+            style={{ position: "relative", width: isMobile ? "100%" : 520, height: isMobile ? "auto" : 520, aspectRatio: isMobile ? "1/1" : undefined, border: "1px solid var(--accent)", background: "var(--bg-deep)", cursor: "zoom-in", overflow: "hidden", boxSizing: "border-box", boxShadow: "0 0 0 1px rgba(120,220,255,.15),0 0 48px rgba(120,220,255,.25)" }}
+          >
+            {cardUrl ? (
+              <div role="img" aria-label="XRAY share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-dim)" }}>rendering card…</div>
+            )}
+            <div style={{ position: "absolute", right: 8, bottom: 8, fontSize: 9, letterSpacing: ".14em", color: "var(--bone-mid)", textTransform: "uppercase", background: "rgba(4,10,18,.85)", padding: "3px 6px", border: "1px solid var(--border)", whiteSpace: "nowrap" }}>click to enlarge</div>
+          </div>
+        </div>
+      )}
+
+      {/* holders table + trailers */}
+      {showTable && (
+        <>
+          <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
+              <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>HOLDERS</div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>sorted by share of supply · every address opens on Blockscout</div>
+            </div>
+            {rows.length > 0 && !isMobile && (
+              <div className="tabular" style={{ fontSize: 13, borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .9fr 1.1fr .8fr 1.2fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>
+                  <span>wallet</span>
+                  <span style={{ textAlign: "center" }}>supply</span>
+                  <span style={{ textAlign: "center" }}>pnl here</span>
+                  <span style={{ textAlign: "center" }}>avg pnl / trade</span>
+                  <span style={{ textAlign: "center" }}>winrate</span>
+                  <span />
+                </div>
+                {rows.map((r) => (
+                  <div key={r.addr} style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .9fr 1.1fr .8fr 1.2fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", alignItems: "center" }}>
+                    <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
+                    <span style={{ textAlign: "center", color: "var(--text)" }}>{r.supply}</span>
+                    <span style={{ textAlign: "center", color: r.pnlColor }}>{r.pnl}</span>
+                    <span style={{ textAlign: "center", color: r.avgColor }}>{r.avg}</span>
+                    <span style={{ textAlign: "center", color: "var(--text)" }}>{r.winrate}</span>
+                    <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      {r.badges.map((b) => (
+                        <span key={b.text} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b.color}`, color: b.color, padding: "2px 6px" }}>{b.text}</span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {rows.length > 0 && isMobile && (
+              <div className="tabular" style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--border)", fontSize: 12 }}>
+                {rows.map((r) => (
+                  <div key={r.addr} style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
+                      <span style={{ color: "var(--text)" }}>{r.supply} supply</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ color: "var(--text-dim)" }}>pnl here <span style={{ color: r.pnlColor }}>{r.pnl}</span></span>
+                      <span style={{ color: "var(--text-dim)" }}>avg <span style={{ color: r.avgColor }}>{r.avg}</span></span>
+                      <span style={{ color: "var(--text-dim)" }}>wr <span style={{ color: "var(--text)" }}>{r.winrate}</span></span>
+                    </div>
+                    <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {r.badges.map((b) => (
+                        <span key={b.text} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b.color}`, color: b.color, padding: "2px 6px" }}>{b.text}</span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", borderTop: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{loaded ? `showing ${loaded} of ${total}` : `${total} holders - table collapsed`}</span>
+              <button onClick={() => setLoaded((l) => Math.min(40, l + 10))} style={smallBtn}>
+                {loaded ? "load 10 more" : "load first 10"}
+              </button>
+            </div>
+          </div>
+
+          <div className="tabular" style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "14px 24px", display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
+            <span style={{ color: "var(--text-dim)" }}>exited fully: <span style={{ color: "var(--text)" }}>{G.exited}</span> wallets</span>
+            <span style={{ color: "var(--text-dim)" }}>their avg pnl here <span style={{ color: G.exitColor }}>{G.exitPnl}</span></span>
+            <span style={{ color: "var(--text-dim)" }}>their winrate overall <span style={{ color: "var(--text)" }}>{G.exitWr}</span></span>
+          </div>
+
+          <div className="tabular" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 1, background: "var(--border)", border: "1px solid var(--border)", fontSize: 12 }}>
+            {[
+              ["dust", "214"],
+              ["unknown cost basis", "87"],
+              ["infrastructure", "6"],
+              ["first-ever trades", "312"],
+            ].map(([t, v]) => (
+              <div key={t} style={{ background: "var(--bg-panel)", padding: "12px 16px", display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ color: "var(--text-dim)" }}>{t}</span>
+                <span style={{ color: "var(--text)" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+              top 1000 holders only · <a href="#" onClick={(e) => { e.preventDefault(); start(); }}>recompute over all {G.total} holders</a> - takes several minutes
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => cardUrl && setCardOpen(true)} style={smallBtn}>preview card</button>
+              <button onClick={copyImage} style={smallBtn}>{copiedImg ? copiedImg.toLowerCase() : "copy image"}</button>
+              <button onClick={downloadImage} style={smallBtn}>download png</button>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(location.href);
+                  setLinked(true);
+                  setTimeout(() => setLinked(false), 1200);
+                }}
+                style={smallBtn}
+              >
+                {linked ? "link copied" : "copy link"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {cardOpen && <CardLightbox url={cardUrl} onClose={() => setCardOpen(false)} />}
+    </div>
+  );
+}
