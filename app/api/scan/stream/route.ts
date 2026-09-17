@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { Cache } from "../../../../lib/cache.ts";
 import { cachePath, resolveQuery, runScan } from "../../../../lib/site/live";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // Live scan over the engine (mode A), streamed as SSE: stage events while
 // the agents work, then a single result payload. The terminal's agent row

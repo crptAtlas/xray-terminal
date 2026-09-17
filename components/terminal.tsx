@@ -157,14 +157,15 @@ export function Terminal() {
       src.addEventListener("error", (e) => {
         const data = (e as MessageEvent).data as string | undefined;
         if (data) {
+          // a real error event from the engine
           const err = JSON.parse(data) as { kind: string; message: string };
           setLiveError(err.message);
           setView(err.kind === "notpons" ? "error-notpons" : "error-nodata");
-        } else {
-          setLiveError("connection lost - press scan again");
-          setView("error-nodata");
+          src.close();
         }
-        src.close();
+        // otherwise: transport hiccup - EventSource reconnects on its own
+        // and the incremental cache makes the retry cheaper than the run
+        // it replaces, so stay in the running view
       });
     },
     [stopAll],
