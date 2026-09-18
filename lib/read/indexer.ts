@@ -100,10 +100,20 @@ export async function syncTradeIndexTail(client: PublicClient, cache: Cache): Pr
   }
   let tip = span.tip;
   while (tip < latest) {
-    const to = tip + WINDOW > latest ? latest : tip + WINDOW;
-    const rows = await fetchWindow(client, tip + 1n, to);
-    if (rows.length) cache.appendChainTrades(rows);
-    tip = to;
+    // a few windows in flight: a stale tail (a server that slept) catches
+    // up in seconds instead of minutes, one window at a time
+    const jobs: { from: bigint; to: bigint }[] = [];
+    let cursor = tip;
+    for (let i = 0; i < PARALLEL && cursor < latest; i++) {
+      const to = cursor + WINDOW > latest ? latest : cursor + WINDOW;
+      jobs.push({ from: cursor + 1n, to });
+      cursor = to;
+    }
+    const parts = await Promise.all(jobs.map((j) => fetchWindow(client, j.from, j.to)));
+    for (const rows of parts) {
+      if (rows.length) cache.appendChainTrades(rows);
+    }
+    tip = cursor;
     cache.setTradeIndexSpan(span.floor, tip);
   }
 }
