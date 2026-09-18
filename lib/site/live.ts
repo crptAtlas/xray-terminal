@@ -211,7 +211,7 @@ function withProfiles(
       traced: aggregates.winrateWallets,
     },
     card: { ...scan.card, winrate: wr === null ? "—" : wr.toFixed(0) + "%" },
-    source: { ...scan.source, label: "rpc + bitquery", requests, seconds },
+    source: { ...scan.source, label: "rpc + index", requests, seconds },
   };
 }
 
