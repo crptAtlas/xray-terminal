@@ -21,7 +21,14 @@ import type { Cache } from "../cache.ts";
 
 const WINDOW = 40_000n; // ~1.1 h of chain per request
 const WINDOW_MAX = 640_000n; // empty pre-launchpad desert: grow up to this
-const PARALLEL = 3;
+// Politeness matters: the official node temporarily 403-bans IPs that pull
+// too hard. Two windows in flight plus a breath between batches finishes
+// overnight without tripping the ban; a trip costs an hour-scale cooldown.
+const PARALLEL = Number(process.env.XRAY_INDEX_PARALLEL ?? 2);
+const BATCH_DELAY_MS = Number(process.env.XRAY_INDEX_DELAY_MS ?? 400);
+const ERROR_COOLDOWN_MS = 90_000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Row = {
   block: bigint;
@@ -133,7 +140,16 @@ export async function backfillTradeIndex(
       jobs.push({ from, to: cursor - 1n });
       cursor = from;
     }
-    const parts = await Promise.all(jobs.map((j) => fetchWindow(client, j.from, j.to)));
+    let parts: Row[][];
+    try {
+      parts = await Promise.all(jobs.map((j) => fetchWindow(client, j.from, j.to)));
+    } catch (err) {
+      // a 403 ban or node hiccup: cool off and try the same batch again
+      // instead of dying with hours of progress left on the table
+      console.error(`\nindex batch failed (${err instanceof Error ? err.message.slice(0, 80) : err}); cooling off ${ERROR_COOLDOWN_MS / 1000}s`);
+      await sleep(ERROR_COOLDOWN_MS);
+      continue;
+    }
     let batchRows = 0;
     for (const rows of parts) {
       if (rows.length) cache.appendChainTrades(rows);
@@ -142,6 +158,7 @@ export async function backfillTradeIndex(
     total += batchRows;
     floor = cursor;
     cache.setTradeIndexSpan(floor, tip);
+    if (BATCH_DELAY_MS > 0) await sleep(BATCH_DELAY_MS);
     if (batchRows === 0) {
       emptyStreak++;
       if (emptyStreak >= 2 && window < WINDOW_MAX) window *= 2n;
