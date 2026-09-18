@@ -20,6 +20,13 @@ import { ethUsd } from "../usd.ts";
 interface CachedWallet {
   positions: PositionSummary[];
   ethWei: string;
+  // trade-index floor at capture time: while the backfill deepens the
+  // index, profiles captured at a shallower floor are stale and rebuilt
+  floor: string;
+}
+
+function currentFloor(cache: Cache): bigint {
+  return cache.tradeIndexSpan()?.floor ?? 0n;
 }
 
 function readCached(cache: Cache, wallet: string): CachedWallet | null {
@@ -28,6 +35,8 @@ function readCached(cache: Cache, wallet: string): CachedWallet | null {
   try {
     const parsed = JSON.parse(raw) as Partial<CachedWallet>;
     if (!Array.isArray(parsed.positions) || typeof parsed.ethWei !== "string") return null; // old format
+    if (typeof parsed.floor !== "string") return null; // pre-floor format
+    if (BigInt(parsed.floor) > currentFloor(cache)) return null; // the index got deeper since
     return parsed as CachedWallet;
   } catch {
     return null;
@@ -73,7 +82,8 @@ export async function walletProfile(
   const byToken = byWallet.get(w) ?? new Map();
   const positions = buildPositions(byToken, ledgerRemaining(byToken));
   const eth = ethWei.get(w) ?? 0n;
-  cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString() } satisfies CachedWallet));
+  // a direct topic query reads the whole chain: floor 0
+  cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString(), floor: "0" } satisfies CachedWallet));
   return profileFromPositions(w, positions, eth, excludeToken, rate);
 }
 
@@ -129,6 +139,7 @@ async function profilesFromIndex(
   } catch (err) {
     console.warn(`trade index tail sync: ${err instanceof Error ? err.message : err}`);
   }
+  const floorNow = currentFloor(cache);
   const lower = misses.map((w) => w.toLowerCase());
   const rowsByWallet = cache.chainTradesFor(lower);
   const curves = new Set<string>();
@@ -147,7 +158,7 @@ async function profilesFromIndex(
     }
     const positions = buildPositions(byToken, ledgerRemaining(byToken));
     const eth = ethWei.get(lw) ?? 0n;
-    cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString() } satisfies CachedWallet));
+    cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString(), floor: floorNow.toString() } satisfies CachedWallet));
     out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
   }
 }
@@ -177,7 +188,7 @@ async function profilesFromRpc(
         const byToken = byWallet.get(w.toLowerCase()) ?? new Map();
         const positions = buildPositions(byToken, ledgerRemaining(byToken));
         const eth = ethWei.get(w.toLowerCase()) ?? 0n;
-        cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString() } satisfies CachedWallet));
+        cache.saveProfile(w, JSON.stringify({ positions, ethWei: eth.toString(), floor: "0" } satisfies CachedWallet));
         out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
       }
     } catch (err) {
