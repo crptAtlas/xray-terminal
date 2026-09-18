@@ -22,6 +22,8 @@ interface CachedWallet {
   // deepens either lane, profiles captured shallower are stale and rebuilt
   floor: string;
   floorV4: string;
+  // chain tip at capture: a wallet that traded past it gets recomputed
+  tip?: string;
 }
 
 function currentFloor(cache: Cache, lane: "curve" | "v4" = "curve"): bigint {
@@ -111,10 +113,35 @@ export async function walletProfilesBatch(
   const deadline = Date.now() + deadlineMs;
   const rate = await ethUsd().catch(() => 0);
   const misses: string[] = [];
+  const hits = new Map<string, CachedWallet>();
   for (const w of wallets) {
     const cached = readCached(cache, w);
-    if (cached) out.set(w, profileFromPositions(w, cached.positions, BigInt(cached.ethWei), excludeToken, rate));
+    if (cached) hits.set(w, cached);
     else misses.push(w);
+  }
+  // a cached profile goes stale the moment its wallet trades again; the
+  // check is a local indexed query per distinct capture tip (profiles
+  // cached in one scan share a tip, so this is one or two queries)
+  if (hits.size) {
+    const byTip = new Map<string, string[]>();
+    for (const [w, c] of hits) {
+      if (c.tip === undefined) {
+        misses.push(w); // pre-tip format: rebuild once
+        hits.delete(w);
+        continue;
+      }
+      const list = byTip.get(c.tip) ?? [];
+      list.push(w);
+      byTip.set(c.tip, list);
+    }
+    const stale = new Set<string>();
+    for (const [tip, ws] of byTip) {
+      for (const w of cache.walletsTradedSince(ws, BigInt(tip))) stale.add(w);
+    }
+    for (const [w, c] of hits) {
+      if (stale.has(w.toLowerCase())) misses.push(w);
+      else out.set(w, profileFromPositions(w, c.positions, BigInt(c.ethWei), excludeToken, rate));
+    }
   }
 
   const span = cache.tradeIndexSpan();
@@ -175,7 +202,13 @@ async function profilesFromIndex(
     const eth = ethWei.get(lw) ?? 0n;
     cache.saveProfile(
       w,
-      JSON.stringify({ positions, ethWei: eth.toString(), floor: floorNow.toString(), floorV4: floorV4Now.toString() } satisfies CachedWallet),
+      JSON.stringify({
+        positions,
+        ethWei: eth.toString(),
+        floor: floorNow.toString(),
+        floorV4: floorV4Now.toString(),
+        tip: (cache.tradeIndexSpan("curve")?.tip ?? 0n).toString(),
+      } satisfies CachedWallet),
     );
     out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
   }

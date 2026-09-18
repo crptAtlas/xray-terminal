@@ -176,6 +176,22 @@ export class Cache {
     return rows.map((r) => ({ ...r, block: BigInt(r.block) }));
   }
 
+  /** Wallets among these that have trades newer than the given block.
+   * One indexed local query; lets cached profiles refresh the moment a
+   * wallet trades again instead of sitting out a TTL. */
+  walletsTradedSince(wallets: string[], afterBlock: bigint): Set<string> {
+    const out = new Set<string>();
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const q = this.db.prepare(
+        `SELECT DISTINCT wallet FROM chain_trades WHERE block > ? AND wallet IN (${slice.map(() => "?").join(",")})`,
+      );
+      for (const row of q.all(Number(afterBlock), ...slice.map((w) => w.toLowerCase())) as { wallet: string }[]) {
+        out.add(row.wallet);
+      }
+    }
+    return out;
+  }
+
   /** Which of these token addresses are Pons launches. Pair tokens (NVDA,
    * SPCX, ...) move through the same pools but are not launches; profile
    * positions only make sense for launched tokens. */

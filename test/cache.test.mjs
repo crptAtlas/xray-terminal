@@ -98,3 +98,14 @@ test("IN () queries survive thousands of keys (SQLite variable cap)", () => {
   assert.equal(c.curveTokens(curves).size, 0); // no mapping saved; must not throw
   c.close();
 });
+
+test("walletsTradedSince finds wallets with rows past a block", () => {
+  const c = new Cache(":memory:");
+  c.appendChainTrades([
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc", wallet: "0xold", kind: "buy", tokens: 1n, eth: 1n },
+    { block: 200n, logIndex: 0, tx: "0x2", curve: "0xc", wallet: "0xfresh", kind: "buy", tokens: 1n, eth: 1n },
+  ]);
+  const got = c.walletsTradedSince(["0xold", "0xfresh", "0xnone"], 150n);
+  assert.deepEqual([...got], ["0xfresh"]);
+  c.close();
+});
