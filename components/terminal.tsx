@@ -219,6 +219,9 @@ export function Terminal() {
         token: live.token,
         pnl: live.verdict.pnl as string | null,
         pnlNum: live.verdict.pnlNum,
+        holdersPnl: live.verdict.holdersPnl,
+        holdersPnlNum: live.verdict.holdersPnlNum,
+        holdersPnlWallets: live.verdict.holdersPnlWallets,
         median: live.verdict.median,
         inProfit: live.verdict.inProfit as number | null,
         profilesRead: live.profilesRead ?? null,
@@ -229,7 +232,7 @@ export function Terminal() {
         gradeColor: live.card.gradeColor,
         dead: live.dead,
         bands: live.bands.map((b) => ({ range: b.range, color: pnlColor(b.mid), supply: b.supply + "%", wallets: b.wallets, avg: b.avg, avgColor: b.avg.startsWith("+") ? "var(--profit)" : b.avg === "—" ? "var(--text-dim)" : "var(--loss)" })),
-        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "—", avgColor: "var(--text-dim)", winrate: r.winrate ?? "—", badges: r.badges })),
+        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "—", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? "—", badges: r.badges })),
         exited: { wallets: String(live.exited.wallets), pnl: live.exited.avgPnl ?? "—", pnlColor: live.exited.avgPnl?.startsWith("+") ? "var(--profit)" : "var(--loss)", wr: "—" },
         flags: [
           ["dust", String(live.flags.dust)],
@@ -245,6 +248,9 @@ export function Terminal() {
       token: { ticker: "$MARROW", address: DEMO_ADDR, age: "3h 12m", stage: "graduated", mcap: "$412k", liquidity: "$58k", vol24h: "$1.21M", holders: "1 043" },
       pnl: G.pnl as string | null,
       pnlNum: parseFloat(G.pnl.replace("−", "-")) as number | null,
+      holdersPnl: G.pnl as string | null,
+      holdersPnlNum: parseFloat(G.pnl.replace("−", "-")) as number | null,
+      holdersPnlWallets: 0,
       median: null as string | null,
       inProfit: null as number | null,
       profilesRead: null as number | null,
@@ -275,7 +281,24 @@ export function Terminal() {
   const liveDone = liveStages.filter((s) => s.status === "done" || s.status === "skip").length;
   const liveActiveIdx = liveStages.findIndex((s) => s.status === "start");
   const stageIdx = isLiveRun ? (liveActiveIdx >= 0 ? liveActiveIdx : Math.min(liveDone, 5)) : Math.min(step, 5);
-  const progress = isRunning ? (isLiveRun ? Math.round((liveDone / 6) * 100) : Math.round((step / 6) * 100)) : 0;
+  // the bar creeps steadily toward the next stage boundary so a long
+  // stage never looks frozen; a completed stage snaps it forward
+  const [smooth, setSmooth] = useState(0);
+  const stageTarget = isRunning ? (isLiveRun ? liveDone : step) / 6 : 0;
+  useEffect(() => {
+    if (!isRunning) {
+      setSmooth(0);
+      return;
+    }
+    const floor = stageTarget * 100;
+    const ceil = Math.min((stageTarget + 1 / 6) * 100 - 2, 98);
+    setSmooth((s) => Math.max(s, floor));
+    const t = setInterval(() => {
+      setSmooth((s) => (s < ceil ? Math.min(s + Math.max(0.15, (ceil - s) * 0.02), ceil) : s));
+    }, 250);
+    return () => clearInterval(t);
+  }, [isRunning, stageTarget]);
+  const progress = isRunning ? Math.round(smooth) : 0;
 
   const showHeader = isResult || (!isLiveRun && isRunning && step >= 1);
   const showScore = (isResult || (!isLiveRun && isRunning && step >= 4)) && !D.dead;
@@ -283,6 +306,7 @@ export function Terminal() {
   const showTable = isResult && !D.dead;
 
   const pnlPos = D.pnlNum === null ? 0 : Math.max(0, Math.min(100, (D.pnlNum + 100) / 3));
+  const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, (D.holdersPnlNum + 100) / 3));
   const wrPos = D.winrate === null ? 0 : parseFloat(D.winrate);
   const glowColor = D.gradeColor + "55";
 
@@ -544,15 +568,17 @@ export function Terminal() {
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, justifyContent: "space-between", minWidth: 0, boxSizing: "border-box", height: isMobile ? "auto" : 520, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "minmax(0,1fr)" : "repeat(2,minmax(0,1fr))", gap: 0 }}>
               {metric(
-                "avg holder pnl",
-                D.pnl,
-                D.pnlNum === null ? "var(--bone-dark)" : pnlColor(D.pnlNum),
-                pnlPos,
+                "avg pnl / trade of holders",
+                D.holdersPnl,
+                D.holdersPnlNum === null ? "var(--bone-dark)" : pnlColor(D.holdersPnlNum),
+                holdersPnlPos,
                 ["−100%", "0", "+100%", "+200%"],
-                D.median !== null && D.inProfit !== null ? (
-                  <>median <span style={{ color: "var(--text)" }}>{D.median}</span> · <span style={{ color: "var(--text)" }}>{D.inProfit}</span> of {D.counted} in profit</>
+                D.holdersPnl !== null ? (
+                  <>chain-wide record of <span style={{ color: "var(--text)" }}>{D.holdersPnlWallets}</span> holders · this token excluded</>
+                ) : D.profilesRead !== null && D.profilesRead > 0 ? (
+                  <>{D.profilesRead} wallets read · none with closed trades yet</>
                 ) : (
-                  <>across <span style={{ color: "var(--text)" }}>{D.counted}</span> holders</>
+                  <>reading wallet histories…</>
                 ),
                 { paddingRight: isMobile ? 0 : 24 },
               )}
@@ -573,6 +599,12 @@ export function Terminal() {
                 ),
                 isMobile ? {} : { paddingLeft: 24, borderLeft: "1px solid var(--border)" },
               )}
+            </div>
+            <div className="tabular" style={{ fontSize: 13, color: "var(--text-dim)", borderTop: "1px solid var(--border)", paddingTop: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              pnl on this token{" "}
+              <span style={{ color: D.pnlNum === null ? "var(--text-dim)" : pnlColor(D.pnlNum), fontWeight: 700 }}>{D.pnl ?? "—"}</span>
+              {D.median !== null && <> · median <span style={{ color: "var(--text)" }}>{D.median}</span></>}
+              {D.inProfit !== null && <> · <span style={{ color: "var(--text)" }}>{D.inProfit}</span> of {D.counted} in profit</>}
             </div>
             {showGroups && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid var(--border)", paddingTop: 20 }}>
@@ -625,7 +657,7 @@ export function Terminal() {
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
               <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>HOLDERS</div>
-              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>sorted by share of supply · every address opens on Blockscout</div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>sorted by holder avg pnl once histories land · every address opens on Blockscout</div>
             </div>
             {rows.length > 0 && !isMobile && (
               <div className="tabular" style={{ fontSize: 13, borderTop: "1px solid var(--border)" }}>

@@ -114,3 +114,22 @@ test("empty input", () => {
   assert.equal(agg.avgPnlPct, null);
   assert.equal(agg.exited.wallets, 0);
 });
+
+test("avgProfilePnl: supply-weighted holders record, clamped, current holders only", async () => {
+  const { aggregate } = await import("../lib/pnl/aggregate.ts");
+  const row = (wallet, share, pnl) => ({ wallet, supplyShare: share, position: { pnlPct: pnl, closed: false, boughtTokens: 1n } });
+  const rows = [row("0xa", 0.05, 10), row("0xb", 0.01, -5), row("0xc", 0, 50)];
+  const profiles = new Map([
+    ["0xa", { trades: 3, winrate: 60, avgPnlPerTrade: 100 }],
+    ["0xb", { trades: 2, winrate: 30, avgPnlPerTrade: -40 }],
+    ["0xc", { trades: 9, winrate: 90, avgPnlPerTrade: 999 }], // exited: not counted
+  ]);
+  const a = aggregate(rows, profiles);
+  // (100*5 + -40*1) / 6 = 76.67
+  assert.ok(Math.abs(a.avgProfilePnl - 76.666) < 0.01);
+  assert.equal(a.profilePnlWallets, 2);
+  // a sniper wallet avg of +90000 clamps to +500 before weighting
+  const crazy = new Map([["0xa", { trades: 1, winrate: null, avgPnlPerTrade: 90000 }]]);
+  const b = aggregate([row("0xa", 0.05, 1)], crazy);
+  assert.equal(b.avgProfilePnl, 500);
+});

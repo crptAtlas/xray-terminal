@@ -118,6 +118,14 @@ export class RpcProvider implements Provider {
 
     const createdBlock = hint?.createdBlock ?? (await this.findLaunchBlock(addr));
 
+    const ethPaired = launched.pairToken === ZERO || launched.pairToken === ADDR.weth;
+    let pairSymbol: string | null = null;
+    if (!ethPaired) {
+      pairSymbol = (await this.client
+        .readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "symbol" })
+        .catch(() => "?" as string)) as string;
+    }
+
     return {
       address: addr,
       symbol: symbol as string,
@@ -134,6 +142,8 @@ export class RpcProvider implements Provider {
       createdBlock,
       createdAt: Number(launchedAt),
       phase,
+      pairToken: launched.pairToken,
+      pairSymbol,
     };
   }
 

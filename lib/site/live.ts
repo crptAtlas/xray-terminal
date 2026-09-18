@@ -34,6 +34,7 @@ export interface LiveHolderRow {
   pnlHere: string;
   pnlNum: number | null;
   avgPnl: string | null;
+  avgPnlNum: number | null;
   winrate: string | null;
   badges: { text: string; color: string }[];
 }
@@ -43,7 +44,22 @@ export interface LiveScan {
   dead: boolean;
   grade: Grade;
   token: { ticker: string; address: string; age: string; stage: string; mcap: string; liquidity: string; vol24h: string; holders: string };
-  verdict: { pnl: string; pnlNum: number | null; median: string | null; inProfit: number; winrate: string | null; counted: number; traced: number | null; hint: string };
+  verdict: {
+    // primary: the holders' own avg pnl per closed trade across Pons
+    // (scanned token excluded); null until the profile phase lands
+    holdersPnl: string | null;
+    holdersPnlNum: number | null;
+    holdersPnlWallets: number;
+    winrate: string | null;
+    traced: number | null;
+    // this token's current avg pnl - the third metric
+    pnl: string;
+    pnlNum: number | null;
+    median: string | null;
+    inProfit: number;
+    counted: number;
+    hint: string;
+  };
   bands: LiveBand[];
   bandCoverage: string;
   holders: LiveHolderRow[];
@@ -55,7 +71,15 @@ export interface LiveScan {
   card: CardData;
 }
 
-const pct = (n: number | null, digits = 1): string => (n === null ? "—" : `${n >= 0 ? "+" : "−"}${Math.abs(n).toFixed(digits)}%`);
+const pct = (n: number | null, digits = 1): string => {
+  if (n === null) return "—";
+  const sign = n >= 0 ? "+" : "−";
+  const a = Math.abs(n);
+  // sniper pnl can run to millions of percent; keep it short on screen
+  if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(1)}M%`;
+  if (a >= 1e4) return `${sign}${(a / 1e3).toFixed(1)}k%`;
+  return `${sign}${a.toFixed(digits)}%`;
+};
 
 function short(a: string): string {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -75,7 +99,13 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
   const bands: LiveBand[] = groups.map((g) => {
     const inBand = s.holders.filter((r) => r.position.pnlPct !== null && r.position.pnlPct >= g.minPct && r.position.pnlPct <= g.maxPct);
     const avg = inBand.length ? inBand.reduce((sum, r) => sum + (r.position.pnlPct as number), 0) / inBand.length : null;
-    const f = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(0)}`;
+    const f = (v: number) => {
+      const sign = v >= 0 ? "+" : "−";
+      const a = Math.abs(v);
+      if (a >= 1e6) return `${sign}${(a / 1e6).toFixed(1)}M`;
+      if (a >= 1e4) return `${sign}${(a / 1e3).toFixed(1)}k`;
+      return `${sign}${a.toFixed(0)}`;
+    };
     return {
       supply: Math.round(g.supplyShare * 1000) / 10,
       range: `${f(g.minPct)}..${f(g.maxPct)}%`,
@@ -92,6 +122,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     pnlHere: pct(r.position.pnlPct),
     pnlNum: r.position.pnlPct,
     avgPnl: null,
+    avgPnlNum: null,
     winrate: null,
     badges: [], // SMART / WHALE arrive with the profile phase
   }));
@@ -113,13 +144,16 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
       holders: h.holders.toLocaleString("fr-FR").replace(/ /g, " "),
     },
     verdict: {
+      holdersPnl: null,
+      holdersPnlNum: null,
+      holdersPnlWallets: 0,
+      winrate: null,
+      traced: null,
       pnl: pct(a.avgPnlPct),
       pnlNum: a.avgPnlPct,
       median: a.medianPnlPct === null ? null : pct(a.medianPnlPct),
       inProfit: a.inProfit,
-      winrate: null,
       counted: a.pnlWallets,
-      traced: null,
       hint: HINTS[grade],
     },
     bands,
@@ -137,7 +171,8 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     card: {
       ticker: `$${s.meta.symbol}`,
       addr: s.meta.address,
-      pnl: pct(a.avgPnlPct, 1),
+      pnl: "—",
+      pnlHere: pct(a.avgPnlPct, 1),
       winrate: "—",
       grade,
       gradeColor: grade === "healthy" ? "#60F080" : grade === "cracked" ? "#FFD640" : "#FF605C",
@@ -190,11 +225,16 @@ function withProfiles(
     return {
       ...r,
       avgPnl: p.avgPnlPerTrade === null ? null : pct(p.avgPnlPerTrade),
+      avgPnlNum: p.avgPnlPerTrade ?? null,
       winrate: p.winrate === null ? null : p.winrate.toFixed(0) + "%",
       badges,
     };
   });
+  // the table is the terminal's argument: sort by the holders' own track
+  // record, best traders first; wallets without a record sink to the end
+  holders.sort((x, y) => (y.avgPnlNum ?? -Infinity) - (x.avgPnlNum ?? -Infinity));
   const wr = aggregates.avgWinrate;
+  const hp = aggregates.avgProfilePnl;
   const profilesRead = [...profiles.values()].filter((p) => !p.notRead).length;
   const ft = aggregates.firstTrade;
   return {
@@ -207,10 +247,18 @@ function withProfiles(
     },
     verdict: {
       ...scan.verdict,
+      holdersPnl: hp === null ? null : pct(hp),
+      holdersPnlNum: hp,
+      holdersPnlWallets: aggregates.profilePnlWallets,
       winrate: wr === null ? null : wr.toFixed(0) + "%",
       traced: aggregates.winrateWallets,
     },
-    card: { ...scan.card, winrate: wr === null ? "—" : wr.toFixed(0) + "%" },
+    card: {
+      ...scan.card,
+      pnl: pct(hp),
+      pnlHere: scan.verdict.pnl,
+      winrate: wr === null ? "—" : wr.toFixed(0) + "%",
+    },
     source: { ...scan.source, label: "rpc + index", requests, seconds },
   };
 }

@@ -77,7 +77,10 @@ export interface WalletScan {
 export interface CardData {
   ticker: string;
   addr: string;
+  // primary number: the holders' avg pnl per trade across Pons
   pnl: string;
+  // this token's own avg pnl, shown small under the big number
+  pnlHere?: string;
   winrate: string;
   grade: Grade;
   gradeColor: string;

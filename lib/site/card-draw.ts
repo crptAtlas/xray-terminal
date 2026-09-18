@@ -100,7 +100,10 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   noglow();
   x.fillStyle = "#6E8291";
   x.font = '400 22px "JetBrains Mono"';
-  x.fillText("avg holder pnl on this token", 1008, 206);
+  x.fillText("avg holder pnl across Pons", 1008, 206);
+  if (d.pnlHere) {
+    x.fillText(`on this token ${d.pnlHere}`, 1008, 236);
+  }
   x.textAlign = "left";
   // winrate + scale bar
   x.fillStyle = gc;

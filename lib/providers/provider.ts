@@ -18,6 +18,11 @@ export interface TokenMeta {
   createdBlock: bigint;
   createdAt: number; // unix seconds
   phase: Phase;
+  // launches can be paired with a token instead of ETH (tokenized stocks:
+  // NVDA, GOOGL, ...). All curve amounts are then in pair-token units and
+  // ETH-based pnl math does not apply.
+  pairToken: Hex;
+  pairSymbol: string | null; // null when the pair is native ETH
 }
 
 export interface RawTransfer {

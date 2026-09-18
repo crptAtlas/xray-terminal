@@ -21,6 +21,7 @@ import type { HolderRow } from "../read/token.ts";
 export interface ProfileLite {
   trades: number;
   winrate: number | null;
+  avgPnlPerTrade?: number | null;
   notRead?: boolean; // missed the profile deadline; never counted anywhere
 }
 
@@ -33,6 +34,10 @@ export interface Aggregates {
   pnlWallets: number;
   avgWinrate: number | null;
   winrateWallets: number;
+  // the terminal's primary metric: supply-weighted avg of the holders'
+  // own avg pnl per closed trade across Pons, the scanned token excluded
+  avgProfilePnl: number | null;
+  profilePnlWallets: number;
   firstTrade: { wallets: number; supplyShare: number } | null; // needs profiles
   exited: { wallets: number; avgPnlPct: number | null; avgWinrate: number | null };
 }
@@ -70,9 +75,12 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
 
   let avgWinrate: number | null = null;
   let winrateWallets = 0;
+  let avgProfilePnl: number | null = null;
+  let profilePnlWallets = 0;
   let firstTrade: Aggregates["firstTrade"] = null;
   if (profiles) {
     const wrPairs: { value: number; weight: number }[] = [];
+    const ppPairs: { value: number; weight: number }[] = [];
     let ftWallets = 0;
     let ftSupply = 0;
     for (const r of holding) {
@@ -81,6 +89,13 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
       if (p.trades >= 2 && p.winrate !== null) {
         wrPairs.push({ value: p.winrate, weight: r.supplyShare });
       }
+      const app = p.avgPnlPerTrade;
+      if (p.trades >= 1 && app !== null && app !== undefined) {
+        ppPairs.push({
+          value: Math.max(AVG_CLAMP.min, Math.min(AVG_CLAMP.max, app)),
+          weight: r.supplyShare,
+        });
+      }
       if (p.trades === 0) {
         ftWallets++;
         ftSupply += r.supplyShare;
@@ -88,6 +103,8 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
     }
     avgWinrate = weightedMean(wrPairs);
     winrateWallets = wrPairs.length;
+    avgProfilePnl = weightedMean(ppPairs);
+    profilePnlWallets = ppPairs.length;
     firstTrade = { wallets: ftWallets, supplyShare: ftSupply };
   }
 
@@ -109,6 +126,8 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
     pnlWallets: pnlPairs.length,
     avgWinrate,
     winrateWallets,
+    avgProfilePnl,
+    profilePnlWallets,
     firstTrade,
     exited: { wallets: exitedRows.length, avgPnlPct: mean(exitedPnls), avgWinrate: exitedWr },
   };

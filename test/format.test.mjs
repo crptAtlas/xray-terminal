@@ -83,7 +83,7 @@ test("text format follows the spec layout", () => {
   assert.match(out, /^\$TST {2}0x1234/m);
   assert.match(out, /age 3h 12m {2}phase curve 74%/);
   assert.match(out, /mcap \$1\.2M {3}liquidity \$340k {3}volume 24h \$890k {3}holders 1 043/);
-  assert.match(out, /avg pnl {2}\+40% {8}across 1002 wallets/);
+  assert.match(out, /pnl on this token {6}\+40% {3}across 1002 wallets/);
   assert.match(out, /group 1 {3}\+12\.\.17% {3}15% of supply {3}58 wallets/);
   assert.match(out, /#1 {2}0x1234\.\.cdef {3}4\.2% supply {3}pnl \+180%/);
   assert.match(out, /exited {6}340 wallets, avg pnl \+22%/);

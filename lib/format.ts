@@ -77,10 +77,13 @@ function textCheck(r: CheckResult): string {
     lines.push(DEAD_LINE);
     lines.push("");
   } else {
-    lines.push(`avg pnl  ${pct(a.avgPnlPct)}        across ${a.pnlWallets} wallets`);
-    if (a.avgWinrate !== null) {
-      lines.push(`winrate   ${a.avgWinrate.toFixed(0)}%        across ${a.winrateWallets} wallets with 2+ trades`);
+    if (a.avgProfilePnl != null) {
+      lines.push(`holders avg pnl/trade  ${pct(a.avgProfilePnl)}   across ${a.profilePnlWallets} holders, this token excluded`);
     }
+    if (a.avgWinrate !== null) {
+      lines.push(`holders winrate        ${a.avgWinrate.toFixed(0)}%   across ${a.winrateWallets} wallets with 2+ trades`);
+    }
+    lines.push(`pnl on this token      ${pct(a.avgPnlPct)}   across ${a.pnlWallets} wallets`);
     lines.push("");
     r.groups.forEach((g, i) => {
       lines.push(
