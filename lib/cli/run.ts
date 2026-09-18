@@ -152,13 +152,16 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   while (!done.curve || !done.v4) {
     for (const lane of lanes) {
       if (done[lane]) continue;
-      const res = await backfillTradeIndex(client, cache, {
-        lane,
-        budgetMs: 60_000,
-        onProgress: (p) => {
-          rows += 0; // progress printed below per slice
-        },
-      });
+      let res;
+      try {
+        res = await backfillTradeIndex(client, cache, { lane, budgetMs: 60_000 });
+      } catch (err) {
+        // any lane error (tail sync included) cools off instead of killing
+        // hours of unattended progress
+        console.error(`\n${lane} lane: ${err instanceof Error ? err.message.slice(0, 80) : err}; cooling off 90s`);
+        await new Promise((r) => setTimeout(r, 90_000));
+        continue;
+      }
       rows += res.rows;
       done[lane] = res.done;
       const dc = tradeIndexDepthDays(cache, "curve");
