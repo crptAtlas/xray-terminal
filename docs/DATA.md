@@ -11,6 +11,18 @@ the live chain and the live Bitquery API. Date of measurement:
   (oldest trade row: 2026-09-13). The 30-day figure from early planning
   was wrong for this plan tier; deeper history is the paid `archive`
   add-on (`combined` dataset - refused on the current plan).
+- **The launchpad is ~42% stock-paired** (NVDA, SPCX, ... pairs; sampled
+  300 launches). Curve amounts for those are pair-token units, so pnl
+  percentages stay correct but USD figures do not apply (the UI shows
+  n/a and names the pair). The v4 currency sort uses `meta.pairToken`
+  (address(0) for native ETH pools) - comparing against the WETH address
+  inverted the swap sides for any token sorting below it.
+- **Post-graduation v4 trades carry no trader topic, but the token's own
+  Transfer does**: wallet -> poolManager is a sell, poolManager -> wallet
+  a buy, and the Swap in the same tx whose token-side magnitude equals
+  the moved amount carries the quote. Measured on live blocks: ~65% of
+  pool transfers match a swap 1:1; one sampled holder had 32 curve buys
+  and 1550 v4 sells - most of every wallet's record lives on v4.
 - **Wallet histories do not need Bitquery at all.** The curve events
   index the real trader in their topics (`CurveBuy` topic2 = recipient,
   `CurveSell` topic1 = seller), and the public RPC serves logs from
