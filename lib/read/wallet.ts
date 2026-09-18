@@ -4,12 +4,10 @@ import { buildPositions, profileFromPositions, type PositionSummary, type Profil
 import { ethUsd } from "../usd.ts";
 
 /**
- * Wallet profiles through the global 24h cache, built from the public RPC:
- * the curve events index the real trader in their topics, so a batch of
- * wallets costs two topic-filtered getLogs over the whole chain - full
- * history, no indexer, no paid API. Post-graduation v4 swaps carry no
- * trader topic and are not part of the profile (the curve is where meme
- * life happens; noted in docs/DATA.md).
+ * Wallet profiles through the global 24h cache, built from the local
+ * chain-wide trade index: curve trades (trader in the event topics) plus
+ * v4 pool trades (trader from the token transfer beside the swap). Full
+ * history, no paid API; details in docs/DATA.md.
  *
  * The cache stores per-token position summaries plus the ETH balance, so
  * a profile can be folded with any token excluded (the token being

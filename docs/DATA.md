@@ -28,9 +28,8 @@ the live chain and the live Bitquery API. Date of measurement:
   `CurveSell` topic1 = seller), and the public RPC serves logs from
   genesis. A local chain-wide trade index (`xray index`, resumable
   backfill into SQLite) makes every wallet's full history a local
-  SELECT; a cheap tail sync before each scan keeps it at the head.
-  Post-graduation v4 swaps carry no trader topic and are not part of
-  profiles - the curve is where meme life happens.
+  SELECT; a cheap tail sync before each scan keeps it at the head. Two
+  lanes: curve events and v4 pool trades (attributed as above).
 - Node limits worth knowing: batched topic-alternative queries over the
   full range are unreliable above ~25-50 wallets (the node masks its
   log-query timeout as "Missing or invalid parameters"), which is why
