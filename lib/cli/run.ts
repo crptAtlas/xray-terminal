@@ -167,7 +167,21 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   }
   process.stderr.write("\n");
   console.error("index complete: full chain history in both lanes");
-  cache.close();
+  // follow mode: the backfill is done for good, so this process becomes
+  // the chain follower - every new block lands in the index within
+  // seconds and scans never pay a catch-up cost
+  console.error("following the chain head (tail sync every 30s; ctrl-c to stop)...");
+  const { syncTradeIndexTail } = await import("../read/indexer.ts");
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  for (;;) {
+    try {
+      await syncTradeIndexTail(client, cache, "curve");
+      await syncTradeIndexTail(client, cache, "v4");
+    } catch (err) {
+      console.error(`tail sync: ${err instanceof Error ? err.message.slice(0, 80) : err}`);
+    }
+    await sleep(30_000);
+  }
 }
 
 export async function runDoctor(_opts: CliOpts): Promise<void> {
