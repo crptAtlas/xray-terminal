@@ -56,11 +56,6 @@ export async function tokenSnapshot(
   onStage({ agent: "scanner", status: "start" });
   const known = cache.tokenState(address.toLowerCase());
   const meta = await provider.tokenMeta(address, known?.createdBlock ? { createdBlock: known.createdBlock } : undefined);
-  if (meta.pairSymbol) {
-    throw new Error(
-      `$${meta.symbol} is paired with ${meta.pairSymbol}, not ETH - stock-paired launches are not supported yet`,
-    );
-  }
 
   // incremental sync: cached trades + only the new blocks
   const state = cache.tokenState(meta.address);

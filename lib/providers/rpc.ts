@@ -214,10 +214,10 @@ export class RpcProvider implements Provider {
     for (const l of swapLogs) {
       const decoded = decodeEventLog({ abi: poolManagerAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
       const a = decoded.args as { amount0: bigint; amount1: bigint };
-      // The token is one currency, ETH/WETH the other; take the quote side.
-      // Which side is which depends on currency sort order; classify matches
-      // by token amount, so hand over both magnitudes.
-      const tokenIsC0 = token.address.toLowerCase() < ADDR.weth;
+      // The token is one currency, the quote the other (native ETH pools
+      // use address(0), stock pairs the pair token). Sort order decides
+      // which side is which; classify matches by token amount.
+      const tokenIsC0 = token.address.toLowerCase() < token.pairToken;
       const tokenAmt = tokenIsC0 ? a.amount0 : a.amount1;
       const ethAmt = tokenIsC0 ? a.amount1 : a.amount0;
       quotes.push({
@@ -323,7 +323,7 @@ export class RpcProvider implements Provider {
     // price(c1 per c0) = (sqrtP / 2^96)^2; convert to ETH per token.
     const ratio = Number(last.sqrtPriceX96) / 2 ** 96;
     const p = ratio * ratio;
-    const tokenIsC0 = token.address.toLowerCase() < ADDR.weth;
+    const tokenIsC0 = token.address.toLowerCase() < token.pairToken;
     return tokenIsC0 ? p : 1 / p;
   }
 
@@ -339,7 +339,7 @@ export class RpcProvider implements Provider {
     // ETH side as L * sqrtP / 2^96 from the latest swap.
     const last = await this.lastSwap(token);
     if (!last) return 0n;
-    const tokenIsC0 = token.address.toLowerCase() < ADDR.weth;
+    const tokenIsC0 = token.address.toLowerCase() < token.pairToken;
     if (tokenIsC0) {
       return (last.liquidity * last.sqrtPriceX96) / 2n ** 96n;
     }

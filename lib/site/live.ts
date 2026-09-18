@@ -137,10 +137,14 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
       ticker: `$${s.meta.symbol}`,
       address: s.meta.address,
       age: fmtAge(h.ageMs),
-      stage: h.phase.kind === "curve" ? `curve · ${h.phase.fillPct.toFixed(0)}%` : "graduated",
-      mcap: fmtUsd(h.mcapUsd),
-      liquidity: fmtUsd(h.liquidityUsd),
-      vol24h: fmtUsd(h.volume24hUsd),
+      stage:
+        (h.phase.kind === "curve" ? `curve · ${h.phase.fillPct.toFixed(0)}%` : "graduated") +
+        (s.meta.pairSymbol ? ` · ${s.meta.pairSymbol} pair` : ""),
+      // stock-paired launches trade in pair-token units; pretending they
+      // are dollars would lie, so the usd figures step aside
+      mcap: s.meta.pairSymbol ? "n/a" : fmtUsd(h.mcapUsd),
+      liquidity: s.meta.pairSymbol ? "n/a" : fmtUsd(h.liquidityUsd),
+      vol24h: s.meta.pairSymbol ? "n/a" : fmtUsd(h.volume24hUsd),
       holders: h.holders.toLocaleString("fr-FR").replace(/ /g, " "),
     },
     verdict: {
