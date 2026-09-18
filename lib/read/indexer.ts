@@ -1,6 +1,7 @@
 import { decodeEventLog, type PublicClient } from "viem";
-import { CHAIN, TOPIC, type Hex } from "../chain.ts";
+import { ADDR, CHAIN, INFRA, TOPIC, type Hex } from "../chain.ts";
 import { curveAbi } from "../abi/pons.ts";
+import { poolManagerAbi, SWAP_TOPIC } from "../abi/pool.ts";
 import { getLogsAdaptive, type RawLog } from "../providers/logs.ts";
 import type { Cache } from "../cache.ts";
 
@@ -39,7 +40,10 @@ type Row = {
   kind: "buy" | "sell";
   tokens: bigint;
   eth: bigint;
+  token?: string;
 };
+
+export type Lane = "curve" | "v4";
 
 function decodeRows(logs: RawLog[]): Row[] {
   const rows: Row[] = [];
@@ -89,15 +93,88 @@ async function fetchWindow(client: PublicClient, fromBlock: bigint, toBlock: big
   return decodeRows(logs);
 }
 
-/** Catch the index up from its tip to the chain head. Cheap; run before profiles. */
-export async function syncTradeIndexTail(client: PublicClient, cache: Cache): Promise<void> {
-  const span = cache.tradeIndexSpan();
+/**
+ * Post-graduation v4 trades. The Swap event names no trader, but the
+ * token itself moves between the trader and the pool manager in the same
+ * transaction: Transfer wallet -> poolManager is a sell, poolManager ->
+ * wallet a buy. The quote side comes from the Swap event in that
+ * transaction whose token-side magnitude matches the transferred amount.
+ */
+const PM_PADDED = `0x000000000000000000000000${ADDR.poolManager.slice(2)}` as Hex;
+
+export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] {
+  // tx -> list of |amount0|,|amount1| pairs from its swaps
+  const swapsByTx = new Map<string, { a0: bigint; a1: bigint }[]>();
+  for (const l of swapLogs) {
+    let decoded;
+    try {
+      decoded = decodeEventLog({ abi: poolManagerAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
+    } catch {
+      continue;
+    }
+    const a = decoded.args as { amount0: bigint; amount1: bigint };
+    const abs = (v: bigint) => (v < 0n ? -v : v);
+    const list = swapsByTx.get(l.transactionHash) ?? [];
+    list.push({ a0: abs(a.amount0), a1: abs(a.amount1) });
+    swapsByTx.set(l.transactionHash, list);
+  }
+  const rows: Row[] = [];
+  for (const l of transferLogs) {
+    if (l.topics.length < 3 || l.data === "0x") continue;
+    const from = ("0x" + (l.topics[1] as string).slice(26)).toLowerCase();
+    const to = ("0x" + (l.topics[2] as string).slice(26)).toLowerCase();
+    const pm = ADDR.poolManager;
+    const kind: "buy" | "sell" | null = to === pm ? "sell" : from === pm ? "buy" : null;
+    if (!kind) continue;
+    const wallet = kind === "sell" ? from : to;
+    if (INFRA.has(wallet)) continue; // liquidity moves, not trades
+    const tokens = BigInt(l.data);
+    if (tokens === 0n) continue;
+    // the swap whose token side equals the moved amount carries the quote
+    const swaps = swapsByTx.get(l.transactionHash);
+    if (!swaps) continue;
+    let eth: bigint | null = null;
+    for (const s of swaps) {
+      if (s.a0 === tokens) { eth = s.a1; break; }
+      if (s.a1 === tokens) { eth = s.a0; break; }
+    }
+    if (eth === null || eth === 0n) continue; // no matching swap: not a simple trade
+    rows.push({
+      block: l.blockNumber,
+      logIndex: l.logIndex,
+      tx: l.transactionHash,
+      curve: "",
+      wallet,
+      kind,
+      tokens,
+      eth,
+      token: l.address.toLowerCase(),
+    });
+  }
+  return rows;
+}
+
+async function fetchWindowV4(client: PublicClient, fromBlock: bigint, toBlock: bigint): Promise<Row[]> {
+  const [toPm, fromPm, swaps] = await Promise.all([
+    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, null, PM_PADDED], fromBlock, toBlock }, { parallel: 1 }),
+    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1 }),
+    getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock, toBlock }, { parallel: 1 }),
+  ]);
+  return decodeV4Rows(toPm.concat(fromPm), swaps);
+}
+
+const laneFetch = { curve: fetchWindow, v4: fetchWindowV4 } as const;
+
+/** Catch a lane up from its tip to the chain head. Cheap; run before profiles. */
+export async function syncTradeIndexTail(client: PublicClient, cache: Cache, lane: Lane = "curve"): Promise<void> {
+  const span = cache.tradeIndexSpan(lane);
   const latest = await client.getBlockNumber();
   if (!span) {
     // first contact: an empty span at the head; backfill grows it downward
-    cache.setTradeIndexSpan(latest + 1n, latest);
+    cache.setTradeIndexSpan(latest + 1n, latest, lane);
     return;
   }
+  const fetch = laneFetch[lane];
   let tip = span.tip;
   while (tip < latest) {
     // a few windows in flight: a stale tail (a server that slept) catches
@@ -109,12 +186,12 @@ export async function syncTradeIndexTail(client: PublicClient, cache: Cache): Pr
       jobs.push({ from: cursor + 1n, to });
       cursor = to;
     }
-    const parts = await Promise.all(jobs.map((j) => fetchWindow(client, j.from, j.to)));
+    const parts = await Promise.all(jobs.map((j) => fetch(client, j.from, j.to)));
     for (const rows of parts) {
       if (rows.length) cache.appendChainTrades(rows);
     }
     tip = cursor;
-    cache.setTradeIndexSpan(span.floor, tip);
+    cache.setTradeIndexSpan(span.floor, tip, lane);
   }
 }
 
@@ -133,11 +210,13 @@ export interface BackfillProgress {
 export async function backfillTradeIndex(
   client: PublicClient,
   cache: Cache,
-  opts: { budgetMs?: number; onProgress?: (p: BackfillProgress) => void } = {},
+  opts: { budgetMs?: number; onProgress?: (p: BackfillProgress) => void; lane?: Lane } = {},
 ): Promise<BackfillProgress> {
-  await syncTradeIndexTail(client, cache);
+  const lane = opts.lane ?? "curve";
+  const fetch = laneFetch[lane];
+  await syncTradeIndexTail(client, cache, lane);
   const stopAt = opts.budgetMs ? Date.now() + opts.budgetMs : Infinity;
-  let { floor, tip } = cache.tradeIndexSpan()!;
+  let { floor, tip } = cache.tradeIndexSpan(lane)!;
   let window = WINDOW;
   let emptyStreak = 0;
   let total = 0;
@@ -152,7 +231,7 @@ export async function backfillTradeIndex(
     }
     let parts: Row[][];
     try {
-      parts = await Promise.all(jobs.map((j) => fetchWindow(client, j.from, j.to)));
+      parts = await Promise.all(jobs.map((j) => fetch(client, j.from, j.to)));
     } catch (err) {
       // a 403 ban or node hiccup: cool off and try the same batch again
       // instead of dying with hours of progress left on the table
@@ -167,7 +246,7 @@ export async function backfillTradeIndex(
     }
     total += batchRows;
     floor = cursor;
-    cache.setTradeIndexSpan(floor, tip);
+    cache.setTradeIndexSpan(floor, tip, lane);
     if (BATCH_DELAY_MS > 0) await sleep(BATCH_DELAY_MS);
     if (batchRows === 0) {
       emptyStreak++;
@@ -181,9 +260,9 @@ export async function backfillTradeIndex(
   return { floor, tip, rows: total, done: floor === 0n };
 }
 
-/** How many days of history the index currently holds, tip to floor. */
-export function tradeIndexDepthDays(cache: Cache): number | null {
-  const span = cache.tradeIndexSpan();
+/** How many days of history a lane currently holds, tip to floor. */
+export function tradeIndexDepthDays(cache: Cache, lane: Lane = "curve"): number | null {
+  const span = cache.tradeIndexSpan(lane);
   if (!span || span.tip <= span.floor) return null;
   return Number(span.tip - span.floor) / Number(CHAIN.blocksPerDay);
 }

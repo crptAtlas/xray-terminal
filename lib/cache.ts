@@ -75,6 +75,13 @@ export class Cache {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
     this.db.exec(SCHEMA);
+    // v4 trades know their token directly (no curve involved); the column
+    // arrived after the table, so add it in place on older databases
+    try {
+      this.db.exec("ALTER TABLE chain_trades ADD COLUMN token TEXT");
+    } catch {
+      /* already there */
+    }
   }
 
   close(): void {
@@ -169,6 +176,20 @@ export class Cache {
     return rows.map((r) => ({ ...r, block: BigInt(r.block) }));
   }
 
+  /** Which of these token addresses are Pons launches. Pair tokens (NVDA,
+   * SPCX, ...) move through the same pools but are not launches; profile
+   * positions only make sense for launched tokens. */
+  launchTokens(tokens: string[]): Set<string> {
+    const out = new Set<string>();
+    for (const slice of chunks(tokens, IN_CHUNK)) {
+      const q = this.db.prepare(`SELECT token FROM launches WHERE token IN (${slice.map(() => "?").join(",")})`);
+      for (const row of q.all(...slice.map((t) => t.toLowerCase())) as { token: string }[]) {
+        out.add(row.token);
+      }
+    }
+    return out;
+  }
+
   curveTokens(curves: string[]): Map<string, string> {
     const out = new Map<string, string>();
     if (curves.length === 0) return out;
@@ -199,45 +220,49 @@ export class Cache {
     tx();
   }
 
-  /** Indexed span of the chain-wide trade index: [floor, tip], both inclusive. */
-  tradeIndexSpan(): { floor: bigint; tip: bigint } | null {
+  /** Indexed span of a chain-wide trade lane: [floor, tip], both inclusive.
+   * The "curve" lane holds curve trades, the "v4" lane post-graduation
+   * pool trades; each backfills at its own pace. */
+  tradeIndexSpan(lane: "curve" | "v4" = "curve"): { floor: bigint; tip: bigint } | null {
+    const prefix = lane === "curve" ? "trades" : "trades_v4";
     const g = (k: string) => (this.db.prepare("SELECT value FROM meta WHERE key = ?").get(k) as { value: string } | undefined)?.value;
-    const floor = g("trades_floor");
-    const tip = g("trades_tip");
+    const floor = g(`${prefix}_floor`);
+    const tip = g(`${prefix}_tip`);
     return floor && tip ? { floor: BigInt(floor), tip: BigInt(tip) } : null;
   }
 
-  setTradeIndexSpan(floor: bigint, tip: bigint): void {
+  setTradeIndexSpan(floor: bigint, tip: bigint, lane: "curve" | "v4" = "curve"): void {
+    const prefix = lane === "curve" ? "trades" : "trades_v4";
     const put = this.db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
     const tx = this.db.transaction(() => {
-      put.run("trades_floor", floor.toString());
-      put.run("trades_tip", tip.toString());
+      put.run(`${prefix}_floor`, floor.toString());
+      put.run(`${prefix}_tip`, tip.toString());
     });
     tx();
   }
 
-  appendChainTrades(rows: { block: bigint; logIndex: number; tx: string; curve: string; wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint }[]): void {
+  appendChainTrades(rows: { block: bigint; logIndex: number; tx: string; curve: string; wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; token?: string }[]): void {
     const ins = this.db.prepare(
-      "INSERT OR IGNORE INTO chain_trades (block, log_index, tx, curve, wallet, kind, tokens, eth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO chain_trades (block, log_index, tx, curve, wallet, kind, tokens, eth, token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     );
     const tx = this.db.transaction(() => {
       for (const r of rows) {
-        ins.run(Number(r.block), r.logIndex, r.tx, r.curve, r.wallet, r.kind, r.tokens.toString(), r.eth.toString());
+        ins.run(Number(r.block), r.logIndex, r.tx, r.curve, r.wallet, r.kind, r.tokens.toString(), r.eth.toString(), r.token ?? null);
       }
     });
     tx();
   }
 
-  chainTradesFor(wallets: string[]): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]> {
-    const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]>();
+  chainTradesFor(wallets: string[]): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]> {
+    const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]>();
     if (wallets.length === 0) return out;
     for (const slice of chunks(wallets, IN_CHUNK)) {
       const q = this.db.prepare(
-        `SELECT wallet, curve, kind, tokens, eth, block, tx FROM chain_trades WHERE wallet IN (${slice.map(() => "?").join(",")}) ORDER BY block, log_index`,
+        `SELECT wallet, curve, kind, tokens, eth, block, tx, token FROM chain_trades WHERE wallet IN (${slice.map(() => "?").join(",")}) ORDER BY block, log_index`,
       );
-      for (const row of q.all(...slice.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]) {
+      for (const row of q.all(...slice.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string; token: string | null }[]) {
         const list = out.get(row.wallet) ?? [];
-        list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx });
+        list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx, token: row.token ?? undefined });
         out.set(row.wallet, list);
       }
     }

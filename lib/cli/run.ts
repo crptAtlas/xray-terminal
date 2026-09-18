@@ -138,22 +138,35 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   const t0 = Date.now();
   console.error("syncing the launch index (curve -> token map)...");
   await syncLaunches(client, cache);
-  console.error("building the chain-wide trade index (resumable; ctrl-c any time)...");
-  const res = await backfillTradeIndex(client, cache, {
-    onProgress: (p) => {
-      const days = tradeIndexDepthDays(cache);
+  console.error("building the chain-wide trade index (two lanes: curve + v4; resumable; ctrl-c any time)...");
+  // alternate lanes in one-minute slices so both histories deepen together;
+  // the freshest blocks land first in each lane
+  let curveDone = false;
+  let v4Done = false;
+  let rows = 0;
+  while (!curveDone || !v4Done) {
+    for (const lane of ["v4", "curve"] as const) {
+      if (lane === "curve" && curveDone) continue;
+      if (lane === "v4" && v4Done) continue;
+      const res = await backfillTradeIndex(client, cache, {
+        lane,
+        budgetMs: 60_000,
+        onProgress: (p) => {
+          rows += 0; // progress printed below per slice
+        },
+      });
+      rows += res.rows;
+      if (lane === "curve") curveDone = res.done;
+      else v4Done = res.done;
+      const dc = tradeIndexDepthDays(cache, "curve");
+      const dv = tradeIndexDepthDays(cache, "v4");
       process.stderr.write(
-        `\r  floor block ${p.floor}   depth ${days === null ? "?" : days.toFixed(1)} days   rows +${p.rows}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `,
+        `\r  curve ${dc === null ? "?" : dc.toFixed(1)}d${curveDone ? " done" : ""}   v4 ${dv === null ? "?" : dv.toFixed(1)}d${v4Done ? " done" : ""}   rows +${rows}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `,
       );
-    },
-  });
+    }
+  }
   process.stderr.write("\n");
-  const days = tradeIndexDepthDays(cache);
-  console.error(
-    res.done
-      ? `index complete: full chain history (${days?.toFixed(1)} days), ${res.rows} new rows`
-      : `index paused at block ${res.floor} (${days?.toFixed(1)} days deep); run again to continue`,
-  );
+  console.error("index complete: full chain history in both lanes");
   cache.close();
 }
 

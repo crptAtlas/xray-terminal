@@ -1,0 +1,71 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { decodeV4Rows } from "../lib/read/indexer.ts";
+import { encodeAbiParameters, parseAbiParameters } from "viem";
+import { ADDR } from "../lib/chain.ts";
+import { SWAP_TOPIC } from "../lib/abi/pool.ts";
+
+const PM = `0x000000000000000000000000${ADDR.poolManager.slice(2)}`;
+const pad = (a) => `0x000000000000000000000000${a.slice(2)}`;
+const W = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const TOKEN = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const SWAP = SWAP_TOPIC;
+
+const transfer = (from, to, amount, tx = "0xt1") => ({
+  address: TOKEN,
+  topics: [TRANSFER, pad(from), pad(to)],
+  data: `0x${amount.toString(16).padStart(64, "0")}`,
+  blockNumber: 10n,
+  transactionHash: tx,
+  logIndex: 1,
+});
+const swap = (amount0, amount1, tx = "0xt1") => ({
+  address: ADDR.poolManager,
+  topics: [SWAP, "0x" + "11".repeat(32), pad("0xcccccccccccccccccccccccccccccccccccccccc")],
+  data: encodeAbiParameters(
+    parseAbiParameters("int128, int128, uint160, uint128, int24, uint24"),
+    [amount0, amount1, 1n, 1n, 0, 3000],
+  ),
+  blockNumber: 10n,
+  transactionHash: tx,
+  logIndex: 0,
+});
+
+test("v4 sell: token to poolManager, quote from the matching swap", () => {
+  const rows = decodeV4Rows([transfer(W, ADDR.poolManager, 1000n)], [swap(-5n, 1000n)]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, "sell");
+  assert.equal(rows[0].wallet, W);
+  assert.equal(rows[0].token, TOKEN);
+  assert.equal(rows[0].tokens, 1000n);
+  assert.equal(rows[0].eth, 5n);
+});
+
+test("v4 buy: token from poolManager to the wallet", () => {
+  const rows = decodeV4Rows([transfer(ADDR.poolManager, W, 777n)], [swap(777n, -42n)]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, "buy");
+  assert.equal(rows[0].eth, 42n);
+});
+
+test("liquidity moves and unmatched transfers are not trades", () => {
+  // infra wallet
+  assert.equal(decodeV4Rows([transfer(ADDR.locker, ADDR.poolManager, 5n)], [swap(-1n, 5n)]).length, 0);
+  // no swap in tx
+  assert.equal(decodeV4Rows([transfer(W, ADDR.poolManager, 5n)], []).length, 0);
+  // amounts do not match any swap side
+  assert.equal(decodeV4Rows([transfer(W, ADDR.poolManager, 5n)], [swap(-9n, 900n)]).length, 0);
+});
+
+test("multi-swap tx: each transfer finds its own swap by amount", () => {
+  const rows = decodeV4Rows(
+    [transfer(W, ADDR.poolManager, 100n, "0xm"), transfer(ADDR.poolManager, W, 200n, "0xm")],
+    [swap(-3n, 100n, "0xm"), swap(200n, -7n, "0xm")],
+  );
+  assert.equal(rows.length, 2);
+  const sell = rows.find((r) => r.kind === "sell");
+  const buy = rows.find((r) => r.kind === "buy");
+  assert.equal(sell.eth, 3n);
+  assert.equal(buy.eth, 7n);
+});

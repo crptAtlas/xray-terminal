@@ -135,7 +135,8 @@ async function profilesFromIndex(
 ): Promise<void> {
   const { syncTradeIndexTail } = await import("./indexer.ts");
   try {
-    await syncTradeIndexTail(rpc.client, cache);
+    await syncTradeIndexTail(rpc.client, cache, "curve");
+    await syncTradeIndexTail(rpc.client, cache, "v4");
   } catch (err) {
     console.warn(`trade index tail sync: ${err instanceof Error ? err.message : err}`);
   }
@@ -143,14 +144,23 @@ async function profilesFromIndex(
   const lower = misses.map((w) => w.toLowerCase());
   const rowsByWallet = cache.chainTradesFor(lower);
   const curves = new Set<string>();
-  for (const rows of rowsByWallet.values()) for (const r of rows) curves.add(r.curve);
+  const directTokens = new Set<string>();
+  for (const rows of rowsByWallet.values()) {
+    for (const r of rows) {
+      if (r.token) directTokens.add(r.token);
+      else if (r.curve) curves.add(r.curve);
+    }
+  }
   const tokenOf = await curveResolver(rpc, cache)([...curves]);
+  // v4 rows name their token directly, but pair tokens (NVDA, SPCX, ...)
+  // ride the same pools; only launched tokens count as positions
+  const launched = cache.launchTokens([...directTokens]);
   const ethWei = await rpc.ethBalances(lower).catch(() => new Map<string, bigint>());
   for (const w of misses) {
     const lw = w.toLowerCase();
     const byToken = new Map<string, { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]>();
     for (const r of rowsByWallet.get(lw) ?? []) {
-      const token = tokenOf.get(r.curve);
+      const token = r.token ? (launched.has(r.token) ? r.token : undefined) : tokenOf.get(r.curve);
       if (!token) continue;
       const list = byToken.get(token) ?? [];
       list.push({ wallet: lw, kind: r.kind, tokens: r.tokens, eth: r.eth, block: r.block, tx: r.tx });
