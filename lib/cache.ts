@@ -17,6 +17,16 @@ import type { Trade, TransferIn } from "./pnl/classify.ts";
 
 export const PROFILE_TTL_MS = 24 * 60 * 60 * 1000;
 
+// SQLite caps bound variables (999 on older builds); IN () lists go in
+// slices of this size everywhere.
+const IN_CHUNK = 500;
+
+function chunks<T>(xs: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < xs.length; i += size) out.push(xs.slice(i, i + size));
+  return out;
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tokens (
@@ -162,15 +172,19 @@ export class Cache {
   curveTokens(curves: string[]): Map<string, string> {
     const out = new Map<string, string>();
     if (curves.length === 0) return out;
-    const q = this.db.prepare(`SELECT curve, token FROM curve_tokens WHERE curve IN (${curves.map(() => "?").join(",")})`);
-    for (const row of q.all(...curves.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
-      out.set(row.curve, row.token);
+    // SQLite caps bound variables; a thousand wallets' history can name
+    // tens of thousands of curves, so every IN () goes in chunks
+    for (const slice of chunks(curves, IN_CHUNK)) {
+      const q = this.db.prepare(`SELECT curve, token FROM curve_tokens WHERE curve IN (${slice.map(() => "?").join(",")})`);
+      for (const row of q.all(...slice.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
+        out.set(row.curve, row.token);
+      }
     }
     // the launch index knows most curves already
     const missing = curves.filter((c) => !out.has(c.toLowerCase()));
-    if (missing.length) {
-      const q2 = this.db.prepare(`SELECT curve, token FROM launches WHERE curve IN (${missing.map(() => "?").join(",")})`);
-      for (const row of q2.all(...missing.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
+    for (const slice of chunks(missing, IN_CHUNK)) {
+      const q2 = this.db.prepare(`SELECT curve, token FROM launches WHERE curve IN (${slice.map(() => "?").join(",")})`);
+      for (const row of q2.all(...slice.map((c) => c.toLowerCase())) as { curve: string; token: string }[]) {
         out.set(row.curve, row.token);
       }
     }
@@ -217,13 +231,15 @@ export class Cache {
   chainTradesFor(wallets: string[]): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]> {
     const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]>();
     if (wallets.length === 0) return out;
-    const q = this.db.prepare(
-      `SELECT wallet, curve, kind, tokens, eth, block, tx FROM chain_trades WHERE wallet IN (${wallets.map(() => "?").join(",")}) ORDER BY block, log_index`,
-    );
-    for (const row of q.all(...wallets.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]) {
-      const list = out.get(row.wallet) ?? [];
-      list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx });
-      out.set(row.wallet, list);
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const q = this.db.prepare(
+        `SELECT wallet, curve, kind, tokens, eth, block, tx FROM chain_trades WHERE wallet IN (${slice.map(() => "?").join(",")}) ORDER BY block, log_index`,
+      );
+      for (const row of q.all(...slice.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]) {
+        const list = out.get(row.wallet) ?? [];
+        list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx });
+        out.set(row.wallet, list);
+      }
     }
     return out;
   }

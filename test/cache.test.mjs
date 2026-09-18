@@ -82,3 +82,19 @@ test("chain trade index: span, rows, per-wallet select", () => {
   assert.equal(got.has("0xmissing"), false);
   c.close();
 });
+
+test("IN () queries survive thousands of keys (SQLite variable cap)", () => {
+  const c = new Cache(":memory:");
+  c.setTradeIndexSpan(1n, 10n);
+  const rows = [];
+  for (let i = 0; i < 1500; i++) {
+    rows.push({ block: 5n, logIndex: i, tx: "0x" + i, curve: "0xc" + i, wallet: "0xw" + (i % 1200), kind: "buy", tokens: 1n, eth: 1n });
+  }
+  c.appendChainTrades(rows);
+  const wallets = Array.from({ length: 1200 }, (_, i) => "0xw" + i);
+  const got = c.chainTradesFor(wallets);
+  assert.equal([...got.values()].reduce((s, l) => s + l.length, 0), 1500);
+  const curves = Array.from({ length: 1500 }, (_, i) => "0xc" + i);
+  assert.equal(c.curveTokens(curves).size, 0); // no mapping saved; must not throw
+  c.close();
+});
