@@ -138,16 +138,20 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   const t0 = Date.now();
   console.error("syncing the launch index (curve -> token map)...");
   await syncLaunches(client, cache);
-  console.error("building the chain-wide trade index (two lanes: curve + v4; resumable; ctrl-c any time)...");
+  // XRAY_INDEX_LANES splits the work across machines: one digs curve,
+  // another digs v4 from a different IP, rows merge by primary key
+  const lanes = (process.env.XRAY_INDEX_LANES ?? "v4,curve")
+    .split(",")
+    .map((l) => l.trim())
+    .filter((l): l is "curve" | "v4" => l === "curve" || l === "v4");
+  console.error(`building the chain-wide trade index (lanes: ${lanes.join(" + ")}; resumable; ctrl-c any time)...`);
   // alternate lanes in one-minute slices so both histories deepen together;
   // the freshest blocks land first in each lane
-  let curveDone = false;
-  let v4Done = false;
+  const done: Record<string, boolean> = { curve: !lanes.includes("curve"), v4: !lanes.includes("v4") };
   let rows = 0;
-  while (!curveDone || !v4Done) {
-    for (const lane of ["v4", "curve"] as const) {
-      if (lane === "curve" && curveDone) continue;
-      if (lane === "v4" && v4Done) continue;
+  while (!done.curve || !done.v4) {
+    for (const lane of lanes) {
+      if (done[lane]) continue;
       const res = await backfillTradeIndex(client, cache, {
         lane,
         budgetMs: 60_000,
@@ -156,17 +160,16 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
         },
       });
       rows += res.rows;
-      if (lane === "curve") curveDone = res.done;
-      else v4Done = res.done;
+      done[lane] = res.done;
       const dc = tradeIndexDepthDays(cache, "curve");
       const dv = tradeIndexDepthDays(cache, "v4");
       process.stderr.write(
-        `\r  curve ${dc === null ? "?" : dc.toFixed(1)}d${curveDone ? " done" : ""}   v4 ${dv === null ? "?" : dv.toFixed(1)}d${v4Done ? " done" : ""}   rows +${rows}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `,
+        `\r  curve ${dc === null ? "?" : dc.toFixed(1)}d${done.curve ? " done" : ""}   v4 ${dv === null ? "?" : dv.toFixed(1)}d${done.v4 ? " done" : ""}   rows +${rows}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `,
       );
     }
   }
   process.stderr.write("\n");
-  console.error("index complete: full chain history in both lanes");
+  console.error("index lanes complete");
   // follow mode: the backfill is done for good, so this process becomes
   // the chain follower - every new block lands in the index within
   // seconds and scans never pay a catch-up cost

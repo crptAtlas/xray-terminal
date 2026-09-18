@@ -253,12 +253,14 @@ export async function backfillTradeIndex(
     floor = cursor;
     cache.setTradeIndexSpan(floor, tip, lane);
     if (BATCH_DELAY_MS > 0) await sleep(BATCH_DELAY_MS);
-    if (batchRows === 0) {
+    if (batchRows < 5000) {
       emptyStreak++;
       if (emptyStreak >= 2 && window < WINDOW_MAX) window *= 2n;
-    } else {
+    } else if (batchRows > 20000) {
       emptyStreak = 0;
       window = laneWindow[lane];
+    } else {
+      emptyStreak = 0;
     }
     opts.onProgress?.({ floor, tip, rows: total, done: floor === 0n });
   }
