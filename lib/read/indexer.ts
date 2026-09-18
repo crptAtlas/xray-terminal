@@ -21,6 +21,9 @@ import type { Cache } from "../cache.ts";
  */
 
 const WINDOW = 40_000n; // ~1.1 h of chain per request
+// v4 logs are ~60x denser than curve events (every pool transfer plus
+// every swap), so that lane walks in much smaller windows
+const WINDOW_V4 = 3_000n;
 const WINDOW_MAX = 640_000n; // empty pre-launchpad desert: grow up to this
 // Politeness matters: the official node temporarily 403-bans IPs that pull
 // too hard. Two windows in flight plus a breath between batches finishes
@@ -164,6 +167,7 @@ async function fetchWindowV4(client: PublicClient, fromBlock: bigint, toBlock: b
 }
 
 const laneFetch = { curve: fetchWindow, v4: fetchWindowV4 } as const;
+const laneWindow = { curve: WINDOW, v4: WINDOW_V4 } as const;
 
 /** Catch a lane up from its tip to the chain head. Cheap; run before profiles. */
 export async function syncTradeIndexTail(client: PublicClient, cache: Cache, lane: Lane = "curve"): Promise<void> {
@@ -175,6 +179,7 @@ export async function syncTradeIndexTail(client: PublicClient, cache: Cache, lan
     return;
   }
   const fetch = laneFetch[lane];
+  const win = laneWindow[lane];
   let tip = span.tip;
   while (tip < latest) {
     // a few windows in flight: a stale tail (a server that slept) catches
@@ -182,7 +187,7 @@ export async function syncTradeIndexTail(client: PublicClient, cache: Cache, lan
     const jobs: { from: bigint; to: bigint }[] = [];
     let cursor = tip;
     for (let i = 0; i < PARALLEL && cursor < latest; i++) {
-      const to = cursor + WINDOW > latest ? latest : cursor + WINDOW;
+      const to = cursor + win > latest ? latest : cursor + win;
       jobs.push({ from: cursor + 1n, to });
       cursor = to;
     }
@@ -217,7 +222,7 @@ export async function backfillTradeIndex(
   await syncTradeIndexTail(client, cache, lane);
   const stopAt = opts.budgetMs ? Date.now() + opts.budgetMs : Infinity;
   let { floor, tip } = cache.tradeIndexSpan(lane)!;
-  let window = WINDOW;
+  let window = laneWindow[lane];
   let emptyStreak = 0;
   let total = 0;
   while (floor > 0n && Date.now() < stopAt) {
@@ -253,7 +258,7 @@ export async function backfillTradeIndex(
       if (emptyStreak >= 2 && window < WINDOW_MAX) window *= 2n;
     } else {
       emptyStreak = 0;
-      window = WINDOW;
+      window = laneWindow[lane];
     }
     opts.onProgress?.({ floor, tip, rows: total, done: floor === 0n });
   }
