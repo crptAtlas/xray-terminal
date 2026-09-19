@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS chain_trades (
   tokens TEXT NOT NULL, eth TEXT NOT NULL,
   PRIMARY KEY (block, log_index)
 );
-CREATE INDEX IF NOT EXISTS idx_ct_wallet ON chain_trades(wallet);
+CREATE INDEX IF NOT EXISTS idx_ct_wallet_block ON chain_trades(wallet, block, log_index);
 `;
 
 export function defaultCachePath(): string {
@@ -74,6 +74,9 @@ export class Cache {
     this.db = new Database(path ?? defaultCachePath());
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 60000");
+    // the trade index is tens of GB of rows; mmap turns per-wallet reads
+    // into page-cache hits instead of syscall churn
+    this.db.pragma("mmap_size = 8589934592");
     this.db.exec(SCHEMA);
     // v4 trades know their token directly (no curve involved); the column
     // arrived after the table, so add it in place on older databases
