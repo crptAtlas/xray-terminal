@@ -198,6 +198,25 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   }
 }
 
+export async function runFollow(_opts: CliOpts): Promise<void> {
+  const { makeClient } = await import("../providers/rpc.ts");
+  const { Cache } = await import("../cache.ts");
+  const { syncTradeIndexTail } = await import("../read/indexer.ts");
+  const client = makeClient();
+  const cache = new Cache();
+  console.error("following the chain head (tail sync every 30s; ctrl-c to stop)...");
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  for (;;) {
+    try {
+      await syncTradeIndexTail(client, cache, "curve");
+      await syncTradeIndexTail(client, cache, "v4");
+    } catch (err) {
+      console.error(`tail sync: ${err instanceof Error ? err.message.slice(0, 80) : err}`);
+    }
+    await sleep(30_000);
+  }
+}
+
 export async function runDoctor(_opts: CliOpts): Promise<void> {
   const { doctor } = await import("../doctor.ts");
   const { ok } = await doctor();

@@ -41,6 +41,14 @@ program
   });
 
 program
+  .command("follow")
+  .description("follow the chain head: light tail sync of both index lanes, forever")
+  .action(async () => {
+    const { runFollow } = await import("../lib/cli/run.ts");
+    await runFollow(program.opts());
+  });
+
+program
   .command("doctor")
   .description("verify data source, addresses, topics and limits against the live chain")
   .action(async () => {
