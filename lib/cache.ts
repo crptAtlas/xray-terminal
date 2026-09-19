@@ -73,7 +73,7 @@ export class Cache {
   constructor(path?: string) {
     this.db = new Database(path ?? defaultCachePath());
     this.db.pragma("journal_mode = WAL");
-    this.db.pragma("busy_timeout = 5000");
+    this.db.pragma("busy_timeout = 60000");
     this.db.exec(SCHEMA);
     // v4 trades know their token directly (no curve involved); the column
     // arrived after the table, so add it in place on older databases
