@@ -24,7 +24,13 @@ interface CachedWallet {
   floorV4: string;
   // chain tip at capture: a wallet that traded past it gets recomputed
   tip?: string;
+  // capture time: very fresh profiles are accepted as-is even if the
+  // wallet traded again - hot bots trade every minute and rebuilding
+  // a thousand of them on every scan costs minutes
+  at?: number;
 }
+
+const FRESH_ENOUGH_MS = 10 * 60 * 1000;
 
 function currentFloor(cache: Cache, lane: "curve" | "v4" = "curve"): bigint {
   return cache.tradeIndexSpan(lane)?.floor ?? 0n;
@@ -124,12 +130,14 @@ export async function walletProfilesBatch(
   // cached in one scan share a tip, so this is one or two queries)
   if (hits.size) {
     const byTip = new Map<string, string[]>();
+    const now = Date.now();
     for (const [w, c] of hits) {
       if (c.tip === undefined) {
         misses.push(w); // pre-tip format: rebuild once
         hits.delete(w);
         continue;
       }
+      if (c.at !== undefined && now - c.at < FRESH_ENOUGH_MS) continue; // fresh enough as-is
       const list = byTip.get(c.tip) ?? [];
       list.push(w);
       byTip.set(c.tip, list);
@@ -208,6 +216,7 @@ async function profilesFromIndex(
         floor: floorNow.toString(),
         floorV4: floorV4Now.toString(),
         tip: (cache.tradeIndexSpan("curve")?.tip ?? 0n).toString(),
+        at: Date.now(),
       } satisfies CachedWallet),
     );
     out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));

@@ -275,15 +275,29 @@ export class Cache {
   chainTradesFor(wallets: string[]): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]> {
     const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]>();
     if (wallets.length === 0) return out;
-    for (const slice of chunks(wallets, IN_CHUNK)) {
-      const q = this.db.prepare(
-        `SELECT wallet, curve, kind, tokens, eth, block, tx, token FROM chain_trades WHERE wallet IN (${slice.map(() => "?").join(",")}) ORDER BY block, log_index`,
+    // per-wallet indexed scan with a row cap: hyper-active bots carry
+    // 100k+ trades and reading all of them costs minutes per scan; the
+    // most recent 20k tell the same story about how they trade
+    const q = this.db.prepare(
+      "SELECT curve, kind, tokens, eth, block, tx, token FROM chain_trades WHERE wallet = ? ORDER BY block DESC, log_index DESC LIMIT 20000",
+    );
+    for (const w of wallets) {
+      const lw = w.toLowerCase();
+      const rows = q.all(lw) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string; token: string | null }[];
+      if (rows.length === 0) continue;
+      rows.reverse(); // back to ascending block order
+      out.set(
+        lw,
+        rows.map((row) => ({
+          curve: row.curve,
+          kind: row.kind,
+          tokens: BigInt(row.tokens),
+          eth: BigInt(row.eth),
+          block: BigInt(row.block),
+          tx: row.tx,
+          token: row.token ?? undefined,
+        })),
       );
-      for (const row of q.all(...slice.map((w) => w.toLowerCase())) as { wallet: string; curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string; token: string | null }[]) {
-        const list = out.get(row.wallet) ?? [];
-        list.push({ curve: row.curve, kind: row.kind, tokens: BigInt(row.tokens), eth: BigInt(row.eth), block: BigInt(row.block), tx: row.tx, token: row.token ?? undefined });
-        out.set(row.wallet, list);
-      }
     }
     return out;
   }
