@@ -12,8 +12,17 @@ export function GET(req: NextRequest): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: string, data: unknown) =>
-        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      // a viewer that disconnects mid-scan must never poison the shared
+      // run for everyone else: writes to a closed controller are no-ops
+      let open = true;
+      const send = (event: string, data: unknown) => {
+        if (!open) return;
+        try {
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          open = false;
+        }
+      };
       try {
         if (!q) {
           send("error", { kind: "nodata", message: "empty query" });
@@ -47,7 +56,12 @@ export function GET(req: NextRequest): Response {
           message: msg,
         });
       } finally {
-        controller.close();
+        open = false;
+        try {
+          controller.close();
+        } catch {
+          /* already closed by the disconnect */
+        }
       }
     },
   });
