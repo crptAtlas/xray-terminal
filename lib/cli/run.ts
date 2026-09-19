@@ -137,7 +137,15 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   const cache = new Cache();
   const t0 = Date.now();
   console.error("syncing the launch index (curve -> token map)...");
-  await syncLaunches(client, cache);
+  for (;;) {
+    try {
+      await syncLaunches(client, cache);
+      break;
+    } catch (err) {
+      console.error(`launch sync: ${err instanceof Error ? err.message.slice(0, 80) : err}; cooling off 90s`);
+      await new Promise((r) => setTimeout(r, 90_000));
+    }
+  }
   // XRAY_INDEX_LANES splits the work across machines: one digs curve,
   // another digs v4 from a different IP, rows merge by primary key
   const lanes = (process.env.XRAY_INDEX_LANES ?? "v4,curve")
