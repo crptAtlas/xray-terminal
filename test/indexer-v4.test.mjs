@@ -69,3 +69,16 @@ test("multi-swap tx: each transfer finds its own swap by amount", () => {
   assert.equal(sell.eth, 3n);
   assert.equal(buy.eth, 7n);
 });
+
+test("buy with a hook fee leg: swap total = wallet leg + fee leg, wallet gets its share", () => {
+  // swap pays out 1000 tokens: 970 to the wallet, 30 to the hook as fee
+  const rows = decodeV4Rows(
+    [transfer(ADDR.poolManager, W, 970n, "0xf"), transfer(ADDR.poolManager, ADDR.hook, 30n, "0xf")],
+    [swap(-2000n, 1000n, "0xf")],
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, "buy");
+  assert.equal(rows[0].wallet, W);
+  assert.equal(rows[0].tokens, 970n);
+  assert.equal(rows[0].eth, 1940n); // 2000 * 970 / 1000
+});

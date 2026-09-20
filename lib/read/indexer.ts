@@ -106,8 +106,9 @@ async function fetchWindow(client: PublicClient, fromBlock: bigint, toBlock: big
 const PM_PADDED = `0x000000000000000000000000${ADDR.poolManager.slice(2)}` as Hex;
 
 export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] {
-  // tx -> list of |amount0|,|amount1| pairs from its swaps
-  const swapsByTx = new Map<string, { a0: bigint; a1: bigint }[]>();
+  // tx -> list of swaps with both magnitudes; matched to transfers of the
+  // same tx by the token-side magnitude, tolerating the hook's fee cut
+  const swapsByTx = new Map<string, { a0: bigint; a1: bigint; logIndex: number }[]>();
   for (const l of swapLogs) {
     let decoded;
     try {
@@ -118,41 +119,86 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
     const a = decoded.args as { amount0: bigint; amount1: bigint };
     const abs = (v: bigint) => (v < 0n ? -v : v);
     const list = swapsByTx.get(l.transactionHash) ?? [];
-    list.push({ a0: abs(a.amount0), a1: abs(a.amount1) });
+    list.push({ a0: abs(a.amount0), a1: abs(a.amount1), logIndex: l.logIndex });
     swapsByTx.set(l.transactionHash, list);
   }
-  const rows: Row[] = [];
+  // per tx, group the pool transfers: a buy is one swap paying out one
+  // wallet transfer plus (often) a fee transfer to the hook; the swap's
+  // token side is the SUM of those legs, so match on the total and hand
+  // the wallet its share of the quote
+  const pm = ADDR.poolManager;
+  const byTx = new Map<string, RawLog[]>();
   for (const l of transferLogs) {
     if (l.topics.length < 3 || l.data === "0x") continue;
-    const from = ("0x" + (l.topics[1] as string).slice(26)).toLowerCase();
-    const to = ("0x" + (l.topics[2] as string).slice(26)).toLowerCase();
-    const pm = ADDR.poolManager;
-    const kind: "buy" | "sell" | null = to === pm ? "sell" : from === pm ? "buy" : null;
-    if (!kind) continue;
-    const wallet = kind === "sell" ? from : to;
-    if (INFRA.has(wallet)) continue; // liquidity moves, not trades
-    const tokens = BigInt(l.data);
-    if (tokens === 0n) continue;
-    // the swap whose token side equals the moved amount carries the quote
-    const swaps = swapsByTx.get(l.transactionHash);
-    if (!swaps) continue;
-    let eth: bigint | null = null;
-    for (const s of swaps) {
-      if (s.a0 === tokens) { eth = s.a1; break; }
-      if (s.a1 === tokens) { eth = s.a0; break; }
+    const list = byTx.get(l.transactionHash) ?? [];
+    list.push(l);
+    byTx.set(l.transactionHash, list);
+  }
+  const rows: Row[] = [];
+  for (const [tx, transfers] of byTx) {
+    const swaps = swapsByTx.get(tx);
+    if (!swaps || swaps.length === 0) continue;
+    // legs by token and direction
+    type Leg = { log: RawLog; wallet: string; tokens: bigint; kind: "buy" | "sell"; infra: boolean };
+    const legs: Leg[] = [];
+    for (const l of transfers) {
+      const from = ("0x" + (l.topics[1] as string).slice(26)).toLowerCase();
+      const to = ("0x" + (l.topics[2] as string).slice(26)).toLowerCase();
+      const kind: "buy" | "sell" | null = to === pm ? "sell" : from === pm ? "buy" : null;
+      if (!kind) continue;
+      const wallet = kind === "sell" ? from : to;
+      const tokens = BigInt(l.data);
+      if (tokens === 0n) continue;
+      legs.push({ log: l, wallet, tokens, kind, infra: INFRA.has(wallet) });
     }
-    if (eth === null || eth === 0n) continue; // no matching swap: not a simple trade
-    rows.push({
-      block: l.blockNumber,
-      logIndex: l.logIndex,
-      tx: l.transactionHash,
-      curve: "",
-      wallet,
-      kind,
-      tokens,
-      eth,
-      token: l.address.toLowerCase(),
-    });
+    if (legs.length === 0) continue;
+    const groups = new Map<string, Leg[]>();
+    for (const leg of legs) {
+      const key = `${leg.log.address.toLowerCase()}|${leg.kind}`;
+      const g = groups.get(key) ?? [];
+      g.push(leg);
+      groups.set(key, g);
+    }
+    const used = new Set<number>();
+    for (const [key, g] of groups) {
+      const token = key.split("|")[0]!;
+      const total = g.reduce((s, x) => s + x.tokens, 0n);
+      // exact-sum match first (fee legs included), then a single-leg match
+      let quote: bigint | null = null;
+      let pick = -1;
+      for (let i = 0; i < swaps.length; i++) {
+        if (used.has(i)) continue;
+        const s = swaps[i]!;
+        if (s.a0 === total) { quote = s.a1; pick = i; break; }
+        if (s.a1 === total) { quote = s.a0; pick = i; break; }
+      }
+      if (quote === null) {
+        for (const leg of g) {
+          for (let i = 0; i < swaps.length; i++) {
+            if (used.has(i)) continue;
+            const s = swaps[i]!;
+            if (s.a0 === leg.tokens || s.a1 === leg.tokens) {
+              const q = s.a0 === leg.tokens ? s.a1 : s.a0;
+              if (q === 0n || leg.infra) break;
+              used.add(i);
+              rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: q, token });
+              break;
+            }
+          }
+        }
+        continue;
+      }
+      used.add(pick);
+      if (quote === 0n) continue;
+      // the wallet legs share the quote pro rata; fee legs to infra are
+      // the protocol's cut, not a trade
+      for (const leg of g) {
+        if (leg.infra) continue;
+        const eth = (quote * leg.tokens) / total;
+        if (eth === 0n) continue;
+        rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth, token });
+      }
+    }
   }
   return rows;
 }
