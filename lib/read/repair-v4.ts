@@ -1,7 +1,7 @@
 import type { PublicClient } from "viem";
 import { ADDR, TOPIC, type Hex } from "../chain.ts";
 import { SWAP_TOPIC } from "../abi/pool.ts";
-import { getLogsAdaptive, type RawLog } from "../providers/logs.ts";
+import { getLogsAdaptive } from "../providers/logs.ts";
 import { decodeV4Rows } from "./indexer.ts";
 import type { Cache } from "../cache.ts";
 
@@ -18,30 +18,19 @@ const PM_PADDED = `0x000000000000000000000000${ADDR.poolManager.slice(2)}` as He
 const HOOK_PADDED = `0x000000000000000000000000${ADDR.hook.slice(2)}` as Hex;
 
 export async function repairWindow(client: PublicClient, cache: Cache, fromBlock: bigint, toBlock: bigint): Promise<number> {
+  // fee legs are the cheap key: every dropped buy carried one
   const fees = await getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED, HOOK_PADDED], fromBlock, toBlock }, { parallel: 1 });
   if (fees.length === 0) return 0;
   const txs = new Set(fees.map((l) => l.transactionHash));
-  // a dropped buy is poolManager -> wallet with a fee leg beside it, so
-  // only the pm -> * transfers and the swaps matter; the fee blocks are
-  // a small subset of the window, so both queries run over exactly the
-  // block spans that carry fees (merged into runs to keep requests few)
-  const blocks = [...new Set(fees.map((l) => l.blockNumber))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const runs: { a: bigint; b: bigint }[] = [];
-  for (const bn of blocks) {
-    const last = runs[runs.length - 1];
-    if (last && bn - last.b <= 50n) last.b = bn;
-    else runs.push({ a: bn, b: bn });
-  }
-  const fromPm: RawLog[] = [];
-  const swaps: RawLog[] = [];
-  for (const r of runs) {
-    const [f, s] = await Promise.all([
-      getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock: r.a, toBlock: r.b }, { parallel: 1 }),
-      getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock: r.a, toBlock: r.b }, { parallel: 1 }),
-    ]);
-    fromPm.push(...f);
-    swaps.push(...s);
-  }
+  const tokens = [...new Set(fees.map((l) => l.address.toLowerCase()))];
+  // transfers only of the fee-bearing tokens (address-filtered: half the
+  // cost of a sweep). Swaps stay a full sweep: stock-paired launches route
+  // through a second pool in the same tx, so a pool-id filter derived
+  // from the token alone would drop ~17% of the quotes.
+  const [fromPm, swaps] = await Promise.all([
+    getLogsAdaptive(client, { address: tokens as Hex[], topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1 }),
+    getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock, toBlock }, { parallel: 1 }),
+  ]);
   const transfers = fromPm.filter((l) => txs.has(l.transactionHash));
   const sw = swaps.filter((l) => txs.has(l.transactionHash));
   const rows = decodeV4Rows(transfers, sw);

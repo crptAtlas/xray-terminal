@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS chain_trades (
   PRIMARY KEY (block, log_index)
 );
 CREATE INDEX IF NOT EXISTS idx_ct_wallet_block ON chain_trades(wallet, block, log_index);
+CREATE TABLE IF NOT EXISTS pool_ids (token TEXT PRIMARY KEY, pool_id TEXT NOT NULL);
 `;
 
 export function defaultCachePath(): string {
@@ -236,6 +237,23 @@ export class Cache {
     const ins = this.db.prepare("INSERT OR IGNORE INTO curve_tokens (curve, token) VALUES (?, ?)");
     const tx = this.db.transaction(() => {
       for (const [curve, token] of map) ins.run(curve.toLowerCase(), token.toLowerCase());
+    });
+    tx();
+  }
+
+  poolIds(tokens: string[]): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const slice of chunks(tokens, IN_CHUNK)) {
+      const q = this.db.prepare(`SELECT token, pool_id FROM pool_ids WHERE token IN (${slice.map(() => "?").join(",")})`);
+      for (const r of q.all(...slice.map((t) => t.toLowerCase())) as { token: string; pool_id: string }[]) out.set(r.token, r.pool_id);
+    }
+    return out;
+  }
+
+  savePoolIds(map: Map<string, string>): void {
+    const ins = this.db.prepare("INSERT OR IGNORE INTO pool_ids (token, pool_id) VALUES (?, ?)");
+    const tx = this.db.transaction(() => {
+      for (const [t, p] of map) ins.run(t.toLowerCase(), p.toLowerCase());
     });
     tx();
   }
