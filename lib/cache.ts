@@ -77,6 +77,7 @@ export class Cache {
     // the trade index is tens of GB of rows; mmap turns per-wallet reads
     // into page-cache hits instead of syscall churn
     this.db.pragma("mmap_size = 8589934592");
+    this.db.pragma("cache_size = -524288"); // 512 MB of page cache per connection
     this.db.exec(SCHEMA);
     // v4 trades know their token directly (no curve involved); the column
     // arrived after the table, so add it in place on older databases
@@ -284,14 +285,19 @@ export class Cache {
     const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]>();
     if (wallets.length === 0) return out;
     // per-wallet indexed scan, optionally only trades past a block (the
-    // incremental ledger applies new trades on top of the folded record)
+    // incremental ledger applies new trades on top of the folded record).
+    // Lean columns: the ledger needs no tx hash. A from-scratch read is
+    // capped at the most recent 20k trades - hyper-active bots carry far
+    // more and the cap keeps a thousand-wallet phase in seconds; from
+    // then on every scan is a small increment anyway.
     const q = this.db.prepare(
-      "SELECT curve, kind, tokens, eth, block, tx, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block, log_index",
+      "SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT 20000",
     );
     for (const w of wallets) {
       const lw = w.toLowerCase();
-      const rows = q.all(lw, Number(afterBlock)) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string; token: string | null }[];
+      const rows = q.all(lw, Number(afterBlock)) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; token: string | null }[];
       if (rows.length === 0) continue;
+      rows.reverse(); // ascending block order for the fold
       out.set(
         lw,
         rows.map((row) => ({
@@ -300,7 +306,7 @@ export class Cache {
           tokens: BigInt(row.tokens),
           eth: BigInt(row.eth),
           block: BigInt(row.block),
-          tx: row.tx,
+          tx: "",
           token: row.token ?? undefined,
         })),
       );
