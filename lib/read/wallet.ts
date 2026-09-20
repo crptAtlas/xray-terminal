@@ -1,6 +1,7 @@
 import type { Cache } from "../cache.ts";
 import type { RpcProvider } from "../providers/rpc.ts";
 import { buildPositions, profileFromPositions, type PositionSummary, type Profile } from "../profile/profile.ts";
+import { applyTrades, emptyLedger, ledgerPositions, type WalletLedger } from "../profile/ledger.ts";
 import { ethUsd } from "../usd.ts";
 
 /**
@@ -18,6 +19,9 @@ import { ethUsd } from "../usd.ts";
 interface CachedWallet {
   positions: PositionSummary[];
   ethWei: string;
+  // the incremental ledger this profile derives from; new trades fold
+  // on top of it, the record is never recomputed from the first block
+  ledger?: WalletLedger;
   // trade-index floors at capture time, one per lane: while a backfill
   // deepens either lane, profiles captured shallower are stale and rebuilt
   floor: string;
@@ -119,6 +123,7 @@ export async function walletProfilesBatch(
   const deadline = Date.now() + deadlineMs;
   const rate = await ethUsd().catch(() => 0);
   const misses: string[] = [];
+  const increments = new Map<string, CachedWallet>();
   const hits = new Map<string, CachedWallet>();
   for (const w of wallets) {
     const cached = readCached(cache, w);
@@ -147,12 +152,17 @@ export async function walletProfilesBatch(
       for (const w of cache.walletsTradedSince(ws, BigInt(tip))) stale.add(w);
     }
     for (const [w, c] of hits) {
-      if (stale.has(w.toLowerCase())) misses.push(w);
-      else out.set(w, profileFromPositions(w, c.positions, BigInt(c.ethWei), excludeToken, rate));
+      if (stale.has(w.toLowerCase())) {
+        if (c.ledger) increments.set(w, c); // fold only the new trades
+        else misses.push(w);
+      } else out.set(w, profileFromPositions(w, c.positions, BigInt(c.ethWei), excludeToken, rate));
     }
   }
 
   const span = cache.tradeIndexSpan();
+  if (increments.size && span && span.tip > span.floor) {
+    await profilesFromIndex(rpc, cache, [...increments.keys()], excludeToken, rate, out, increments);
+  }
   if (misses.length && span && span.tip > span.floor) {
     await profilesFromIndex(rpc, cache, misses, excludeToken, rate, out);
   } else if (misses.length) {
@@ -171,6 +181,7 @@ async function profilesFromIndex(
   excludeToken: string | undefined,
   rate: number,
   out: Map<string, Profile>,
+  prior: Map<string, CachedWallet> = new Map(),
 ): Promise<void> {
   const { syncTradeIndexTail } = await import("./indexer.ts");
   try {
@@ -181,8 +192,21 @@ async function profilesFromIndex(
   }
   const floorNow = currentFloor(cache, "curve");
   const floorV4Now = currentFloor(cache, "v4");
+  const tipNow = cache.tradeIndexSpan("curve")?.tip ?? 0n;
   const lower = misses.map((w) => w.toLowerCase());
-  const rowsByWallet = cache.chainTradesFor(lower);
+  // wallets with a prior ledger read only trades past their synced block;
+  // fresh wallets read everything (once)
+  const rowsByWallet = new Map<string, ReturnType<Cache["chainTradesFor"]> extends Map<string, infer R> ? R : never>();
+  const fresh: string[] = [];
+  for (const w of misses) {
+    const lw = w.toLowerCase();
+    const p = prior.get(w)?.ledger;
+    if (p) {
+      const rows = cache.chainTradesFor([lw], BigInt(p.syncedBlock)).get(lw);
+      if (rows) rowsByWallet.set(lw, rows);
+    } else fresh.push(lw);
+  }
+  for (const [lw, rows] of cache.chainTradesFor(fresh)) rowsByWallet.set(lw, rows);
   const curves = new Set<string>();
   const directTokens = new Set<string>();
   for (const rows of rowsByWallet.values()) {
@@ -206,16 +230,19 @@ async function profilesFromIndex(
       list.push({ wallet: lw, kind: r.kind, tokens: r.tokens, eth: r.eth, block: r.block, tx: r.tx });
       byToken.set(token, list);
     }
-    const positions = buildPositions(byToken, ledgerRemaining(byToken));
+    const before = prior.get(w)?.ledger ?? emptyLedger();
+    const ledger = applyTrades(before, byToken, tipNow);
+    const positions = ledgerPositions(ledger);
     const eth = ethWei.get(lw) ?? 0n;
     cache.saveProfile(
       w,
       JSON.stringify({
         positions,
         ethWei: eth.toString(),
+        ledger,
         floor: floorNow.toString(),
         floorV4: floorV4Now.toString(),
-        tip: (cache.tradeIndexSpan("curve")?.tip ?? 0n).toString(),
+        tip: tipNow.toString(),
         at: Date.now(),
       } satisfies CachedWallet),
     );
