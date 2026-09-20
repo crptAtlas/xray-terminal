@@ -239,6 +239,14 @@ export class Cache {
     tx();
   }
 
+  getMeta(key: string): string | null {
+    return (this.db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+  }
+
   /** Indexed span of a chain-wide trade lane: [floor, tip], both inclusive.
    * The "curve" lane holds curve trades, the "v4" lane post-graduation
    * pool trades; each backfills at its own pace. */

@@ -198,6 +198,50 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   }
 }
 
+export async function runRepairV4(_opts: CliOpts): Promise<void> {
+  const { makeClient } = await import("../providers/rpc.ts");
+  const { Cache } = await import("../cache.ts");
+  const { repairWindow } = await import("../read/repair-v4.ts");
+  const client = makeClient();
+  const cache = new Cache();
+  const from = BigInt(process.env.XRAY_REPAIR_FROM ?? "0");
+  const to = BigInt(process.env.XRAY_REPAIR_TO ?? String(await client.getBlockNumber()));
+  const WINDOW = 3000n;
+  const PARALLEL = Number(process.env.XRAY_INDEX_PARALLEL ?? 3);
+  const DELAY = Number(process.env.XRAY_INDEX_DELAY_MS ?? 300);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const put = (k: string, v: string) => cache.setMeta(k, v);
+  let cursor = BigInt(cache.getMeta("repair_v4_cursor") ?? String(to));
+  if (cursor > to) cursor = to;
+  let total = 0;
+  const t0 = Date.now();
+  console.error(`repairing v4 buys from ${cursor} down to ${from} (resumable)...`);
+  while (cursor > from) {
+    const jobs: { a: bigint; b: bigint }[] = [];
+    let c = cursor;
+    for (let i = 0; i < PARALLEL && c > from; i++) {
+      const a = c - WINDOW > from ? c - WINDOW : from;
+      jobs.push({ a: a + 1n, b: c });
+      c = a;
+    }
+    try {
+      const parts = await Promise.all(jobs.map((j) => repairWindow(client, cache, j.a, j.b)));
+      total += parts.reduce((s, n) => s + n, 0);
+    } catch (err) {
+      console.error(`\nrepair batch: ${err instanceof Error ? err.message.slice(0, 80) : err}; cooling off 90s`);
+      await sleep(90_000);
+      continue;
+    }
+    cursor = c;
+    put("repair_v4_cursor", cursor.toString());
+    process.stderr.write(`\r  cursor ${cursor}   rows +${total}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `);
+    if (DELAY > 0) await sleep(DELAY);
+  }
+  process.stderr.write("\n");
+  console.error(`repair complete: ${total} rows added`);
+  cache.close();
+}
+
 export async function runFollow(_opts: CliOpts): Promise<void> {
   const { makeClient } = await import("../providers/rpc.ts");
   const { Cache } = await import("../cache.ts");

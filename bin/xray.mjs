@@ -41,6 +41,14 @@ program
   });
 
 program
+  .command("repair-v4")
+  .description("re-decode v4 buys that carried a hook fee leg (narrow, resumable)")
+  .action(async () => {
+    const { runRepairV4 } = await import("../lib/cli/run.ts");
+    await runRepairV4(program.opts());
+  });
+
+program
   .command("follow")
   .description("follow the chain head: light tail sync of both index lanes, forever")
   .action(async () => {
