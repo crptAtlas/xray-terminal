@@ -71,7 +71,7 @@ async function fetchWindow(client: PublicClient, q: LogQuery): Promise<RawLog[]>
 export async function getLogsAdaptive(
   client: PublicClient,
   q: LogQuery,
-  opts: { parallel?: number; maxDepth?: number } = {},
+  opts: { parallel?: number; maxDepth?: number; onSplit?: () => void } = {},
 ): Promise<RawLog[]> {
   const parallel = opts.parallel ?? 6;
   // Topic-heavy queries over huge ranges can fail at every depth; capping
@@ -93,6 +93,7 @@ export async function getLogsAdaptive(
   }
 
   async function split(fromBlock: bigint, toBlock: bigint, depth: number): Promise<RawLog[]> {
+    opts.onSplit?.();
     const mid = fromBlock + (toBlock - fromBlock) / 2n;
     const [a, b] = await Promise.all([walk(fromBlock, mid, depth + 1), walk(mid + 1n, toBlock, depth + 1)]);
     return a.concat(b);

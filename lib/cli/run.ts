@@ -209,7 +209,10 @@ export async function runRepairV4(_opts: CliOpts): Promise<void> {
   // under the node's 10k-log cap for the swap sweep (~3.5 swaps per
   // block): a window that fits answers in one request, one that does
   // not costs three (fail, split, split)
-  const WINDOW = BigInt(process.env.XRAY_REPAIR_WINDOW ?? "2000");
+  // the window adapts to log density: splits shrink it, clean runs grow it
+  let window = BigInt(process.env.XRAY_REPAIR_WINDOW ?? "2000");
+  const WINDOW_MIN = 500n;
+  const WINDOW_MAX = 20000n;
   const PARALLEL = Number(process.env.XRAY_INDEX_PARALLEL ?? 3);
   const DELAY = Number(process.env.XRAY_INDEX_DELAY_MS ?? 300);
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -223,13 +226,16 @@ export async function runRepairV4(_opts: CliOpts): Promise<void> {
     const jobs: { a: bigint; b: bigint }[] = [];
     let c = cursor;
     for (let i = 0; i < PARALLEL && c > from; i++) {
-      const a = c - WINDOW > from ? c - WINDOW : from;
+      const a = c - window > from ? c - window : from;
       jobs.push({ a: a + 1n, b: c });
       c = a;
     }
     try {
       const parts = await Promise.all(jobs.map((j) => repairWindow(client, cache, j.a, j.b)));
-      total += parts.reduce((s, n) => s + n, 0);
+      total += parts.reduce((s, r) => s + r.rows, 0);
+      const splits = parts.reduce((s, r) => s + r.splits, 0);
+      if (splits > 0 && window > WINDOW_MIN) window = window / 2n < WINDOW_MIN ? WINDOW_MIN : window / 2n;
+      else if (splits === 0 && window < WINDOW_MAX) window = (window * 5n) / 4n;
     } catch (err) {
       console.error(`\nrepair batch: ${err instanceof Error ? err.message.slice(0, 80) : err}; cooling off 90s`);
       await sleep(90_000);
@@ -237,7 +243,7 @@ export async function runRepairV4(_opts: CliOpts): Promise<void> {
     }
     cursor = c;
     put("repair_v4_cursor", cursor.toString());
-    process.stderr.write(`\r  cursor ${cursor}   rows +${total}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `);
+    process.stderr.write(`\r  cursor ${cursor}   window ${window}   rows +${total}   ${((Date.now() - t0) / 1000).toFixed(0)}s   `);
     if (DELAY > 0) await sleep(DELAY);
   }
   process.stderr.write("\n");
