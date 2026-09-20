@@ -206,7 +206,10 @@ export async function runRepairV4(_opts: CliOpts): Promise<void> {
   const cache = new Cache();
   const from = BigInt(process.env.XRAY_REPAIR_FROM ?? "0");
   const to = BigInt(process.env.XRAY_REPAIR_TO ?? String(await client.getBlockNumber()));
-  const WINDOW = 3000n;
+  // under the node's 10k-log cap for the swap sweep (~3.5 swaps per
+  // block): a window that fits answers in one request, one that does
+  // not costs three (fail, split, split)
+  const WINDOW = BigInt(process.env.XRAY_REPAIR_WINDOW ?? "2000");
   const PARALLEL = Number(process.env.XRAY_INDEX_PARALLEL ?? 3);
   const DELAY = Number(process.env.XRAY_INDEX_DELAY_MS ?? 300);
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
