@@ -183,12 +183,16 @@ async function profilesFromIndex(
   out: Map<string, Profile>,
   prior: Map<string, CachedWallet> = new Map(),
 ): Promise<void> {
-  const { syncTradeIndexTail } = await import("./indexer.ts");
-  try {
-    await syncTradeIndexTail(rpc.client, cache, "curve");
-    await syncTradeIndexTail(rpc.client, cache, "v4");
-  } catch (err) {
-    console.warn(`trade index tail sync: ${err instanceof Error ? err.message : err}`);
+  // the head is followed by a dedicated process (xray follow) wherever
+  // one runs; a scan only syncs the tail itself when nobody else does
+  if (process.env.XRAY_FOLLOWER !== "external") {
+    const { syncTradeIndexTail } = await import("./indexer.ts");
+    try {
+      await syncTradeIndexTail(rpc.client, cache, "curve");
+      await syncTradeIndexTail(rpc.client, cache, "v4");
+    } catch (err) {
+      console.warn(`trade index tail sync: ${err instanceof Error ? err.message : err}`);
+    }
   }
   const floorNow = currentFloor(cache, "curve");
   const floorV4Now = currentFloor(cache, "v4");
