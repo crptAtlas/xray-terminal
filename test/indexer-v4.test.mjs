@@ -82,3 +82,42 @@ test("buy with a hook fee leg: swap total = wallet leg + fee leg, wallet gets it
   assert.equal(rows[0].tokens, 970n);
   assert.equal(rows[0].eth, 1940n); // 2000 * 970 / 1000
 });
+
+test("one swap serves both sides of a trade: the sell leg and the buy leg", () => {
+  // wallet sells TOKEN_A into the pool and receives TOKEN_B from it
+  const A = "0xaaaa000000000000000000000000000000000001";
+  const rows = decodeV4Rows(
+    [
+      { address: A, topics: [TRANSFER, pad(W), pad(ADDR.poolManager)], data: `0x${(500n).toString(16).padStart(64, "0")}`, blockNumber: 7n, transactionHash: "0xboth", logIndex: 1 },
+      { address: TOKEN, topics: [TRANSFER, pad(ADDR.poolManager), pad(W)], data: `0x${(900n).toString(16).padStart(64, "0")}`, blockNumber: 7n, transactionHash: "0xboth", logIndex: 2 },
+    ],
+    [swap(-500n, 900n, "0xboth")],
+  );
+  assert.equal(rows.length, 2);
+  const sell = rows.find((r) => r.kind === "sell");
+  const buy = rows.find((r) => r.kind === "buy");
+  assert.equal(sell.tokens, 500n);
+  assert.equal(sell.eth, 900n);
+  assert.equal(buy.tokens, 900n);
+  assert.equal(buy.eth, 500n);
+});
+
+test("multi-hop: each leg claims its own swap", () => {
+  const rows = decodeV4Rows(
+    [
+      transfer(ADDR.poolManager, W, 100n, "0xhop"),
+      transfer(ADDR.poolManager, W, 250n, "0xhop"),
+    ],
+    [swap(100n, -7n, "0xhop"), swap(250n, -19n, "0xhop")],
+  );
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((r) => r.eth).sort((a, b) => Number(a - b)), [7n, 19n]);
+});
+
+test("weth legs are the quote side, never a position", () => {
+  const rows = decodeV4Rows(
+    [{ address: ADDR.weth, topics: [TRANSFER, pad(ADDR.poolManager), pad(W)], data: `0x${(42n).toString(16).padStart(64, "0")}`, blockNumber: 8n, transactionHash: "0xw", logIndex: 0 }],
+    [swap(42n, -1n, "0xw")],
+  );
+  assert.equal(rows.length, 0);
+});
