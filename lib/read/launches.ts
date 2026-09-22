@@ -54,7 +54,7 @@ export async function syncLaunches(client: PublicClient, cache: Cache): Promise<
           functionName: "symbol" as const,
         })),
         allowFailure: true,
-        batchSize: 200_000,
+        batchSize: 20_000,
       });
       res.forEach((r, j) => {
         const d = slice[j]!;

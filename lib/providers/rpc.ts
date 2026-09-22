@@ -106,7 +106,7 @@ export class RpcProvider implements Provider {
         { address: launched.curve, abi: curveAbi, functionName: "launchedAt" },
       ],
       allowFailure: false,
-      batchSize: 200_000,
+      batchSize: 20_000,
     })) as [string, string, number, bigint, bigint];
 
     let phase: TokenMeta["phase"];
@@ -254,7 +254,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
-        batchSize: 200_000,
+        batchSize: 20_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
@@ -265,7 +265,9 @@ export class RpcProvider implements Provider {
 
   async balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
     const out = new Map<string, bigint>();
-    const chunk = 500;
+    // one multicall per chunk (viem's own calldata chunking is raised to
+    // fit), small enough that the node answers it in one piece
+    const chunk = 250;
     for (let i = 0; i < wallets.length; i += chunk) {
       const slice = wallets.slice(i, i + chunk);
       const res = await this.client.multicall({
@@ -276,7 +278,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
-        batchSize: 200_000,
+        batchSize: 20_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
