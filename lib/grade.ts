@@ -35,6 +35,17 @@ export const HOLDER_BENCHMARKS = {
   avgPnl: { weak: -13, typical: 0, strong: 11 },
 } as const;
 
+/**
+ * The grade itself: the holders' own average PnL per trade across Pons,
+ * this token excluded. Green is meant to be rare - a room of wallets
+ * that averages +50% a trade is a different room from one that averages
+ * nothing, and the card should say so.
+ */
+export const GRADE_THRESHOLDS = {
+  healthy: 50, // holders averaging +50% a trade or better
+  cracked: 30, // +30% to +50%
+} as const;
+
 export function gradeOf(
   aggregates: Aggregates,
   holders: HolderRow[],
@@ -45,22 +56,16 @@ export function gradeOf(
   const holding = holders.filter((h) => h.supplyShare > 0 && h.position.pnlPct !== null);
   if (holding.length === 0) return "shattered";
   const inProfit = holding.filter((h) => (h.position.pnlPct as number) > 0).length / holding.length;
-  const avg = aggregates.avgPnlPct ?? 0;
-  const tokenHealthy = avg > 0 && inProfit > config.majority;
-  const tokenBroken = inProfit < 1 - config.majority;
-
-  // The holders' own record decides too: a token whose holders lose
-  // everywhere is not healthy, however green its own chart looks. The
-  // record is only known after the profile phase, so before it the grade
-  // rests on the token alone.
+  // The holders' record is the grade. Until the profile phase lands it
+  // is unknown, and the token's own book stands in for it.
   const record = aggregates.avgProfilePnl;
-  const wr = aggregates.avgWinrate;
-  const knowsHow =
-    record === null || record === undefined
-      ? null
-      : record >= HOLDER_BENCHMARKS.avgPnl.typical && (wr === null || wr >= HOLDER_BENCHMARKS.winrate.weak);
-
-  if (tokenHealthy && knowsHow !== false) return "healthy";
-  if (tokenBroken) return "shattered";
+  if (record !== null && record !== undefined) {
+    if (record >= GRADE_THRESHOLDS.healthy) return "healthy";
+    if (record >= GRADE_THRESHOLDS.cracked) return "cracked";
+    return "shattered";
+  }
+  const avg = aggregates.avgPnlPct ?? 0;
+  if (avg > 0 && inProfit > config.majority) return "healthy";
+  if (inProfit < 1 - config.majority) return "shattered";
   return "cracked";
 }
