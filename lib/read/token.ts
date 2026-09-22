@@ -57,19 +57,46 @@ export async function tokenSnapshot(
   const known = cache.tokenState(address.toLowerCase());
   const meta = await provider.tokenMeta(address, known?.createdBlock ? { createdBlock: known.createdBlock } : undefined);
 
-  // incremental sync: cached trades + only the new blocks
-  const state = cache.tokenState(meta.address);
-  const fromBlock = state ? state.syncedBlock + 1n : meta.createdBlock;
-  const activity = await provider.activity(meta, fromBlock);
-  const market = marketSet(meta);
-  const fresh = classify(activity.transfers, activity.quotes, market);
-  cache.appendTrades(meta.address, fresh.trades);
-  cache.appendTransfersIn(meta.address, fresh.transfersIn);
-  cache.saveToken(meta, activity.toBlock);
+  // Fast path: the chain-wide index already holds every trade of this
+  // token, so the scan reads them locally instead of pulling the token's
+  // whole log history from the node again. It applies when both lanes
+  // cover the token's lifetime; otherwise the node path below runs.
+  const curveSpan = cache.tradeIndexSpan("curve");
+  const v4Span = cache.tradeIndexSpan("v4");
+  const indexCovers =
+    !process.env.XRAY_NO_INDEX_SCAN &&
+    !!curveSpan &&
+    !!v4Span &&
+    curveSpan.floor <= meta.createdBlock &&
+    v4Span.floor <= meta.createdBlock &&
+    curveSpan.tip > meta.createdBlock;
 
-  const trades = state ? cache.loadTrades(meta.address) : fresh.trades;
-  const transfersIn = state ? cache.loadTransfersIn(meta.address) : fresh.transfersIn;
-  onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades` });
+  let trades: Trade[];
+  let transfersIn: TransferIn[];
+  let syncedBlock: bigint;
+  if (indexCovers) {
+    trades = cache.tokenTradesFromIndex(meta.address, meta.curve);
+    // transfers between wallets are not indexed; a wallet holding more
+    // than it bought is caught by the position math anyway
+    transfersIn = [];
+    syncedBlock = curveSpan!.tip < v4Span!.tip ? curveSpan!.tip : v4Span!.tip;
+    onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades (index)` });
+  } else {
+    // incremental sync: cached trades + only the new blocks
+    const state = cache.tokenState(meta.address);
+    const fromBlock = state ? state.syncedBlock + 1n : meta.createdBlock;
+    const activity = await provider.activity(meta, fromBlock);
+    const market = marketSet(meta);
+    const fresh = classify(activity.transfers, activity.quotes, market);
+    cache.appendTrades(meta.address, fresh.trades);
+    cache.appendTransfersIn(meta.address, fresh.transfersIn);
+    cache.saveToken(meta, activity.toBlock);
+
+    trades = state ? cache.loadTrades(meta.address) : fresh.trades;
+    transfersIn = state ? cache.loadTransfersIn(meta.address) : fresh.transfersIn;
+    syncedBlock = activity.toBlock;
+    onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades` });
+  }
   onStage({ agent: "ledger", status: "start" });
 
   // candidate wallets: anyone who ever traded or received tokens
@@ -148,7 +175,7 @@ export async function tokenSnapshot(
     holdersTotal,
     excluded: { dust, unknownBasis: { wallets: ubWallets, supplyShare: ubSupply }, infra: infraCount },
     trades,
-    syncedBlock: activity.toBlock,
+    syncedBlock,
     priceEth,
     usdRate,
   };

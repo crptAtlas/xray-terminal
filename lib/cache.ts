@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS curve_tokens (
 CREATE TABLE IF NOT EXISTS chain_trades (
   block INTEGER NOT NULL, log_index INTEGER NOT NULL, tx TEXT NOT NULL,
   curve TEXT NOT NULL, wallet TEXT NOT NULL, kind TEXT NOT NULL,
-  tokens TEXT NOT NULL, eth TEXT NOT NULL,
+  tokens TEXT NOT NULL, eth TEXT NOT NULL, token TEXT,
   PRIMARY KEY (block, log_index)
 );
 CREATE INDEX IF NOT EXISTS idx_ct_wallet_block ON chain_trades(wallet, block, log_index);
@@ -86,6 +86,17 @@ export class Cache {
       this.db.exec("ALTER TABLE chain_trades ADD COLUMN token TEXT");
     } catch {
       /* already there */
+    }
+    // indexes that need the token column exist only after it does; on a
+    // big database the caller builds them once out of band, so this is a
+    // no-op there and instant on a fresh one
+    if (process.env.XRAY_BUILD_INDEXES !== "0") {
+      try {
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_curve_block ON chain_trades(curve, block, log_index)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_token_block ON chain_trades(token, block, log_index)");
+      } catch {
+        /* a concurrent writer holds the lock; the index is built out of band */
+      }
     }
   }
 
@@ -179,6 +190,25 @@ export class Cache {
       .prepare("SELECT token, symbol, curve, block FROM launches WHERE symbol = ? COLLATE NOCASE")
       .all(symbol) as { token: string; symbol: string; curve: string; block: string }[];
     return rows.map((r) => ({ ...r, block: BigInt(r.block) }));
+  }
+
+  /** Every indexed trade of one token: curve trades by its curve, pool
+   * trades by the token itself. The scan reads these instead of pulling
+   * the token's whole log history from the node again. */
+  tokenTradesFromIndex(token: string, curve: string): { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[] {
+    const q = this.db.prepare(
+      `SELECT wallet, kind, tokens, eth, block, tx FROM chain_trades
+       WHERE curve = ? OR token = ?
+       ORDER BY block, log_index`,
+    );
+    return (q.all(curve.toLowerCase(), token.toLowerCase()) as { wallet: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]).map((r) => ({
+      wallet: r.wallet,
+      kind: r.kind,
+      tokens: BigInt(r.tokens),
+      eth: BigInt(r.eth),
+      block: BigInt(r.block),
+      tx: r.tx,
+    }));
   }
 
   /** Wallets among these that have trades newer than the given block.
