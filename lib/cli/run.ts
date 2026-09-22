@@ -185,6 +185,12 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
   }
   process.stderr.write("\n");
   console.error("index lanes complete");
+  // a segment job (a gap fill) exits here; the head is followed by the
+  // dedicated follower service
+  if (process.env.XRAY_INDEX_NO_FOLLOW) {
+    cache.close();
+    return;
+  }
   // follow mode: the backfill is done for good, so this process becomes
   // the chain follower - every new block lands in the index within
   // seconds and scans never pay a catch-up cost
