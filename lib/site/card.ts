@@ -1,7 +1,7 @@
 import { drawCard } from "./card-draw";
 import type { CardData } from "./types";
 
-// Browser side of the share card: load images and fonts, draw, and offer
+// Browser side of the share card: load images and fonts, draw and offer
 // copy / download. The drawing itself lives in card-draw.ts, shared with
 // the server OG route.
 

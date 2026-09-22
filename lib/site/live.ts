@@ -287,7 +287,7 @@ export function runScan(
   const existing = inflight.get(key);
   if (existing) {
     // a second viewer joins a running scan: it gets the stages from here
-    // on, the partial result already computed, and every later partial
+    // on, the partial result already computed and every later partial
     existing.listeners.add(onStage);
     if (onPhase) {
       existing.phaseListeners.add(onPhase);

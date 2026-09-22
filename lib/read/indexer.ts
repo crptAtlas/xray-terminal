@@ -184,7 +184,7 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
     }
 
     // pass 2: legs that carried a protocol fee - the swap side is the sum
-    // of the wallet leg and the fee leg, and the quote splits pro rata
+    // of the wallet leg and the fee leg and the quote splits pro rata
     const groups = new Map<string, Leg[]>();
     for (const leg of legs) {
       if (!leg.infra && !leftover.includes(leg)) continue;

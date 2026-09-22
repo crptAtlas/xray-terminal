@@ -487,7 +487,7 @@ export function Terminal() {
           <img src="/assets/lightbox.png" alt="" style={{ width: 64, height: 64, display: "block", opacity: 0.8 }} />
           <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-dark)" }}>NOTHING ON THE FILM YET</div>
           <div style={{ fontSize: 13, color: "var(--text-dim)", maxWidth: 640 }}>
-            paste a contract address or a ticker - six agents rebuild every holder&apos;s book and tell you who is in profit, who is underwater, and whether they can trade at all.
+            paste a contract address or a ticker - six agents rebuild every holder&apos;s book and tell you who is in profit, who is underwater and whether they can trade at all.
           </div>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
             live scans read the public RPC and take 10-60s · demo tour:{" "}

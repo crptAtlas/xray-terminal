@@ -277,7 +277,7 @@ export class RpcProvider implements Provider {
 
   // The latest pool swap, found by scanning backwards in widening windows
   // and memoized per token per provider instance: priceNowEth and
-  // liquidityEth both need it, and a day-wide scan for it was the single
+  // liquidityEth both need it and a day-wide scan for it was the single
   // biggest request sink on graduated tokens.
   private lastSwapMemo = new Map<string, Promise<{ sqrtPriceX96: bigint; liquidity: bigint } | null>>();
 
