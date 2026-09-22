@@ -1,5 +1,6 @@
 import { custom, type Transport } from "viem";
 import { RPC_DEFAULTS } from "../chain.ts";
+import { touchScan } from "../scanflag.ts";
 
 /**
  * Every JSON-RPC request goes through this gate.
@@ -106,6 +107,9 @@ async function pace(st: GateState, isLogs: boolean): Promise<void> {
 
 async function send(st: GateState, method: string, params: unknown): Promise<unknown> {
   const isLogs = method === "eth_getLogs";
+  // the site marks the node busy on every call it makes, so a digger on
+  // the same host stays out of the queue for as long as a scan runs
+  if (process.env.XRAY_TOUCH_SCAN) touchScan();
   await acquire(st);
   try {
     let lastErr: Error = new Error("no endpoint available");

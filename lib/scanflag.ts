@@ -11,7 +11,7 @@ import { join } from "node:path";
  */
 
 const FLAG = join(tmpdir(), "xray-scanning");
-const FRESH_MS = 15_000;
+const FRESH_MS = 20_000;
 
 export function touchScan(): void {
   try {
