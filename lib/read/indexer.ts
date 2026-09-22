@@ -4,6 +4,7 @@ import { curveAbi } from "../abi/pons.ts";
 import { poolManagerAbi, SWAP_TOPIC } from "../abi/pool.ts";
 import { getLogsAdaptive, type RawLog } from "../providers/logs.ts";
 import type { Cache } from "../cache.ts";
+import { yieldToScans } from "../scanflag.ts";
 
 /**
  * Chain-wide curve-trade index. One pass over the chain's CurveBuy and
@@ -281,6 +282,7 @@ export async function backfillTradeIndex(
       jobs.push({ from, to: cursor - 1n });
       cursor = from;
     }
+    await yieldToScans(); // a visitor's scan owns the node while it runs
     let parts: Row[][];
     let splits = 0;
     try {

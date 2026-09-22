@@ -5,6 +5,7 @@ import type { Aggregates } from "../pnl/aggregate.ts";
 import { fmtAge, fmtUsd, isDead, DEAD_HOLDERS_MIN } from "../format.ts";
 import { gradeOf, type Grade } from "../grade.ts";
 import { RpcProvider, makeClient, pickProvider } from "../providers/rpc.ts";
+import { touchScan } from "../scanflag.ts";
 import { resolveTicker, looksLikeAddress } from "../read/launches.ts";
 import type { StageEvent } from "../stages.ts";
 import type { CardData } from "./types";
@@ -302,6 +303,7 @@ export function runScan(
     entry.last = p;
     phaseListeners.forEach((fn) => fn(p));
   };
+  touchScan();
   const promise = (async () => {
     const provider = await pickProvider();
     const cache = new Cache(cachePath());
@@ -312,7 +314,10 @@ export function runScan(
         profiles: true,
         profileLimit: 1000,
         profileDeadlineMs: Number(process.env.XRAY_PROFILE_DEADLINE_MS ?? 90_000),
-        onStage: (e) => listeners.forEach((fn) => fn(e)),
+        onStage: (e) => {
+          touchScan(); // hold back any background digger while we read
+          listeners.forEach((fn) => fn(e));
+        },
       })) {
         if (phase.phase === 1) {
           scan = toLiveScan(phase, (Date.now() - t0) / 1000, provider.stats().requests);

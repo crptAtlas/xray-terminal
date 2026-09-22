@@ -240,6 +240,8 @@ export async function runRepairV4(_opts: CliOpts): Promise<void> {
       jobs.push({ a: a + 1n, b: c });
       c = a;
     }
+    const { yieldToScans } = await import("../scanflag.ts");
+    await yieldToScans();
     try {
       const parts = await Promise.all(jobs.map((j) => repairWindow(client, cache, j.a, j.b)));
       total += parts.reduce((s, r) => s + r.rows, 0);
