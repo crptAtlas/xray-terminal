@@ -87,11 +87,11 @@ function decodeRows(logs: RawLog[]): Row[] {
   return rows;
 }
 
-async function fetchWindow(client: PublicClient, fromBlock: bigint, toBlock: bigint): Promise<Row[]> {
+async function fetchWindow(client: PublicClient, fromBlock: bigint, toBlock: bigint, onSplit?: () => void): Promise<Row[]> {
   const logs = await getLogsAdaptive(
     client,
     { topics: [[TOPIC.curveBuy as Hex, TOPIC.curveSell as Hex]], fromBlock, toBlock },
-    { parallel: 1 },
+    { parallel: 1, onSplit },
   );
   return decodeRows(logs);
 }
@@ -203,11 +203,11 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
   return rows;
 }
 
-async function fetchWindowV4(client: PublicClient, fromBlock: bigint, toBlock: bigint): Promise<Row[]> {
+async function fetchWindowV4(client: PublicClient, fromBlock: bigint, toBlock: bigint, onSplit?: () => void): Promise<Row[]> {
   const [toPm, fromPm, swaps] = await Promise.all([
-    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, null, PM_PADDED], fromBlock, toBlock }, { parallel: 1 }),
-    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1 }),
-    getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock, toBlock }, { parallel: 1 }),
+    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, null, PM_PADDED], fromBlock, toBlock }, { parallel: 1, onSplit }),
+    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1, onSplit }),
+    getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock, toBlock }, { parallel: 1, onSplit }),
   ]);
   return decodeV4Rows(toPm.concat(fromPm), swaps);
 }
@@ -261,28 +261,30 @@ export interface BackfillProgress {
 export async function backfillTradeIndex(
   client: PublicClient,
   cache: Cache,
-  opts: { budgetMs?: number; onProgress?: (p: BackfillProgress) => void; lane?: Lane } = {},
+  opts: { budgetMs?: number; onProgress?: (p: BackfillProgress) => void; lane?: Lane; stopFloor?: bigint } = {},
 ): Promise<BackfillProgress> {
   const lane = opts.lane ?? "curve";
+  const stopFloor = opts.stopFloor ?? 0n;
   const fetch = laneFetch[lane];
   await syncTradeIndexTail(client, cache, lane);
   const stopAt = opts.budgetMs ? Date.now() + opts.budgetMs : Infinity;
   let { floor, tip } = cache.tradeIndexSpan(lane)!;
-  let window = laneWindow[lane];
+  let window: bigint = laneWindow[lane];
   let emptyStreak = 0;
   let total = 0;
-  while (floor > 0n && Date.now() < stopAt) {
+  while (floor > stopFloor && Date.now() < stopAt) {
     // PARALLEL adjacent windows below the floor, fetched concurrently
     const jobs: { from: bigint; to: bigint }[] = [];
     let cursor = floor;
-    for (let i = 0; i < PARALLEL && cursor > 0n; i++) {
-      const from = cursor > window ? cursor - window : 0n;
+    for (let i = 0; i < PARALLEL && cursor > stopFloor; i++) {
+      const from = cursor - window > stopFloor ? cursor - window : stopFloor;
       jobs.push({ from, to: cursor - 1n });
       cursor = from;
     }
     let parts: Row[][];
+    let splits = 0;
     try {
-      parts = await Promise.all(jobs.map((j) => fetch(client, j.from, j.to)));
+      parts = await Promise.all(jobs.map((j) => fetch(client, j.from, j.to, () => splits++)));
     } catch (err) {
       // a 403 ban or node hiccup: cool off and try the same batch again
       // instead of dying with hours of progress left on the table
@@ -299,18 +301,23 @@ export async function backfillTradeIndex(
     floor = cursor;
     cache.setTradeIndexSpan(floor, tip, lane);
     if (BATCH_DELAY_MS > 0) await sleep(BATCH_DELAY_MS);
-    if (batchRows < 5000) {
+    // splits mean the window overshot the node's 10k-log cap and cost
+    // three requests instead of one; a clean pass means it can grow
+    if (splits > 0) {
+      emptyStreak = 0;
+      const half = window / 2n;
+      window = half < 250n ? 250n : half;
+    } else if (batchRows < 5000) {
       emptyStreak++;
       if (emptyStreak >= 2 && window < WINDOW_MAX) window *= 2n;
-    } else if (batchRows > 20000) {
-      emptyStreak = 0;
-      window = laneWindow[lane];
     } else {
       emptyStreak = 0;
+      if (window < WINDOW_MAX) window = (window * 5n) / 4n;
     }
-    opts.onProgress?.({ floor, tip, rows: total, done: floor === 0n });
+
+    opts.onProgress?.({ floor, tip, rows: total, done: floor <= stopFloor });
   }
-  return { floor, tip, rows: total, done: floor === 0n };
+  return { floor, tip, rows: total, done: floor <= stopFloor };
 }
 
 /** How many days of history a lane currently holds, tip to floor. */

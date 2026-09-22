@@ -162,7 +162,11 @@ export async function runIndex(_opts: CliOpts): Promise<void> {
       if (done[lane]) continue;
       let res;
       try {
-        res = await backfillTradeIndex(client, cache, { lane, budgetMs: 60_000 });
+        res = await backfillTradeIndex(client, cache, {
+          lane,
+          budgetMs: 60_000,
+          stopFloor: BigInt(process.env.XRAY_INDEX_FLOOR ?? "0"),
+        });
       } catch (err) {
         // any lane error (tail sync included) cools off instead of killing
         // hours of unattended progress
