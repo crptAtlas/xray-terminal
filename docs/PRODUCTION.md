@@ -1,6 +1,6 @@
 # Production wiring
 
-How the shipped pieces become one live product, and what is needed from
+How the shipped pieces become one live product and what is needed from
 the owner at each step. The engine (lib/) is done and chain-verified; the
 site (app/) runs on design fixtures; this file is the bridge.
 

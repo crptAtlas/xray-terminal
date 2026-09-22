@@ -19,13 +19,13 @@ the live chain and the live Bitquery API. Date of measurement:
   inverted the swap sides for any token sorting below it.
 - **Post-graduation v4 trades carry no trader topic, but the token's own
   Transfer does**: wallet -> poolManager is a sell, poolManager -> wallet
-  a buy, and the Swap in the same tx whose token-side magnitude equals
+  a buy and the Swap in the same tx whose token-side magnitude equals
   the moved amount carries the quote. Measured on live blocks: ~65% of
   pool transfers match a swap 1:1; one sampled holder had 32 curve buys
   and 1550 v4 sells - most of every wallet's record lives on v4.
 - **Wallet histories do not need Bitquery at all.** The curve events
   index the real trader in their topics (`CurveBuy` topic2 = recipient,
-  `CurveSell` topic1 = seller), and the public RPC serves logs from
+  `CurveSell` topic1 = seller) and the public RPC serves logs from
   genesis. A local chain-wide trade index (`xray index`, resumable
   backfill into SQLite) makes every wallet's full history a local
   SELECT; a cheap tail sync before each scan keeps it at the head. Two

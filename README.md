@@ -15,7 +15,7 @@
 
 ## Why xray
 
-A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets, and two questions decide whether you walk in: how the people inside are doing right now, and whether those people have ever made money anywhere else.
+A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets and two questions decide whether you walk in: how the people inside are doing right now and whether those people have ever made money anywhere else.
 
 xray answers both. It takes a token address and reads the whole room - the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds - and then reads the holders themselves: every trade each of them ever made across every Pons token, folded into an average PnL per trade and a winrate. A token held by wallets that lose everywhere is a different token from one held by wallets that win, even when the chart looks identical.
 
@@ -105,12 +105,12 @@ npm run cli -- repair-v4            # re-decode a range of v4 trades in place
 
 **One source: the public RPC.** No keys, no registration, no rate budget to buy.
 
-Phase 1 - the token itself (holder PnL, bands, supply-weighted averages, header, card) - reads that token's own logs with adaptive windows. Phase 2 - who those holders are - reads a local index instead of the network: `xray index` walks the chain once and writes every trade of every wallet into SQLite, `xray follow` keeps it at the head, and from then on a wallet's whole history is a local SELECT. A thousand holders are profiled in seconds, at full depth, without a single extra request.
+Phase 1 - the token itself (holder PnL, bands, supply-weighted averages, header, card) - reads that token's own logs with adaptive windows. Phase 2 - who those holders are - reads a local index instead of the network: `xray index` walks the chain once and writes every trade of every wallet into SQLite, `xray follow` keeps it at the head and from then on a wallet's whole history is a local SELECT. A thousand holders are profiled in seconds, at full depth, without a single extra request.
 
-Two kinds of trade go into that index, and both name their trader:
+Two kinds of trade go into that index and both name their trader:
 
 - **On the curve**, `CurveBuy` and `CurveSell` carry the trader in an indexed topic, so a wallet's curve history is exact.
-- **After graduation**, the v4 `Swap` event names nobody - but the token itself moves between the trader and the pool manager in the same transaction, and the swap's two sides say what the trade was worth. One swap serves both legs of an exchange, a trade can hop through several pools, and the protocol takes its cut as an extra leg; the decoder in `lib/read/indexer.ts` handles all three, which is what makes post-graduation history usable at all. Most of a wallet's record lives here, not on the curve.
+- **After graduation**, the v4 `Swap` event names nobody - but the token itself moves between the trader and the pool manager in the same transaction and the swap's two sides say what the trade was worth. One swap serves both legs of an exchange, a trade can hop through several pools and the protocol takes its cut as an extra leg; the decoder in `lib/read/indexer.ts` handles all three, which is what makes post-graduation history usable at all. Most of a wallet's record lives here, not on the curve.
 
 Profiles are folded incrementally: a wallet's record is four running sums per token plus the block it is synced to, so a later scan applies only the trades made since - the history is never recomputed from the first block.
 
@@ -122,7 +122,7 @@ Tickers are not unique on Pons. When several launches share one, the CLI lists e
 - **PnL per token, not per wallet balance.** `pnl = sold_proceeds + value_now - bought_cost`, realized and unrealized in one number. An ETH top-up between trades cannot leak into it.
 - **The trader is the token movement, never `tx.from`.** The transaction signer is almost always a relayer; buys and sells are detected by which side of the market the tokens crossed. On the curve that is the event's own topic, in a v4 pool it is the token transfer beside the swap.
 - **A position is a sum, not a replay.** Bought tokens, bought cost, sold tokens, sold proceeds - four running totals per token, so new trades are added to a wallet's record instead of rebuilding it.
-- **Stock-paired launches count in their own unit.** Roughly two launches in five are paired with a tokenized stock rather than ETH; percentages stay correct because every amount for such a token is in the same quote unit, and the dollar figures step aside instead of lying.
+- **Stock-paired launches count in their own unit.** Roughly two launches in five are paired with a tokenized stock rather than ETH; percentages stay correct because every amount for such a token is in the same quote unit and the dollar figures step aside instead of lying.
 - **Averages are supply-weighted.** A wallet holding 5% of supply moves the token average five times harder than one holding 1%. Wallets that exited hold nothing, so they get their own line instead of steering the current picture.
 - **Transfers break cost basis.** Tokens that arrived by transfer have no honest entry price; such wallets are flagged `unknown basis` and counted, never guessed. A microscopic cost basis (a few wei) is flagged the same way instead of printing astronomical percentages.
 - **Opening tax is not part of cost basis**, so first-second buyers show inflated PnL - stated, not hidden.

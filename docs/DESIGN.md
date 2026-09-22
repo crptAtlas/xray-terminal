@@ -85,7 +85,7 @@ Two lanes fill `chain_trades`, each with its own span in `meta`:
   from the indexed topic.
 - **v4** - post-graduation pool trades. The `Swap` event names no
   trader, so the trader comes from the token transfer between the wallet
-  and the pool manager in the same transaction, and the quote from the
+  and the pool manager in the same transaction and the quote from the
   swap's other side. One swap serves both legs of an exchange, a trade
   can hop several pools and the protocol takes a leg of its own, so
   sides are claimed one at a time: exact leg matches first, then groups
