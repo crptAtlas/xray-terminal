@@ -141,13 +141,13 @@ test("grade waits for the holders record and then respects it", async () => {
   const base = { avgPnlPct: 20, avgWinrate: null, avgProfilePnl: null, medianPnlPct: 20, inProfit: 2, pnlWallets: 3, winrateWallets: 0, profilePnlWallets: 0, firstTrade: null, exited: { wallets: 0, avgPnlPct: null, avgWinrate: null } };
   // before profiles land the token alone decides
   assert.equal(gradeOf(base, holders, false), "healthy");
-  // once the record is known it is the grade: below +30 red
+  // once the record is known it is the grade: below -10 red
   assert.equal(gradeOf({ ...base, avgProfilePnl: -25, avgWinrate: 20 }, holders, false), "shattered");
-  assert.equal(gradeOf({ ...base, avgProfilePnl: 15, avgWinrate: 40 }, holders, false), "shattered");
-  // +30 to +50 yellow
-  assert.equal(gradeOf({ ...base, avgProfilePnl: 35 }, holders, false), "cracked");
-  // +50 and up green
-  assert.equal(gradeOf({ ...base, avgProfilePnl: 62 }, holders, false), "healthy");
+  // -10 to +15 yellow, around the chain's median
+  assert.equal(gradeOf({ ...base, avgProfilePnl: -3 }, holders, false), "cracked");
+  assert.equal(gradeOf({ ...base, avgProfilePnl: 9 }, holders, false), "cracked");
+  // +15 and up green
+  assert.equal(gradeOf({ ...base, avgProfilePnl: 24 }, holders, false), "healthy");
   // a dead token is shattered regardless
   assert.equal(gradeOf({ ...base, avgProfilePnl: 50 }, holders, true), "shattered");
 });

@@ -42,8 +42,11 @@ export const HOLDER_BENCHMARKS = {
  * nothing, and the card should say so.
  */
 export const GRADE_THRESHOLDS = {
-  healthy: 50, // holders averaging +50% a trade or better
-  cracked: 30, // +30% to +50%
+  // Calibrated on this chain: the median wallet averages 0% a trade and
+  // only the top tenth clears +39%, so green marks a room that is
+  // genuinely ahead rather than an impossible bar.
+  healthy: 15, // holders averaging +15% a trade or better
+  cracked: -10, // -10% to +15%: around the chain's own median
 } as const;
 
 export function gradeOf(

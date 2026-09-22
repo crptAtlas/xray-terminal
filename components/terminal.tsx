@@ -309,14 +309,14 @@ export function Terminal() {
   // scales calibrated on every wallet with 2+ closed trades on this chain:
   // avg pnl p25 -13 / median 0 / p75 +11, winrate p25 27 / median 36 / p75 49
   const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, ((D.holdersPnlNum + 50) / 150) * 100));
-  // the same thresholds the grade uses: +50 and above is green, +30 to
-  // +50 yellow, below +30 red
+  // the same thresholds the grade uses: +15 and above green, -10 to +15
+  // yellow, below -10 red
   const holdersPnlColor =
     D.holdersPnlNum === null
       ? "var(--bone-dark)"
-      : D.holdersPnlNum >= 50
+      : D.holdersPnlNum >= 15
         ? "var(--profit)"
-        : D.holdersPnlNum >= 30
+        : D.holdersPnlNum >= -10
           ? "var(--neutral)"
           : "var(--loss)";
   const wrPos = D.winrate === null ? 0 : parseFloat(D.winrate);
@@ -584,7 +584,7 @@ export function Terminal() {
                 D.holdersPnl,
                 holdersPnlColor,
                 holdersPnlPos,
-                ["−50%", "+30%", "+50%", "+100%"],
+                ["−50%", "−10%", "+15%", "+100%"],
                 D.holdersPnl !== null ? (
                   <>chain-wide record of <span style={{ color: "var(--text)" }}>{D.holdersPnlWallets}</span> holders · this token excluded</>
                 ) : D.profilesRead !== null && D.profilesRead > 0 ? (
