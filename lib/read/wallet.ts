@@ -1,7 +1,7 @@
 import type { Cache } from "../cache.ts";
 import type { RpcProvider } from "../providers/rpc.ts";
 import { buildPositions, profileFromPositions, type PositionSummary, type Profile } from "../profile/profile.ts";
-import { applyTrades, emptyLedger, ledgerPositions, type WalletLedger } from "../profile/ledger.ts";
+import { applyAggregates, applyTrades, emptyLedger, ledgerPositions, type WalletLedger } from "../profile/ledger.ts";
 import { ethUsd } from "../usd.ts";
 
 /**
@@ -198,25 +198,32 @@ async function profilesFromIndex(
   const floorV4Now = currentFloor(cache, "v4");
   const tipNow = cache.tradeIndexSpan("curve")?.tip ?? 0n;
   const lower = misses.map((w) => w.toLowerCase());
-  // wallets with a prior ledger read only trades past their synced block;
-  // fresh wallets read everything (once)
-  const rowsByWallet = new Map<string, ReturnType<Cache["chainTradesFor"]> extends Map<string, infer R> ? R : never>();
+  // The database sums a wallet's trades per token; wallets with a prior
+  // ledger only sum what happened past their synced block.
+  const aggByWallet = new Map<string, ReturnType<Cache["walletAggregates"]> extends Map<string, infer R> ? R : never>();
   const fresh: string[] = [];
+  const byPriorBlock = new Map<string, string[]>();
   for (const w of misses) {
     const lw = w.toLowerCase();
     const p = prior.get(w)?.ledger;
     if (p) {
-      const rows = cache.chainTradesFor([lw], BigInt(p.syncedBlock)).get(lw);
-      if (rows) rowsByWallet.set(lw, rows);
+      const list = byPriorBlock.get(p.syncedBlock) ?? [];
+      list.push(lw);
+      byPriorBlock.set(p.syncedBlock, list);
     } else fresh.push(lw);
   }
-  for (const [lw, rows] of cache.chainTradesFor(fresh)) rowsByWallet.set(lw, rows);
+  for (const [block, ws] of byPriorBlock) {
+    for (const [lw, agg] of cache.walletAggregates(ws, BigInt(block))) aggByWallet.set(lw, agg);
+  }
+  for (const [lw, agg] of cache.walletAggregates(fresh)) aggByWallet.set(lw, agg);
+  // an aggregate key is either a token address (pool trades) or a curve
   const curves = new Set<string>();
   const directTokens = new Set<string>();
-  for (const rows of rowsByWallet.values()) {
-    for (const r of rows) {
-      if (r.token) directTokens.add(r.token);
-      else if (r.curve) curves.add(r.curve);
+  for (const agg of aggByWallet.values()) {
+    for (const key of agg.keys()) {
+      if (!key) continue;
+      directTokens.add(key);
+      curves.add(key);
     }
   }
   const tokenOf = await curveResolver(rpc, cache)([...curves]);
@@ -226,16 +233,27 @@ async function profilesFromIndex(
   const ethWei = await rpc.ethBalances(lower).catch(() => new Map<string, bigint>());
   for (const w of misses) {
     const lw = w.toLowerCase();
-    const byToken = new Map<string, { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[]>();
-    for (const r of rowsByWallet.get(lw) ?? []) {
-      const token = r.token ? (launched.has(r.token) ? r.token : undefined) : tokenOf.get(r.curve);
+    const byToken = new Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>();
+    for (const [key, a] of aggByWallet.get(lw) ?? []) {
+      // a key that is a launched token is a pool trade; otherwise it is a
+      // curve address that resolves to its token
+      const token = launched.has(key) ? key : tokenOf.get(key);
       if (!token) continue;
-      const list = byToken.get(token) ?? [];
-      list.push({ wallet: lw, kind: r.kind, tokens: r.tokens, eth: r.eth, block: r.block, tx: r.tx });
-      byToken.set(token, list);
+      const cur = byToken.get(token);
+      if (cur) {
+        cur.buyTokens += a.buyTokens;
+        cur.buyEth += a.buyEth;
+        cur.sellTokens += a.sellTokens;
+        cur.sellEth += a.sellEth;
+        cur.trades += a.trades;
+        if (a.lastBlock > cur.lastBlock) {
+          cur.lastBlock = a.lastBlock;
+          cur.lastPrice = a.lastPrice;
+        }
+      } else byToken.set(token, { ...a });
     }
     const before = prior.get(w)?.ledger ?? emptyLedger();
-    const ledger = applyTrades(before, byToken, tipNow);
+    const ledger = applyAggregates(before, byToken, tipNow);
     const positions = ledgerPositions(ledger);
     const eth = ethWei.get(lw) ?? 0n;
     cache.saveProfile(

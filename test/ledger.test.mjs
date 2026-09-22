@@ -49,3 +49,19 @@ test("sold more than bought drops the position, same as the unknown-basis rule",
   const byToken = new Map([["0xa", [buy(T(10), E(1), 1n), sell(T(20), E(3), 2n)]]]);
   assert.equal(ledgerPositions(applyTrades(emptyLedger(), byToken, 2n)).length, 0);
 });
+
+test("aggregates fold into the same position as trade-by-trade", async () => {
+  const { applyAggregates } = await import("../lib/profile/ledger.ts");
+  const byToken = new Map([["0xa", [buy(T(100), E(1), 1n), sell(T(60), E(1.5), 2n), buy(T(20), E(0.3), 3n)]]]);
+  const viaTrades = ledgerPositions(applyTrades(emptyLedger(), byToken, 3n));
+  const agg = new Map([["0xa", {
+    buyTokens: Number(T(120)), buyEth: Number(E(1.3)),
+    sellTokens: Number(T(60)), sellEth: Number(E(1.5)),
+    trades: 3, lastPrice: Number(E(0.3)) / Number(T(20)), lastBlock: 3,
+  }]]);
+  const viaAgg = ledgerPositions(applyAggregates(emptyLedger(), agg, 3n));
+  assert.equal(viaAgg.length, viaTrades.length);
+  assert.equal(viaAgg[0].trades, viaTrades[0].trades);
+  assert.equal(viaAgg[0].closed, viaTrades[0].closed);
+  assert.ok(Math.abs(viaAgg[0].pnlPct - viaTrades[0].pnlPct) < 0.01, `${viaAgg[0].pnlPct} vs ${viaTrades[0].pnlPct}`);
+});

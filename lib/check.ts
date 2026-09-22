@@ -83,7 +83,7 @@ export async function* check(
   // this launch must not decorate their stats with it.
   // Profiles arrive in chunks so the page fills in as they land instead
   // of waiting for the last wallet of a thousand.
-  const CHUNK = 200;
+  const CHUNK = 250;
   const deadline = Date.now() + (opts.profileDeadlineMs ?? 60_000);
   const profiles = new Map<string, Profile>();
   for (let i = 0; i < wallets.length; i += CHUNK) {
@@ -93,9 +93,9 @@ export async function* check(
     const part = await walletProfilesBatch(rpc, cache, slice, left, snapshot.meta.address);
     for (const [w, p] of part) profiles.set(w, p);
     const read = [...profiles.values()].filter((p) => !p.notRead).length;
+    // stages report progress; the result itself lands once, complete
     if (i + CHUNK < wallets.length && Date.now() < deadline) {
       onStage({ agent: "tracer", status: "start", detail: `${read} of ${wallets.length} wallets` });
-      yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
     }
   }
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });

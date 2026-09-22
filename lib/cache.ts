@@ -192,6 +192,64 @@ export class Cache {
     return rows.map((r) => ({ ...r, block: BigInt(r.block) }));
   }
 
+  /**
+   * Per wallet and token, the four running sums a ledger needs, computed
+   * inside the database. Reading a hundred thousand rows into memory to
+   * add them up was the slowest step of a scan; SQLite adds them in one
+   * pass. Amounts come back as doubles, which hold fifteen significant
+   * digits - far more than a pnl percentage needs.
+   */
+  walletAggregates(
+    wallets: string[],
+    afterBlock = -1n,
+  ): Map<string, Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>> {
+    const out = new Map<string, Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>>();
+    if (wallets.length === 0) return out;
+    const key = "COALESCE(NULLIF(token, ''), curve)";
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const marks = slice.map(() => "?").join(",");
+      const args = [...slice.map((w) => w.toLowerCase()), Number(afterBlock)];
+      const sums = this.db
+        .prepare(
+          `SELECT wallet, ${key} AS k, kind,
+                  SUM(CAST(tokens AS REAL)) AS tok, SUM(CAST(eth AS REAL)) AS eth, COUNT(*) AS n
+           FROM chain_trades WHERE wallet IN (${marks}) AND block > ?
+           GROUP BY wallet, k, kind`,
+        )
+        .all(...args) as { wallet: string; k: string; kind: "buy" | "sell"; tok: number; eth: number; n: number }[];
+      // the row carrying MAX(block) supplies the last price of the position
+      const last = this.db
+        .prepare(
+          `SELECT wallet, ${key} AS k, MAX(block) AS mb, CAST(tokens AS REAL) AS tok, CAST(eth AS REAL) AS eth
+           FROM chain_trades WHERE wallet IN (${marks}) AND block > ?
+           GROUP BY wallet, k`,
+        )
+        .all(...args) as { wallet: string; k: string; mb: number; tok: number; eth: number }[];
+
+      for (const r of sums) {
+        const byToken = out.get(r.wallet) ?? new Map();
+        const cur = byToken.get(r.k) ?? { buyTokens: 0, buyEth: 0, sellTokens: 0, sellEth: 0, trades: 0, lastPrice: 0, lastBlock: 0 };
+        if (r.kind === "buy") {
+          cur.buyTokens += r.tok;
+          cur.buyEth += r.eth;
+        } else {
+          cur.sellTokens += r.tok;
+          cur.sellEth += r.eth;
+        }
+        cur.trades += r.n;
+        byToken.set(r.k, cur);
+        out.set(r.wallet, byToken);
+      }
+      for (const r of last) {
+        const cur = out.get(r.wallet)?.get(r.k);
+        if (!cur) continue;
+        cur.lastBlock = r.mb;
+        cur.lastPrice = r.tok > 0 ? r.eth / r.tok : 0;
+      }
+    }
+    return out;
+  }
+
   /** Every indexed trade of one token: curve trades by its curve, pool
    * trades by the token itself. The scan reads these instead of pulling
    * the token's whole log history from the node again. */
@@ -335,11 +393,12 @@ export class Cache {
     // per-wallet indexed scan, optionally only trades past a block (the
     // incremental ledger applies new trades on top of the folded record).
     // Lean columns: the ledger needs no tx hash. A from-scratch read is
-    // capped at the most recent 20k trades - hyper-active bots carry far
-    // more and the cap keeps a thousand-wallet phase in seconds; from
-    // then on every scan is a small increment anyway.
+    // capped at the most recent trades - a bot with a hundred thousand of
+    // them says the same thing about how it trades in the last few
+    // thousand, and the cap is what keeps a thousand-wallet phase quick.
+    const cap = Number(process.env.XRAY_WALLET_TRADE_CAP ?? 5000);
     const q = this.db.prepare(
-      "SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT 20000",
+      `SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT ${cap}`,
     );
     for (const w of wallets) {
       const lw = w.toLowerCase();

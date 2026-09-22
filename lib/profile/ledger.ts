@@ -30,6 +30,37 @@ export function emptyLedger(): WalletLedger {
   return { positions: {}, syncedBlock: "0" };
 }
 
+/** Fold database aggregates (per token sums) into the ledger. The sums
+ * arrive as doubles; a position's pnl is a ratio, so the last digits of
+ * a wei amount never matter to it. */
+export function applyAggregates(
+  ledger: WalletLedger,
+  byToken: Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>,
+  upToBlock: bigint,
+): WalletLedger {
+  const positions = { ...ledger.positions };
+  const big = (v: number): bigint => (Number.isFinite(v) && v > 0 ? BigInt(Math.round(v)) : 0n);
+  for (const [token, a] of byToken) {
+    const cur = positions[token];
+    const bt = (cur ? BigInt(cur.boughtTokens) : 0n) + big(a.buyTokens);
+    const bc = (cur ? BigInt(cur.boughtCostWei) : 0n) + big(a.buyEth);
+    const st = (cur ? BigInt(cur.soldTokens) : 0n) + big(a.sellTokens);
+    const sp = (cur ? BigInt(cur.soldProceedsWei) : 0n) + big(a.sellEth);
+    const n = (cur ? cur.trades : 0) + a.trades;
+    const last = a.lastPrice > 0 ? BigInt(Math.round(a.lastPrice * 1e18)) : cur ? BigInt(cur.lastPriceWad) : 0n;
+    positions[token] = {
+      token,
+      trades: n,
+      boughtTokens: bt.toString(),
+      boughtCostWei: bc.toString(),
+      soldTokens: st.toString(),
+      soldProceedsWei: sp.toString(),
+      lastPriceWad: last.toString(),
+    };
+  }
+  return { positions, syncedBlock: upToBlock.toString() };
+}
+
 /** Fold new trades (any tokens, ascending block order) into the ledger. */
 export function applyTrades(ledger: WalletLedger, byToken: Map<string, Trade[]>, upToBlock: bigint): WalletLedger {
   const positions = { ...ledger.positions };
