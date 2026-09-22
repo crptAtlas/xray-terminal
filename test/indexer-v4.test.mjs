@@ -121,3 +121,33 @@ test("weth legs are the quote side, never a position", () => {
   );
   assert.equal(rows.length, 0);
 });
+
+test("arbitrage chain: identical amounts are matched by log position, not first come", () => {
+  const A = "0xaaaa000000000000000000000000000000000001";
+  const B = "0xbbbb000000000000000000000000000000000002";
+  const amt = 1000n;
+  // hop 1: wallet sells A, receives B. hop 2: wallet sells that same B
+  // amount onward. Both hops move an identical amount of B.
+  const leg = (addr, from, to, a, idx) => ({
+    address: addr,
+    topics: [TRANSFER, pad(from), pad(to)],
+    data: `0x${a.toString(16).padStart(64, "0")}`,
+    blockNumber: 9n,
+    transactionHash: "0xarb",
+    logIndex: idx,
+  });
+  const sw = (a0, a1, idx) => ({ ...swap(a0, a1, "0xarb"), logIndex: idx });
+  const rows = decodeV4Rows(
+    [
+      leg(A, W, ADDR.poolManager, 500n, 1),
+      leg(B, ADDR.poolManager, W, amt, 3),
+      leg(B, W, ADDR.poolManager, amt, 5),
+    ],
+    [sw(-500n, amt, 2), sw(amt, -77n, 6)],
+  );
+  assert.equal(rows.length, 3);
+  const bBuy = rows.find((r) => r.token === B && r.kind === "buy");
+  const bSell = rows.find((r) => r.token === B && r.kind === "sell");
+  assert.equal(bBuy.eth, 500n, "the B a wallet received is priced by its own hop");
+  assert.equal(bSell.eth, 77n, "the B it sold onward is priced by the next hop");
+});

@@ -107,10 +107,12 @@ async function fetchWindow(client: PublicClient, fromBlock: bigint, toBlock: big
 const PM_PADDED = `0x000000000000000000000000${ADDR.poolManager.slice(2)}` as Hex;
 
 export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] {
-  // Swaps by transaction. A swap has two sides: what went in and what
-  // came out, so one swap serves both the seller's leg and the buyer's
-  // leg of the same trade - each side is claimed separately.
-  const swapsByTx = new Map<string, { sides: [bigint, bigint]; used: [boolean, boolean] }[]>();
+  // Swaps by transaction, each with its two sides and its position in the
+  // log. A trade writes its legs right next to its swap, so position is
+  // what tells one hop of an arbitrage chain from the next when several
+  // hops move identical amounts.
+  type Swap = { sides: [bigint, bigint]; used: [boolean, boolean]; logIndex: number };
+  const swapsByTx = new Map<string, Swap[]>();
   for (const l of swapLogs) {
     let decoded;
     try {
@@ -121,7 +123,7 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
     const a = decoded.args as { amount0: bigint; amount1: bigint };
     const abs = (v: bigint) => (v < 0n ? -v : v);
     const list = swapsByTx.get(l.transactionHash) ?? [];
-    list.push({ sides: [abs(a.amount0), abs(a.amount1)], used: [false, false] });
+    list.push({ sides: [abs(a.amount0), abs(a.amount1)], used: [false, false], logIndex: l.logIndex });
     swapsByTx.set(l.transactionHash, list);
   }
 
@@ -134,11 +136,11 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
     byTx.set(l.transactionHash, list);
   }
 
-  type Leg = { log: RawLog; wallet: string; tokens: bigint; kind: "buy" | "sell"; infra: boolean; token: string };
+  type Leg = { log: RawLog; wallet: string; tokens: bigint; kind: "buy" | "sell"; infra: boolean; token: string; taken: boolean };
   const rows: Row[] = [];
   for (const [tx, transfers] of byTx) {
-    const swaps = swapsByTx.get(tx);
-    if (!swaps || swaps.length === 0) continue;
+    const swaps = (swapsByTx.get(tx) ?? []).sort((a, b) => a.logIndex - b.logIndex);
+    if (swaps.length === 0) continue;
     const legs: Leg[] = [];
     for (const l of transfers) {
       const from = ("0x" + (l.topics[1] as string).slice(26)).toLowerCase();
@@ -149,88 +151,99 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
       const wallet = kind === "sell" ? from : to;
       const tokens = BigInt(l.data);
       if (tokens === 0n) continue;
-      // WETH legs and protocol legs are part of the trade's bookkeeping:
-      // they claim their side of a swap so the real legs match the right
-      // one, but they never become a position themselves
-      const bookkeeping = INFRA.has(wallet) || token === ADDR.weth;
-      legs.push({ log: l, wallet, tokens, kind, infra: bookkeeping, token });
+      // WETH legs and protocol legs are the trade's bookkeeping: they
+      // claim a swap side so the real legs match the right one, but they
+      // never become a position
+      legs.push({ log: l, wallet, tokens, kind, infra: INFRA.has(wallet) || token === ADDR.weth, token, taken: false });
     }
     if (legs.length === 0) continue;
+    legs.sort((a, b) => a.log.logIndex - b.log.logIndex);
 
-    const claim = (amount: bigint): bigint | null => {
-      for (const s of swaps) {
-        for (const side of [0, 1] as const) {
-          if (s.used[side] || s.sides[side] !== amount) continue;
-          const other = s.sides[side === 0 ? 1 : 0];
-          if (other === 0n) continue;
-          s.used[side] = true;
-          return other;
-        }
-      }
-      return null;
+    const emit = (leg: Leg, quote: bigint) => {
+      leg.taken = true;
+      if (leg.infra || quote === 0n) return;
+      rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: quote, token: leg.token });
     };
 
-    // pass 1: a leg whose amount is exactly one side of some swap - this
-    // is the multi-hop case, where every hop has its own swap
-    const leftover: Leg[] = [];
-    for (const leg of legs) {
-      const quote = claim(leg.tokens);
-      if (quote === null) {
-        if (!leg.infra) leftover.push(leg);
-        continue;
-      }
-      if (leg.infra) continue; // claimed its side, produces no position
-      rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: quote, token: leg.token });
-    }
-
-    // pass 2: legs that carried a protocol fee - the swap side is the sum
-    // of the wallet leg and the fee leg and the quote splits pro rata
-    const groups = new Map<string, Leg[]>();
-    for (const leg of legs) {
-      if (!leg.infra && !leftover.includes(leg)) continue;
-      const key = `${leg.token}|${leg.kind}`;
-      const g = groups.get(key) ?? [];
-      g.push(leg);
-      groups.set(key, g);
-    }
-    const stillLeft: Leg[] = [];
-    for (const g of groups.values()) {
-      const total = g.reduce((sum, x) => sum + x.tokens, 0n);
-      const quote = claim(total);
-      if (quote === null) {
-        for (const leg of g) if (!leg.infra) stillLeft.push(leg);
-        continue;
-      }
-      for (const leg of g) {
-        if (leg.infra) continue; // the protocol's cut, not a trade
-        const eth = (quote * leg.tokens) / total;
-        if (eth === 0n) continue;
-        rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth, token: leg.token });
-      }
-    }
-
-    // pass 3: some trades take their cut off the incoming side, so the
-    // leg is a few percent above the swap's side. Accept a near match
-    // when nothing else claimed that side.
-    for (const leg of stillLeft) {
-      let best: { quote: bigint; s: (typeof swaps)[number]; side: 0 | 1 } | null = null;
-      for (const sw of swaps) {
-        for (const side of [0, 1] as const) {
-          if (sw.used[side]) continue;
-          const v = sw.sides[side];
-          if (v === 0n) continue;
-          const diff = v > leg.tokens ? v - leg.tokens : leg.tokens - v;
-          if ((diff * 100n) / leg.tokens > 5n) continue; // within 5%
-          const other = sw.sides[side === 0 ? 1 : 0];
-          if (other === 0n) continue;
-          best = { quote: other, s: sw, side };
-          break;
+    // Walk swaps in log order. For each side, take the nearest unclaimed
+    // leg with that exact amount - nearest in the log is the leg that
+    // belongs to this hop.
+    for (const sw of swaps) {
+      for (const side of [0, 1] as const) {
+        if (sw.used[side]) continue;
+        const want = sw.sides[side];
+        const other = sw.sides[side === 0 ? 1 : 0];
+        if (want === 0n) continue;
+        let best: Leg | null = null;
+        let bestDist = Infinity;
+        for (const leg of legs) {
+          if (leg.taken || leg.tokens !== want) continue;
+          const dist = Math.abs(leg.log.logIndex - sw.logIndex);
+          if (dist < bestDist) {
+            best = leg;
+            bestDist = dist;
+          }
         }
-        if (best) break;
+        if (!best) continue;
+        sw.used[side] = true;
+        emit(best, other);
       }
-      if (!best) continue;
-      best.s.used[best.side] = true;
-      rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: best.quote, token: leg.token });
+    }
+
+    // Legs that carried a protocol fee: the swap side is the sum of the
+    // wallet leg and the fee leg beside it, and the quote splits pro rata.
+    for (const sw of swaps) {
+      for (const side of [0, 1] as const) {
+        if (sw.used[side]) continue;
+        const want = sw.sides[side];
+        const other = sw.sides[side === 0 ? 1 : 0];
+        if (want === 0n || other === 0n) continue;
+        const groups = new Map<string, Leg[]>();
+        for (const leg of legs) {
+          if (leg.taken) continue;
+          const key = `${leg.token}|${leg.kind}`;
+          const g = groups.get(key) ?? [];
+          g.push(leg);
+          groups.set(key, g);
+        }
+        let hit: Leg[] | null = null;
+        for (const g of groups.values()) {
+          if (g.reduce((sum, x) => sum + x.tokens, 0n) === want) {
+            hit = g;
+            break;
+          }
+        }
+        if (!hit) continue;
+        sw.used[side] = true;
+        const total = hit.reduce((sum, x) => sum + x.tokens, 0n);
+        for (const leg of hit) emit(leg, (other * leg.tokens) / total);
+      }
+    }
+
+    // Trades that take their cut off the incoming side leave the leg a
+    // few percent above the swap's side; accept the nearest such leg.
+    for (const sw of swaps) {
+      for (const side of [0, 1] as const) {
+        if (sw.used[side]) continue;
+        const want = sw.sides[side];
+        const other = sw.sides[side === 0 ? 1 : 0];
+        if (want === 0n || other === 0n) continue;
+        let best: Leg | null = null;
+        let bestDist = Infinity;
+        for (const leg of legs) {
+          if (leg.taken || leg.infra) continue;
+          const diff = leg.tokens > want ? leg.tokens - want : want - leg.tokens;
+          if ((diff * 100n) / (leg.tokens === 0n ? 1n : leg.tokens) > 5n) continue;
+          const dist = Math.abs(leg.log.logIndex - sw.logIndex);
+          if (dist < bestDist) {
+            best = leg;
+            bestDist = dist;
+          }
+        }
+        if (!best) continue;
+        sw.used[side] = true;
+        emit(best, other);
+      }
     }
   }
   return rows;
