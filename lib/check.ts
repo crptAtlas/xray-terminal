@@ -80,8 +80,24 @@ export async function* check(
   const wallets = snapshot.holders.slice(0, opts.profileLimit ?? 1000).map((h) => h.wallet);
   onStage({ agent: "tracer", status: "start" });
   // the scanned token itself is excluded from every profile: insiders of
-  // this launch must not decorate their stats with it
-  const profiles = await walletProfilesBatch(rpc, cache, wallets, opts.profileDeadlineMs ?? 60_000, snapshot.meta.address);
+  // this launch must not decorate their stats with it.
+  // Profiles arrive in chunks so the page fills in as they land instead
+  // of waiting for the last wallet of a thousand.
+  const CHUNK = 200;
+  const deadline = Date.now() + (opts.profileDeadlineMs ?? 60_000);
+  const profiles = new Map<string, Profile>();
+  for (let i = 0; i < wallets.length; i += CHUNK) {
+    const left = deadline - Date.now();
+    if (left <= 0) break;
+    const slice = wallets.slice(i, i + CHUNK);
+    const part = await walletProfilesBatch(rpc, cache, slice, left, snapshot.meta.address);
+    for (const [w, p] of part) profiles.set(w, p);
+    const read = [...profiles.values()].filter((p) => !p.notRead).length;
+    if (i + CHUNK < wallets.length && Date.now() < deadline) {
+      onStage({ agent: "tracer", status: "start", detail: `${read} of ${wallets.length} wallets` });
+      yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
+    }
+  }
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }

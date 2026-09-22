@@ -270,7 +270,12 @@ function withProfiles(
 // One in-flight scan per token per process: concurrent viewers (the SSE
 // terminal, the OG card route, a second tab) subscribe to the same run
 // instead of racing each other for RPC slots and the SQLite writer.
-const inflight = new Map<string, { promise: Promise<LiveScan>; listeners: Set<(e: StageEvent) => void> }>();
+const inflight = new Map<string, {
+  promise: Promise<LiveScan>;
+  listeners: Set<(e: StageEvent) => void>;
+  phaseListeners: Set<(p: LiveScan) => void>;
+  last: LiveScan | null;
+}>();
 
 export function runScan(
   address: string,
@@ -280,10 +285,23 @@ export function runScan(
   const key = address.toLowerCase();
   const existing = inflight.get(key);
   if (existing) {
+    // a second viewer joins a running scan: it gets the stages from here
+    // on, the partial result already computed, and every later partial
     existing.listeners.add(onStage);
+    if (onPhase) {
+      existing.phaseListeners.add(onPhase);
+      if (existing.last) onPhase(existing.last);
+    }
     return existing.promise;
   }
   const listeners = new Set<(e: StageEvent) => void>([onStage]);
+  const phaseListeners = new Set<(p: LiveScan) => void>();
+  if (onPhase) phaseListeners.add(onPhase);
+  const entry = { listeners, phaseListeners, last: null as LiveScan | null };
+  const emit = (p: LiveScan) => {
+    entry.last = p;
+    phaseListeners.forEach((fn) => fn(p));
+  };
   const promise = (async () => {
     const provider = await pickProvider();
     const cache = new Cache(cachePath());
@@ -298,9 +316,11 @@ export function runScan(
       })) {
         if (phase.phase === 1) {
           scan = toLiveScan(phase, (Date.now() - t0) / 1000, provider.stats().requests);
-          onPhase?.(scan);
+          emit(scan);
         } else if (scan) {
+          // the profile phase arrives in chunks; every chunk is a result
           scan = withProfiles(scan, phase.profiles, phase.aggregates, (Date.now() - t0) / 1000, provider.stats().requests);
+          emit(scan);
         }
       }
       if (!scan) throw new Error("scan produced no result");
@@ -310,6 +330,6 @@ export function runScan(
       inflight.delete(key);
     }
   })();
-  inflight.set(key, { promise, listeners });
+  inflight.set(key, { promise, ...entry });
   return promise;
 }
