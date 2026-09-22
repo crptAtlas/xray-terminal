@@ -96,20 +96,27 @@ export class RpcProvider implements Provider {
       phase: Number(launchedRaw.phase),
     };
 
-    const [symbol, name, decimals, totalSupply, launchedAt] = await Promise.all([
-      this.client.readContract({ address: addr, abi: erc20Abi, functionName: "symbol" }),
-      this.client.readContract({ address: addr, abi: erc20Abi, functionName: "name" }),
-      this.client.readContract({ address: addr, abi: erc20Abi, functionName: "decimals" }),
-      this.client.readContract({ address: addr, abi: erc20Abi, functionName: "totalSupply" }),
-      this.client.readContract({ address: launched.curve, abi: curveAbi, functionName: "launchedAt" }),
-    ]);
+    // one multicall instead of five round trips
+    const [symbol, name, decimals, totalSupply, launchedAt] = (await this.client.multicall({
+      contracts: [
+        { address: addr, abi: erc20Abi, functionName: "symbol" },
+        { address: addr, abi: erc20Abi, functionName: "name" },
+        { address: addr, abi: erc20Abi, functionName: "decimals" },
+        { address: addr, abi: erc20Abi, functionName: "totalSupply" },
+        { address: launched.curve, abi: curveAbi, functionName: "launchedAt" },
+      ],
+      allowFailure: false,
+    })) as [string, string, number, bigint, bigint];
 
     let phase: TokenMeta["phase"];
     if (launched.phase === PHASE.curve) {
-      const [real, threshold] = await Promise.all([
-        this.client.readContract({ address: launched.curve, abi: curveAbi, functionName: "realQuoteReserve" }),
-        this.client.readContract({ address: launched.curve, abi: curveAbi, functionName: "graduationThreshold" }),
-      ]);
+      const [real, threshold] = (await this.client.multicall({
+        contracts: [
+          { address: launched.curve, abi: curveAbi, functionName: "realQuoteReserve" },
+          { address: launched.curve, abi: curveAbi, functionName: "graduationThreshold" },
+        ],
+        allowFailure: false,
+      })) as [bigint, bigint];
       const fillPct = threshold === 0n ? 0 : Number((real * 10_000n) / threshold) / 100;
       phase = { kind: "curve", fillPct: Math.min(fillPct, 100) };
     } else {
@@ -287,7 +294,9 @@ export class RpcProvider implements Provider {
     const p = (async () => {
       if (!token.pool) return null;
       const toBlock = await this.client.getBlockNumber();
-      for (const span of [20_000n, 160_000n, CHAIN.blocksPerDay]) {
+      // one recent window: a token with no swap in it has no live price
+      // worth quoting, and the escalating hunt cost dozens of requests
+      for (const span of [40_000n]) {
         const fromBlock = toBlock > span ? toBlock - span : 0n;
         const swaps = await getLogsAdaptive(this.client, {
           address: ADDR.poolManager as Hex,

@@ -108,11 +108,20 @@ export async function tokenSnapshot(
   const candidates = [...wallets].filter((w) => !infra.has(w));
   const infraCount = wallets.size - candidates.length;
 
-  const [balances, priceEth, usdRate] = await Promise.all([
+  // The last trade in the index is the market price, so a graduated
+  // token needs no log hunt for its latest swap. Falling back to the
+  // provider keeps tokens the index does not cover working.
+  const lastTrade = trades.length ? trades[trades.length - 1]! : null;
+  const indexPrice =
+    indexCovers && lastTrade && lastTrade.tokens > 0n
+      ? Number(lastTrade.eth) / Number(lastTrade.tokens)
+      : null;
+  const [balances, priceFromProvider, usdRate] = await Promise.all([
     provider.balances(meta, candidates),
-    provider.priceNowEth(meta),
+    indexPrice === null ? provider.priceNowEth(meta) : Promise.resolve(indexPrice),
     ethUsd(),
   ]);
+  const priceEth = priceFromProvider;
 
   const tradesByWallet = new Map<string, Trade[]>();
   for (const t of trades) {
