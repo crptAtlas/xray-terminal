@@ -45,8 +45,8 @@ export const GRADE_THRESHOLDS = {
   // Calibrated on this chain: the median wallet averages 0% a trade and
   // only the top tenth clears +39%, so green marks a room that is
   // genuinely ahead rather than an impossible bar.
-  healthy: 15, // holders averaging +15% a trade or better
-  cracked: -10, // -10% to +15%: around the chain's own median
+  healthy: 25, // holders averaging +25% a trade or better
+  cracked: 0, // 0% to +25%: at or above the chain's own median
 } as const;
 
 export function gradeOf(
