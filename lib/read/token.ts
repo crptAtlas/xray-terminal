@@ -108,14 +108,18 @@ export async function tokenSnapshot(
   const candidates = [...wallets].filter((w) => !infra.has(w));
   const infraCount = wallets.size - candidates.length;
 
-  // The last trade in the index is the market price, so a graduated
-  // token needs no log hunt for its latest swap. Falling back to the
-  // provider keeps tokens the index does not cover working.
-  const lastTrade = trades.length ? trades[trades.length - 1]! : null;
-  const indexPrice =
-    indexCovers && lastTrade && lastTrade.tokens > 0n
-      ? Number(lastTrade.eth) / Number(lastTrade.tokens)
-      : null;
+  // Recent trades in the index give the market price without hunting the
+  // latest swap in the logs. One trade is not enough: a dust trade or a
+  // rounding artifact would set the price for the whole token, so this
+  // takes the median of the last twenty and falls back to the provider
+  // when they say nothing sane.
+  const recent = trades.slice(-20).filter((t) => t.tokens > 0n && t.eth > 0n);
+  let indexPrice: number | null = null;
+  if (indexCovers && recent.length >= 3) {
+    const prices = recent.map((t) => Number(t.eth) / Number(t.tokens)).sort((a, b) => a - b);
+    const mid = prices[Math.floor(prices.length / 2)]!;
+    if (Number.isFinite(mid) && mid > 0) indexPrice = mid;
+  }
   const [balances, priceFromProvider, usdRate] = await Promise.all([
     provider.balances(meta, candidates),
     indexPrice === null ? provider.priceNowEth(meta) : Promise.resolve(indexPrice),
