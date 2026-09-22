@@ -146,11 +146,14 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
       const kind: "buy" | "sell" | null = to === pm ? "sell" : from === pm ? "buy" : null;
       if (!kind) continue;
       const token = l.address.toLowerCase();
-      if (token === ADDR.weth) continue; // the quote leg of a trade, not a position
       const wallet = kind === "sell" ? from : to;
       const tokens = BigInt(l.data);
       if (tokens === 0n) continue;
-      legs.push({ log: l, wallet, tokens, kind, infra: INFRA.has(wallet), token });
+      // WETH legs and protocol legs are part of the trade's bookkeeping:
+      // they claim their side of a swap so the real legs match the right
+      // one, but they never become a position themselves
+      const bookkeeping = INFRA.has(wallet) || token === ADDR.weth;
+      legs.push({ log: l, wallet, tokens, kind, infra: bookkeeping, token });
     }
     if (legs.length === 0) continue;
 
@@ -171,12 +174,12 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
     // is the multi-hop case, where every hop has its own swap
     const leftover: Leg[] = [];
     for (const leg of legs) {
-      if (leg.infra) continue;
       const quote = claim(leg.tokens);
       if (quote === null) {
-        leftover.push(leg);
+        if (!leg.infra) leftover.push(leg);
         continue;
       }
+      if (leg.infra) continue; // claimed its side, produces no position
       rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: quote, token: leg.token });
     }
 
@@ -190,16 +193,44 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
       g.push(leg);
       groups.set(key, g);
     }
+    const stillLeft: Leg[] = [];
     for (const g of groups.values()) {
       const total = g.reduce((sum, x) => sum + x.tokens, 0n);
       const quote = claim(total);
-      if (quote === null) continue;
+      if (quote === null) {
+        for (const leg of g) if (!leg.infra) stillLeft.push(leg);
+        continue;
+      }
       for (const leg of g) {
         if (leg.infra) continue; // the protocol's cut, not a trade
         const eth = (quote * leg.tokens) / total;
         if (eth === 0n) continue;
         rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth, token: leg.token });
       }
+    }
+
+    // pass 3: some trades take their cut off the incoming side, so the
+    // leg is a few percent above the swap's side. Accept a near match
+    // when nothing else claimed that side.
+    for (const leg of stillLeft) {
+      let best: { quote: bigint; s: (typeof swaps)[number]; side: 0 | 1 } | null = null;
+      for (const sw of swaps) {
+        for (const side of [0, 1] as const) {
+          if (sw.used[side]) continue;
+          const v = sw.sides[side];
+          if (v === 0n) continue;
+          const diff = v > leg.tokens ? v - leg.tokens : leg.tokens - v;
+          if ((diff * 100n) / leg.tokens > 5n) continue; // within 5%
+          const other = sw.sides[side === 0 ? 1 : 0];
+          if (other === 0n) continue;
+          best = { quote: other, s: sw, side };
+          break;
+        }
+        if (best) break;
+      }
+      if (!best) continue;
+      best.s.used[best.side] = true;
+      rows.push({ block: leg.log.blockNumber, logIndex: leg.log.logIndex, tx, curve: "", wallet: leg.wallet, kind: leg.kind, tokens: leg.tokens, eth: best.quote, token: leg.token });
     }
   }
   return rows;
