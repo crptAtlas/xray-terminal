@@ -106,6 +106,7 @@ export class RpcProvider implements Provider {
         { address: launched.curve, abi: curveAbi, functionName: "launchedAt" },
       ],
       allowFailure: false,
+      batchSize: 200_000,
     })) as [string, string, number, bigint, bigint];
 
     let phase: TokenMeta["phase"];
@@ -253,6 +254,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
+        batchSize: 200_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
@@ -274,6 +276,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
+        batchSize: 200_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
