@@ -4,6 +4,7 @@ import type { Profile } from "../profile/profile.ts";
 import type { Aggregates } from "../pnl/aggregate.ts";
 import { fmtAge, fmtUsd, isDead, DEAD_HOLDERS_MIN } from "../format.ts";
 import { gradeOf, type Grade } from "../grade.ts";
+import type { HolderRow } from "../read/token.ts";
 import { RpcProvider, makeClient, pickProvider } from "../providers/rpc.ts";
 import { touchScan } from "../scanflag.ts";
 import { resolveTicker, looksLikeAddress } from "../read/launches.ts";
@@ -222,6 +223,7 @@ function withProfiles(
   aggregates: Aggregates,
   seconds: number,
   requests: number,
+  scanHolders: HolderRow[],
 ): LiveScan {
   const holders = scan.holders.map((r) => {
     const p = profiles.get(r.addrFull);
@@ -240,10 +242,14 @@ function withProfiles(
   holders.sort((x, y) => (y.avgPnlNum ?? -Infinity) - (x.avgPnlNum ?? -Infinity));
   const wr = aggregates.avgWinrate;
   const hp = aggregates.avgProfilePnl;
+  // the grade waited for the holders' record; recompute it now
+  const grade = gradeOf(aggregates, scanHolders, scan.dead);
+  const gradeColor = grade === "healthy" ? "#60F080" : grade === "cracked" ? "#FFD640" : "#FF605C";
   const profilesRead = [...profiles.values()].filter((p) => !p.notRead).length;
   const ft = aggregates.firstTrade;
   return {
     ...scan,
+    grade,
     holders,
     profilesRead,
     flags: {
@@ -252,6 +258,7 @@ function withProfiles(
     },
     verdict: {
       ...scan.verdict,
+      hint: HINTS[grade],
       holdersPnl: hp === null ? null : pct(hp),
       holdersPnlNum: hp,
       holdersPnlWallets: aggregates.profilePnlWallets,
@@ -263,6 +270,10 @@ function withProfiles(
       pnl: pct(hp),
       pnlHere: scan.verdict.pnl,
       winrate: wr === null ? "—" : wr.toFixed(0) + "%",
+      grade,
+      gradeColor,
+      gradeLabel: grade.toUpperCase(),
+      hint: scan.dead ? "token is dead. you're too early or too late" : HINTS[grade],
     },
     source: { ...scan.source, label: "rpc + index", requests, seconds },
   };
@@ -310,6 +321,7 @@ export function runScan(
     const t0 = Date.now();
     try {
       let scan: LiveScan | null = null;
+      let snapHolders: HolderRow[] = [];
       for await (const phase of check(provider, cache, key as `0x${string}`, {
         profiles: true,
         profileLimit: 1000,
@@ -320,11 +332,12 @@ export function runScan(
         },
       })) {
         if (phase.phase === 1) {
+          snapHolders = phase.snapshot.holders;
           scan = toLiveScan(phase, (Date.now() - t0) / 1000, provider.stats().requests);
           emit(scan);
         } else if (scan) {
           // the profile phase arrives in chunks; every chunk is a result
-          scan = withProfiles(scan, phase.profiles, phase.aggregates, (Date.now() - t0) / 1000, provider.stats().requests);
+          scan = withProfiles(scan, phase.profiles, phase.aggregates, (Date.now() - t0) / 1000, provider.stats().requests, snapHolders);
           emit(scan);
         }
       }

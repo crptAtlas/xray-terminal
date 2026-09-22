@@ -133,3 +133,18 @@ test("avgProfilePnl: supply-weighted holders record, clamped, current holders on
   const b = aggregate([row("0xa", 0.05, 1)], crazy);
   assert.equal(b.avgProfilePnl, 500);
 });
+
+test("grade waits for the holders record and then respects it", async () => {
+  const { gradeOf } = await import("../lib/grade.ts");
+  const row = (share, pnl) => ({ wallet: "0x" + share, supplyShare: share, position: { pnlPct: pnl, closed: false, boughtTokens: 1n } });
+  const holders = [row(0.05, 40), row(0.04, 20), row(0.03, -5)];
+  const base = { avgPnlPct: 20, avgWinrate: null, avgProfilePnl: null, medianPnlPct: 20, inProfit: 2, pnlWallets: 3, winrateWallets: 0, profilePnlWallets: 0, firstTrade: null, exited: { wallets: 0, avgPnlPct: null, avgWinrate: null } };
+  // before profiles land the token alone decides
+  assert.equal(gradeOf(base, holders, false), "healthy");
+  // holders who lose everywhere pull a green-looking token down
+  assert.equal(gradeOf({ ...base, avgProfilePnl: -25, avgWinrate: 20 }, holders, false), "cracked");
+  // holders with a decent record keep it healthy
+  assert.equal(gradeOf({ ...base, avgProfilePnl: 15, avgWinrate: 40 }, holders, false), "healthy");
+  // a dead token is shattered regardless
+  assert.equal(gradeOf({ ...base, avgProfilePnl: 50 }, holders, true), "shattered");
+});

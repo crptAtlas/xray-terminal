@@ -306,7 +306,17 @@ export function Terminal() {
   const showTable = isResult && !D.dead;
 
   const pnlPos = D.pnlNum === null ? 0 : Math.max(0, Math.min(100, (D.pnlNum + 100) / 3));
-  const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, (D.holdersPnlNum + 100) / 3));
+  // scales calibrated on every wallet with 2+ closed trades on this chain:
+  // avg pnl p25 -13 / median 0 / p75 +11, winrate p25 27 / median 36 / p75 49
+  const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, ((D.holdersPnlNum + 50) / 150) * 100));
+  const holdersPnlColor =
+    D.holdersPnlNum === null
+      ? "var(--bone-dark)"
+      : D.holdersPnlNum >= 11
+        ? "var(--profit)"
+        : D.holdersPnlNum >= -13
+          ? "var(--neutral)"
+          : "var(--loss)";
   const wrPos = D.winrate === null ? 0 : parseFloat(D.winrate);
   const glowColor = D.gradeColor + "55";
 
@@ -570,9 +580,9 @@ export function Terminal() {
               {metric(
                 "avg pnl / trade of holders",
                 D.holdersPnl,
-                D.holdersPnlNum === null ? "var(--bone-dark)" : pnlColor(D.holdersPnlNum),
+                holdersPnlColor,
                 holdersPnlPos,
-                ["−100%", "0", "+100%", "+200%"],
+                ["−50%", "0", "+50%", "+100%"],
                 D.holdersPnl !== null ? (
                   <>chain-wide record of <span style={{ color: "var(--text)" }}>{D.holdersPnlWallets}</span> holders · this token excluded</>
                 ) : D.profilesRead !== null && D.profilesRead > 0 ? (
@@ -585,11 +595,11 @@ export function Terminal() {
               {metric(
                 "avg winrate",
                 D.winrate,
-                D.winrate === null ? "var(--bone-dark)" : wrPos >= 55 ? "var(--profit)" : wrPos >= 45 ? "var(--neutral)" : "var(--loss)",
+                D.winrate === null ? "var(--bone-dark)" : wrPos >= 49 ? "var(--profit)" : wrPos >= 27 ? "var(--neutral)" : "var(--loss)",
                 wrPos,
-                ["0", "33", "66", "100"],
+                ["0", "27", "49", "100"],
                 D.winrate !== null ? (
-                  <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades</>
+                  <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades · chain median 36%</>
                 ) : D.profilesRead === 0 ? (
                   <>wallet histories unavailable right now - retry the scan</>
                 ) : D.profilesRead !== null ? (
