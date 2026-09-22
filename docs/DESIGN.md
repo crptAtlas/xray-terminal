@@ -68,20 +68,44 @@ extend it from the last indexed block. Address queries never touch it.
 meta(key, value)                          schema version
 tokens(address PK, symbol, curve, created_block, synced_block, ...)
 trades(token, wallet, block, kind, tokens, eth, tx)   raw classified trades
+chain_trades(block, log_index PK, wallet, curve, token, kind, tokens, eth)
+                                          the chain-wide trade index
 launches(block, token, symbol, curve)     ticker index
-profiles(wallet PK, json, fetched_at)     global, 24h TTL
+curve_tokens(curve PK, token)             curve to token map
+profiles(wallet PK, json, fetched_at)     global, 24h TTL, carries a ledger
 ```
 
 Token repeat = read trades from SQLite + getLogs from `synced_block + 1`.
 
-## Bitquery (mode B)
+## The trade index
 
-Written against Bitquery's documented EAP schema for network `robinhood`
-(`streaming.bitquery.io/graphql`, Bearer token from `BITQUERY_TOKEN`).
-No live account exists yet, so mode B ships behind the same provider
-interface with its queries unit-tested on canned responses; the README
-marks live verification of mode B as pending. No token in the repo,
-ever; env only.
+Two lanes fill `chain_trades`, each with its own span in `meta`:
+
+- **curve** - `CurveBuy` and `CurveSell` over the whole chain, trader
+  from the indexed topic.
+- **v4** - post-graduation pool trades. The `Swap` event names no
+  trader, so the trader comes from the token transfer between the wallet
+  and the pool manager in the same transaction, and the quote from the
+  swap's other side. One swap serves both legs of an exchange, a trade
+  can hop several pools and the protocol takes a leg of its own, so
+  sides are claimed one at a time: exact leg matches first, then groups
+  that include the fee leg, then a near match for cuts taken off the
+  incoming side.
+
+`xray index` backfills a lane (resumable, adaptive window under the
+node's 10k-log cap), `xray follow` keeps both at the head, `repair-v4`
+re-decodes a range in place after a decoder fix. A digger yields the
+node to visitor scans through a flag file (`lib/scanflag.ts`) - the
+node serves one IP strictly in order, so a backfill would otherwise put
+every scan behind it.
+
+## Wallet ledger
+
+A profile is not a replay. Per token the ledger keeps bought tokens,
+bought cost, sold tokens, sold proceeds and the last price, plus the
+block the wallet is synced to. New trades are added to those sums, so a
+repeat scan folds only what happened since. Positions, closed trades,
+avg pnl per trade and winrate derive from the sums.
 
 ## CI
 

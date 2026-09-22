@@ -5,17 +5,21 @@
   <img src="https://img.shields.io/badge/Node-20%2B-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Node 20 or newer">
   <img src="https://img.shields.io/badge/Robinhood_Chain-4663-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Robinhood Chain 4663">
   <img src="https://img.shields.io/badge/signing-none-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="No signing">
-  <img src="https://img.shields.io/badge/tests-77-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="77 tests">
+  <img src="https://img.shields.io/badge/tests-92-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="92 tests">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="MIT license"></a>
 </p>
 
-<p align="center"><strong>The terminal that shows who is actually in profit in a token.</strong><br>A read-only CLI and library for holder PnL on Pons V2 tokens, Robinhood Chain.</p>
+<p align="center"><strong>The terminal that shows who is actually in profit in a token - and whether those people can trade at all.</strong><br>A read-only CLI and library for holder PnL on Pons V2 tokens, Robinhood Chain.</p>
 
 <p align="center"><a href="#start-in-one-minute">Start in one minute</a> · <a href="#how-it-reads-a-token">How it reads a token</a> · <a href="#grades">Grades</a> · <a href="#live-check">Live check</a> · <a href="#methodology">Methodology</a> · <a href="#boundaries">Boundaries</a></p>
 
 ## Why xray
 
-A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets. The only question that matters before you walk in is how the people already inside are doing: who is up, who is down, who already left and who is stuck holding a bag they cannot explain. xray takes a token address and reads the whole room: the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds.
+A chart shows you a price. It does not show you who is trapped. Every Pons token is a room full of wallets, and two questions decide whether you walk in: how the people inside are doing right now, and whether those people have ever made money anywhere else.
+
+xray answers both. It takes a token address and reads the whole room - the PnL of every holder, the dense clusters they form, the average weighted by how much each of them actually holds - and then reads the holders themselves: every trade each of them ever made across every Pons token, folded into an average PnL per trade and a winrate. A token held by wallets that lose everywhere is a different token from one held by wallets that win, even when the chart looks identical.
+
+The headline number is that second one: **the average PnL per closed trade of the people holding this token, measured across their whole history and excluding this token**. Their position here is deliberately left out, so the launch's own insiders cannot decorate their record with it.
 
 ### One command, the whole room
 
@@ -69,7 +73,7 @@ xray check 0x… --card card.png
 git clone https://github.com/Skynet-inisghts/holder-pnl.git
 cd holder-pnl
 npm install
-npm test              # 77 tests, offline, on bundled fixtures
+npm test              # 92 tests, offline, on bundled fixtures
 npm run cli -- demo
 ```
 
@@ -94,17 +98,31 @@ npm run cli -- check 0x…            # by contract address
 npm run cli -- check TICKER         # by ticker; ambiguous tickers list the cluster
 npm run cli -- check 0x… --format json --output out.json
 npm run cli -- wallet 0x…           # wallet profile, full chain history
-npm run cli -- index                # build the local chain-wide trade index
+npm run cli -- index                # build the local chain-wide trade index (resumable)
+npm run cli -- follow               # keep the index at the chain head, forever
+npm run cli -- repair-v4            # re-decode a range of v4 trades in place
 ```
 
-**One source: the public RPC.** No keys, no registration, no rate budget to buy. Phase 1 (holder PnL, groups, supply-weighted averages, header, cards) reads the token's own logs with adaptive windows: a 1,000-holder token computes in ~10-20s cold, repeats are near-instant from the incremental cache. Phase 2 (wallet profiles, badges, token winrate) reads the local trade index: the curve events name the real trader in their topics, so `xray index` backfills every curve trade on the chain into SQLite once, a cheap tail sync keeps it at the head and any wallet's full history is a local SELECT. Top-1000 profiles land in seconds at full depth. Post-graduation v4 swaps carry no trader topic and stay out of profiles - the curve is where meme life happens.
+**One source: the public RPC.** No keys, no registration, no rate budget to buy.
+
+Phase 1 - the token itself (holder PnL, bands, supply-weighted averages, header, card) - reads that token's own logs with adaptive windows. Phase 2 - who those holders are - reads a local index instead of the network: `xray index` walks the chain once and writes every trade of every wallet into SQLite, `xray follow` keeps it at the head, and from then on a wallet's whole history is a local SELECT. A thousand holders are profiled in seconds, at full depth, without a single extra request.
+
+Two kinds of trade go into that index, and both name their trader:
+
+- **On the curve**, `CurveBuy` and `CurveSell` carry the trader in an indexed topic, so a wallet's curve history is exact.
+- **After graduation**, the v4 `Swap` event names nobody - but the token itself moves between the trader and the pool manager in the same transaction, and the swap's two sides say what the trade was worth. One swap serves both legs of an exchange, a trade can hop through several pools, and the protocol takes its cut as an extra leg; the decoder in `lib/read/indexer.ts` handles all three, which is what makes post-graduation history usable at all. Most of a wallet's record lives here, not on the curve.
+
+Profiles are folded incrementally: a wallet's record is four running sums per token plus the block it is synced to, so a later scan applies only the trades made since - the history is never recomputed from the first block.
 
 Tickers are not unique on Pons. When several launches share one, the CLI lists every candidate with its launch block and asks for the address. The first ticker query builds a launch index of the whole chain (minutes, half a million launches); later queries extend it incrementally (seconds).
 
 ## Methodology
 
+- **The token's headline is its holders' record, not its own chart.** Every current holder's average PnL per closed trade across Pons, weighted by the share of supply they hold, with this token excluded from their own numbers. Winrate follows the same rule; the token's own PnL is shown next to them, not instead of them.
 - **PnL per token, not per wallet balance.** `pnl = sold_proceeds + value_now - bought_cost`, realized and unrealized in one number. An ETH top-up between trades cannot leak into it.
-- **The trader is the token movement, never `tx.from`.** The transaction signer is almost always a relayer; buys and sells are detected by which side of the market the tokens crossed.
+- **The trader is the token movement, never `tx.from`.** The transaction signer is almost always a relayer; buys and sells are detected by which side of the market the tokens crossed. On the curve that is the event's own topic, in a v4 pool it is the token transfer beside the swap.
+- **A position is a sum, not a replay.** Bought tokens, bought cost, sold tokens, sold proceeds - four running totals per token, so new trades are added to a wallet's record instead of rebuilding it.
+- **Stock-paired launches count in their own unit.** Roughly two launches in five are paired with a tokenized stock rather than ETH; percentages stay correct because every amount for such a token is in the same quote unit, and the dollar figures step aside instead of lying.
 - **Averages are supply-weighted.** A wallet holding 5% of supply moves the token average five times harder than one holding 1%. Wallets that exited hold nothing, so they get their own line instead of steering the current picture.
 - **Transfers break cost basis.** Tokens that arrived by transfer have no honest entry price; such wallets are flagged `unknown basis` and counted, never guessed. A microscopic cost basis (a few wei) is flagged the same way instead of printing astronomical percentages.
 - **Opening tax is not part of cost basis**, so first-second buyers show inflated PnL - stated, not hidden.
@@ -117,16 +135,20 @@ The full spec lives in [docs/SPEC.md](docs/SPEC.md), the decisions on top of it 
 ## Project map
 
 ```text
-bin/xray.mjs             CLI: check, wallet, doctor, demo, serve
+bin/xray.mjs             CLI: check, wallet, index, follow, repair-v4, doctor, demo
 lib/
   chain.ts               chain constants, verified by doctor
   providers/             the source boundary: gate, adaptive logs, rpc
   read/                  token snapshot, header, launches, wallets
+    indexer.ts           the chain-wide trade index: curve events and v4 pool trades
+    repair-v4.ts         re-decode a block range of v4 trades in place
   pnl/                   pure math: classify, position, groups, aggregate
   profile/               winrate, badges, wallet profile
+    ledger.ts            incremental wallet ledger: running sums, never a replay
+  scanflag.ts            a digger yields the node while a scan is running
   grade.ts               healthy / cracked / shattered
   card.ts                1080x1080 share card with the grade skeleton
-  cache.ts               SQLite: token ledger, launch index, 24h profile cache
+  cache.ts               SQLite: trade index, token ledger, launch index, profile cache
   format.ts              text / json / markdown
 assets/brand/            the art pack: sprites, fonts, generators (render_*.py)
 assets/readme/           SVG views rendered from real command output (npm run render:readme)

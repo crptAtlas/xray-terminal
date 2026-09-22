@@ -10,8 +10,7 @@ site (app/) runs on design fixtures; this file is the bridge.
 browser → /api/scan?token=0x…            (Next route)
             └─ engine check() iterator   (lib/check.ts)
                  ├─ phase 1: token scan  (holders, pnl, bands, header, card;
-                 │                        Bitquery fast path when fresh,
-                 │                        public RPC otherwise)
+                 │                        the token's own logs)
                  └─ phase 2: profiles    (winrate, badges, wallet histories;
                                           local chain-wide trade index fed
                                           by the public RPC - full history,
