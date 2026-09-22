@@ -24,7 +24,7 @@ import { yieldToScans } from "../scanflag.ts";
 const WINDOW = 40_000n; // ~1.1 h of chain per request
 // v4 logs are ~60x denser than curve events (every pool transfer plus
 // every swap), so that lane walks in much smaller windows
-const WINDOW_V4 = 3_000n;
+const WINDOW_V4 = BigInt(process.env.XRAY_V4_WINDOW ?? "2000");
 const WINDOW_MAX = 640_000n; // empty pre-launchpad desert: grow up to this
 // Politeness matters: the official node temporarily 403-bans IPs that pull
 // too hard. Two windows in flight plus a breath between batches finishes
@@ -205,9 +205,14 @@ export function decodeV4Rows(transferLogs: RawLog[], swapLogs: RawLog[]): Row[] 
 }
 
 async function fetchWindowV4(client: PublicClient, fromBlock: bigint, toBlock: bigint, onSplit?: () => void): Promise<Row[]> {
+  // A range whose buys are already indexed (the fee-leg repair covered
+  // them) only needs the sell side, which drops a third of the traffic.
+  const sellsOnly = !!process.env.XRAY_V4_SELLS_ONLY;
   const [toPm, fromPm, swaps] = await Promise.all([
     getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, null, PM_PADDED], fromBlock, toBlock }, { parallel: 1, onSplit }),
-    getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1, onSplit }),
+    sellsOnly
+      ? Promise.resolve([] as RawLog[])
+      : getLogsAdaptive(client, { topics: [TOPIC.transfer as Hex, PM_PADDED], fromBlock, toBlock }, { parallel: 1, onSplit }),
     getLogsAdaptive(client, { address: ADDR.poolManager as Hex, topics: [SWAP_TOPIC as Hex], fromBlock, toBlock }, { parallel: 1, onSplit }),
   ]);
   return decodeV4Rows(toPm.concat(fromPm), swaps);
