@@ -43,10 +43,14 @@ export function GET(req: NextRequest): Response {
           send("picks", outcome.picks);
           return;
         }
+        // The half-built scan goes out under its own name. It used to
+        // share "result" with the finished one, and a viewer that took
+        // the first of those was left looking at a token judged on its
+        // own book with every holder's record still blank.
         const result = await runScan(
           outcome.address!,
           (e) => send("stage", e),
-          (partial) => send("result", partial),
+          (partial) => send("partial", partial),
         );
         send("result", result);
       } catch (err) {
