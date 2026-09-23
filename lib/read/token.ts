@@ -63,12 +63,17 @@ export async function tokenSnapshot(
   // cover the token's lifetime; otherwise the node path below runs.
   const curveSpan = cache.tradeIndexSpan("curve");
   const v4Span = cache.tradeIndexSpan("v4");
+  // The folded rows hold every trade that was ever indexed, so coverage
+  // is asked of them rather than of the raw trades, which may be kept to
+  // a rolling window.
+  const foldFloor = cache.positionsFloor();
+  const floor = foldFloor ?? { curve: curveSpan?.floor ?? 0n, v4: v4Span?.floor ?? 0n };
   const indexCovers =
     !process.env.XRAY_NO_INDEX_SCAN &&
     !!curveSpan &&
     !!v4Span &&
-    curveSpan.floor <= meta.createdBlock &&
-    v4Span.floor <= meta.createdBlock &&
+    floor.curve <= meta.createdBlock &&
+    floor.v4 <= meta.createdBlock &&
     curveSpan.tip > meta.createdBlock;
 
   let trades: Trade[];

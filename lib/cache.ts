@@ -597,6 +597,20 @@ export class Cache {
     return this.getMeta("positions_built") === "1";
   }
 
+  /**
+   * The oldest block each lane was folded from. Raw trades may be pruned
+   * to a rolling window afterwards, and the folded rows still hold every
+   * trade that was ever indexed: a token scan asks this, not where the
+   * raw trades now begin.
+   */
+  positionsFloor(): { curve: bigint; v4: bigint } | null {
+    if (!this.positionsReady()) return null;
+    const curve = this.getMeta("positions_floor") ?? this.getMeta("trades_floor");
+    const v4 = this.getMeta("positions_floor_v4") ?? this.getMeta("trades_v4_floor");
+    if (curve === null || v4 === null) return null;
+    return { curve: BigInt(curve), v4: BigInt(v4) };
+  }
+
   chainTradesFor(wallets: string[], afterBlock = -1n): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]> {
     const out = new Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]>();
     if (wallets.length === 0) return out;
