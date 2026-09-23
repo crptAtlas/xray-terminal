@@ -2,6 +2,7 @@ import type { Trade } from "../pnl/classify.ts";
 import { position } from "../pnl/position.ts";
 import { winrate } from "./winrate.ts";
 import { badges } from "./badges.ts";
+import type { ProfileStats } from "../cache.ts";
 
 /**
  * Wallet profile (spec 3.5): every trade of the wallet across every token,
@@ -118,6 +119,37 @@ export function profileFromPositions(
       avgPnlPerTrade: full.avg,
       winrate: full.wr,
       balanceUsd: (Number(ethWei + full.openValueWei) / 1e18) * ethUsdRate,
+    }),
+  };
+}
+
+/**
+ * A profile from a record the database folded, rather than from the
+ * positions themselves. Same arithmetic as profileFromPositions - the
+ * sums simply arrive already added.
+ */
+export function profileFromStats(
+  wallet: string,
+  stats: ProfileStats,
+  ethWei: bigint,
+  ethUsdRate = 0,
+): Profile {
+  const shown = stats.shown;
+  const full = stats.full;
+  const ethFloat = Number(ethWei) / 1e18;
+  return {
+    wallet: wallet.toLowerCase(),
+    trades: shown.closed,
+    wins: shown.wins,
+    avgPnlPerTrade: shown.closed > 0 ? shown.pnlPctSum / shown.closed : null,
+    winrate: winrate(shown.closed, shown.wins),
+    realizedTotalEth: shown.realizedWei / 1e18,
+    balanceEth: ethFloat + shown.openValueWei / 1e18,
+    badges: badges({
+      trades: full.closed,
+      avgPnlPerTrade: full.closed > 0 ? full.pnlPctSum / full.closed : null,
+      winrate: winrate(full.closed, full.wins),
+      balanceUsd: (ethFloat + full.openValueWei / 1e18) * ethUsdRate,
     }),
   };
 }

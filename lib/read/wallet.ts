@@ -1,6 +1,6 @@
 import type { Cache } from "../cache.ts";
 import type { RpcProvider } from "../providers/rpc.ts";
-import { buildPositions, profileFromPositions, type PositionSummary, type Profile } from "../profile/profile.ts";
+import { buildPositions, profileFromPositions, profileFromStats, type PositionSummary, type Profile } from "../profile/profile.ts";
 import { applyAggregates, applyTrades, emptyLedger, ledgerPositions, type WalletLedger } from "../profile/ledger.ts";
 import { ethUsd } from "../usd.ts";
 
@@ -35,6 +35,9 @@ interface CachedWallet {
 }
 
 const FRESH_ENOUGH_MS = 10 * 60 * 1000;
+
+/** A record with nothing in it: no Pons position, so no closed trade. */
+const EMPTY_FOLD = { closed: 0, wins: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
 
 /** Step timings for a profile phase, on stderr under XRAY_TIMING=1. The
  * phase reads several sources and one slow step hides in the total. */
@@ -158,6 +161,21 @@ export async function walletProfilesBatch(
   const lap = timer("batch");
   const rate = await ethUsd().catch(() => 0);
   lap("ethUsd");
+
+  // With the positions folded, a profile is a handful of indexed rows:
+  // cheaper to read than the cached copy of it, which carries a wallet's
+  // whole per-token ledger as JSON and runs to megabytes for a bot that
+  // has touched twenty thousand markets. Reading two hundred of those
+  // cost seven seconds, writing one cost three.
+  if (cache.positionsReady()) {
+    await profilesFromIndex(rpc, cache, wallets, excludeToken, rate, out);
+    lap("build");
+    for (const w of wallets) {
+      if (!out.has(w)) out.set(w, notRead(w));
+    }
+    return out;
+  }
+
   const misses: string[] = [];
   const increments = new Map<string, CachedWallet>();
   const hits = new Map<string, CachedWallet>();
@@ -247,6 +265,26 @@ async function profilesFromIndex(
   // when they are built a profile is one indexed read of a few dozen
   // rows rather than a fold over its trades.
   const folded = cache.positionsReady();
+
+  if (folded) {
+    // The database adds the record up and returns the six numbers a
+    // profile is made of. Carrying the rows out instead means moving a
+    // bot's three hundred thousand markets through memory for an
+    // average it could compute in place.
+    const stats = cache.profileStats(lower, excludeToken);
+    lap("record", `${stats.size} wallets`);
+    const ethWei = await rpc.ethBalances(lower).catch(() => new Map<string, bigint>());
+    lap("eth balances");
+    for (const w of misses) {
+      const lw = w.toLowerCase();
+      // no row means nothing of theirs is a Pons position, which is a
+      // record of zero trades, not a record that could not be read
+      const s = stats.get(lw) ?? { shown: EMPTY_FOLD, full: EMPTY_FOLD };
+      out.set(w, profileFromStats(w, s, ethWei.get(lw) ?? 0n, rate));
+    }
+    lap("profiles", `${out.size} built`);
+    return;
+  }
   // Wallets with a prior ledger read only what happened past their synced
   // block; fresh ones read their history once.
   const rowsByWallet = new Map<string, ReturnType<Cache["chainTradesFor"]> extends Map<string, infer R> ? R : never>();
@@ -349,23 +387,29 @@ async function profilesFromIndex(
     const ledger = applyAggregates(before, byToken, tipNow);
     const positions = ledgerPositions(ledger);
     const eth = ethWei.get(lw) ?? 0n;
-    writes.push({
-      wallet: w,
-      json: JSON.stringify({
-        positions,
-        ethWei: eth.toString(),
-        ledger,
-        floor: floorNow.toString(),
-        floorV4: floorV4Now.toString(),
-        tip: tipNow.toString(),
-        at: Date.now(),
-      } satisfies CachedWallet),
-    });
+    if (!folded) {
+      writes.push({
+        wallet: w,
+        json: JSON.stringify({
+          positions,
+          ethWei: eth.toString(),
+          ledger,
+          floor: floorNow.toString(),
+          floorV4: floorV4Now.toString(),
+          tip: tipNow.toString(),
+          at: Date.now(),
+        } satisfies CachedWallet),
+      });
+    }
     out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
   }
   lap("fold ledgers");
-  cache.saveProfiles(writes);
-  lap("save", `${writes.length} profiles`);
+  // folded profiles are rebuilt from the positions every time, so there
+  // is nothing worth storing a copy of
+  if (!folded) {
+    cache.saveProfiles(writes);
+    lap("save", `${writes.length} profiles`);
+  }
 }
 
 async function profilesFromRpc(

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { TokenMeta } from "./providers/provider.ts";
 import type { Trade, TransferIn } from "./pnl/classify.ts";
+import { MIN_COST_WEI } from "./pnl/position.ts";
 
 /**
  * Incremental store. Two zones:
@@ -90,6 +91,21 @@ ON CONFLICT(wallet, market) DO UPDATE SET
   trades = trades + 1,
   last_price = CASE WHEN excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
   last_block = MAX(last_block, excluded.last_block)`;
+
+export interface RecordFold {
+  closed: number;
+  wins: number;
+  pnlPctSum: number;
+  realizedWei: number;
+  openValueWei: number;
+}
+
+/** A wallet's record twice over: as the terminal shows it (the scanned
+ * token left out) and in full, which is what badges judge. */
+export interface ProfileStats {
+  shown: RecordFold;
+  full: RecordFold;
+}
 
 export interface MarketAggregate {
   buyTokens: number;
@@ -586,6 +602,71 @@ export class Cache {
             lastBlock: r.last_block,
           });
         }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A wallet's whole record folded to the six numbers a profile is made
+   * of, computed inside the database. A trading bot has touched hundreds
+   * of thousands of markets, and carrying those rows into memory to add
+   * them up is the slowest thing a scan does; SQLite adds them where
+   * they lie and returns one row per wallet.
+   *
+   * Only Pons launches count: a market is kept when it is a launched
+   * token or a curve that resolves to one, the same rule the row by row
+   * path applies. Both the record with the scanned token excluded (what
+   * the terminal shows) and the full one (what badges judge) come back
+   * from the same pass.
+   */
+  profileStats(wallets: string[], excludeToken?: string): Map<string, ProfileStats> {
+    const out = new Map<string, ProfileStats>();
+    if (wallets.length === 0) return out;
+    const ex = excludeToken?.toLowerCase() ?? "";
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const marks = slice.map(() => "?").join(",");
+      const q = this.db.prepare(`
+        SELECT w,
+          SUM(CASE WHEN shown AND closed THEN 1 ELSE 0 END) AS closed_s,
+          SUM(CASE WHEN shown AND closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_s,
+          SUM(CASE WHEN shown AND closed THEN pnl / bc * 100 ELSE 0 END) AS pct_s,
+          SUM(CASE WHEN shown AND closed THEN pnl ELSE 0 END) AS realized_s,
+          SUM(CASE WHEN shown AND NOT closed THEN value ELSE 0 END) AS open_s,
+          SUM(CASE WHEN closed THEN 1 ELSE 0 END) AS closed_f,
+          SUM(CASE WHEN closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_f,
+          SUM(CASE WHEN closed THEN pnl / bc * 100 ELSE 0 END) AS pct_f,
+          SUM(CASE WHEN NOT closed THEN value ELSE 0 END) AS open_f
+        FROM (
+          SELECT w, tok, bc, (tok <> ?) AS shown,
+                 ((bt - st) = 0) AS closed,
+                 ((bt - st) * lp) AS value,
+                 (sp + ((bt - st) * lp) - bc) AS pnl
+          FROM (
+            SELECT wp.wallet AS w,
+                   COALESCE(lt.token, lc.token, NULLIF(ct.token, '')) AS tok,
+                   SUM(wp.buy_tokens) AS bt, SUM(wp.buy_eth) AS bc,
+                   SUM(wp.sell_tokens) AS st, SUM(wp.sell_eth) AS sp,
+                   MAX(wp.last_block) AS lb, wp.last_price AS lp
+            FROM wallet_positions wp
+            LEFT JOIN launches lt ON lt.token = wp.market
+            LEFT JOIN launches lc ON lc.curve = wp.market
+            LEFT JOIN curve_tokens ct ON ct.curve = wp.market
+            WHERE wp.wallet IN (${marks})
+            GROUP BY w, tok
+          )
+          WHERE tok IS NOT NULL AND st <= bt AND bc >= ${Number(MIN_COST_WEI)}
+        )
+        GROUP BY w`);
+      const rows = q.all(ex, ...slice.map((w) => w.toLowerCase())) as {
+        w: string; closed_s: number; wins_s: number; pct_s: number; realized_s: number;
+        open_s: number; closed_f: number; wins_f: number; pct_f: number; open_f: number;
+      }[];
+      for (const r of rows) {
+        out.set(r.w, {
+          shown: { closed: r.closed_s, wins: r.wins_s, pnlPctSum: r.pct_s, realizedWei: r.realized_s, openValueWei: r.open_s },
+          full: { closed: r.closed_f, wins: r.wins_f, pnlPctSum: r.pct_f, realizedWei: 0, openValueWei: r.open_f },
+        });
       }
     }
     return out;
