@@ -292,7 +292,10 @@ export function Terminal() {
     .sort((a, b) => {
       const ka = sortKey(a);
       const kb = sortKey(b);
-      if (ka === kb) return 0;
+      // records are clamped at the top of the band, so ties are common:
+      // break them by supply, which is the other thing a reader cares
+      // about, instead of leaving the order to chance
+      if (ka === kb) return (parseFloat(b.supply) || 0) - (parseFloat(a.supply) || 0);
       if (ka === -Infinity) return 1;
       if (kb === -Infinity) return -1;
       return sortDesc ? kb - ka : ka - kb;

@@ -183,7 +183,9 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
       unknownSupplyPct: (s.excluded.unknownBasis.supplyShare * 100).toFixed(1) + "%",
       infra: s.excluded.infra,
     },
-    totalHolders: holding.length,
+    // every wallet that still holds, marked ones included: the table
+    // counts them, so the caption under it must agree
+    totalHolders: s.holdersTotal,
     source: { label: "rpc", requests, seconds },
     card: {
       ticker: `$${s.meta.symbol}`,
