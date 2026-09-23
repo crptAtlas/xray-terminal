@@ -53,12 +53,12 @@ CREATE TABLE IF NOT EXISTS curve_tokens (
   curve TEXT PRIMARY KEY, token TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS chain_trades (
-  block INTEGER NOT NULL, log_index INTEGER NOT NULL, tx TEXT NOT NULL,
-  curve TEXT NOT NULL, wallet TEXT NOT NULL, kind TEXT NOT NULL,
-  tokens TEXT NOT NULL, eth TEXT NOT NULL, token TEXT,
+  block INTEGER NOT NULL, log_index INTEGER NOT NULL,
+  wallet TEXT NOT NULL, curve TEXT, token TEXT,
+  kind INTEGER NOT NULL, tokens REAL NOT NULL, eth REAL NOT NULL,
   PRIMARY KEY (block, log_index)
-);
-CREATE INDEX IF NOT EXISTS idx_ct_wallet_block ON chain_trades(wallet, block, log_index);
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_ct_wallet ON chain_trades(wallet, block, log_index, kind, tokens, eth, token, curve);
 CREATE TABLE IF NOT EXISTS pool_ids (token TEXT PRIMARY KEY, pool_id TEXT NOT NULL);
 `;
 
@@ -70,8 +70,6 @@ export function defaultCachePath(): string {
 
 export class Cache {
   private db: Database.Database;
-  /** the compact table exists while or after a migration; reads span both */
-  private hasV2 = false;
 
   constructor(path?: string) {
     this.db = new Database(path ?? defaultCachePath());
@@ -82,24 +80,14 @@ export class Cache {
     this.db.pragma("mmap_size = 8589934592");
     this.db.pragma("cache_size = -524288"); // 512 MB of page cache per connection
     this.db.exec(SCHEMA);
-    // v4 trades know their token directly (no curve involved); the column
-    // arrived after the table, so add it in place on older databases
-    try {
-      this.db.exec("ALTER TABLE chain_trades ADD COLUMN token TEXT");
-    } catch {
-      /* already there */
-    }
-    // indexes that need the token column exist only after it does; on a
-    // big database the caller builds them once out of band, so this is a
+    // on a large database these are built out of band, so this is a
     // no-op there and instant on a fresh one
-    this.hasV2 =
-      (this.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='chain_trades_v2'").get() as { n: number }).n > 0;
     if (process.env.XRAY_BUILD_INDEXES !== "0") {
       try {
-        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_curve_block ON chain_trades(curve, block, log_index)");
-        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_token_block ON chain_trades(token, block, log_index)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_curve ON chain_trades(curve, block)");
+        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_token ON chain_trades(token, block)");
       } catch {
-        /* a concurrent writer holds the lock; the index is built out of band */
+        /* a concurrent writer holds the lock; built out of band */
       }
     }
   }
@@ -258,27 +246,16 @@ export class Cache {
    * trades by the token itself. The scan reads these instead of pulling
    * the token's whole log history from the node again. */
   tokenTradesFromIndex(token: string, curve: string): { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[] {
-    const sql = this.hasV2
-      ? `SELECT wallet, kind, tokens, eth, block, tx FROM (
-           SELECT wallet, CASE kind WHEN 1 THEN 'buy' ELSE 'sell' END AS kind,
-                  CAST(tokens AS TEXT) AS tokens, CAST(eth AS TEXT) AS eth, block, '' AS tx, log_index
-           FROM chain_trades_v2 WHERE curve = ? OR token = ?
-           UNION ALL
-           SELECT wallet, kind, tokens, eth, block, tx, log_index
-           FROM chain_trades WHERE curve = ? OR token = ?
-         ) ORDER BY block, log_index`
-      : `SELECT wallet, kind, tokens, eth, block, tx FROM chain_trades
-         WHERE curve = ? OR token = ?
-         ORDER BY block, log_index`;
-    const q = this.db.prepare(sql);
-    const a = [curve.toLowerCase(), token.toLowerCase()];
-    return (q.all(...(this.hasV2 ? [...a, ...a] : a)) as { wallet: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]).map((r) => ({
+    const q = this.db.prepare(
+      `SELECT wallet, kind, tokens, eth, block FROM chain_trades WHERE curve = ? OR token = ? ORDER BY block, log_index`,
+    );
+    return (q.all(curve.toLowerCase(), token.toLowerCase()) as { wallet: string; kind: number; tokens: number; eth: number; block: number }[]).map((r) => ({
       wallet: r.wallet,
-      kind: r.kind,
-      tokens: BigInt(r.tokens),
-      eth: BigInt(r.eth),
+      kind: r.kind === 1 ? ("buy" as const) : ("sell" as const),
+      tokens: BigInt(Math.round(r.tokens)),
+      eth: BigInt(Math.round(r.eth)),
       block: BigInt(r.block),
-      tx: r.tx,
+      tx: "",
     }));
   }
 
@@ -388,13 +365,13 @@ export class Cache {
     tx();
   }
 
-  appendChainTrades(rows: { block: bigint; logIndex: number; tx: string; curve: string; wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; token?: string }[]): void {
+  appendChainTrades(rows: { block: bigint; logIndex: number; tx?: string; curve: string; wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; token?: string }[]): void {
     const ins = this.db.prepare(
-      "INSERT OR IGNORE INTO chain_trades (block, log_index, tx, curve, wallet, kind, tokens, eth, token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT OR IGNORE INTO chain_trades (block, log_index, wallet, curve, token, kind, tokens, eth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
     const tx = this.db.transaction(() => {
       for (const r of rows) {
-        ins.run(Number(r.block), r.logIndex, r.tx, r.curve, r.wallet, r.kind, r.tokens.toString(), r.eth.toString(), r.token ?? null);
+        ins.run(Number(r.block), r.logIndex, r.wallet, r.curve || null, r.token ?? null, r.kind === "buy" ? 1 : 0, Number(r.tokens), Number(r.eth));
       }
     });
     tx();
@@ -410,32 +387,23 @@ export class Cache {
     // them says the same thing about how it trades in the last few
     // thousand, and the cap is what keeps a thousand-wallet phase quick.
     const cap = Number(process.env.XRAY_WALLET_TRADE_CAP ?? 5000);
-    // The compact table holds migrated rows, the original holds whatever
-    // has not moved yet; during a migration a wallet's history spans both.
-    const sql = this.hasV2
-      ? `SELECT curve, kind, tokens, eth, block, token FROM (
-           SELECT curve, CASE kind WHEN 1 THEN 'buy' ELSE 'sell' END AS kind,
-                  CAST(tokens AS TEXT) AS tokens, CAST(eth AS TEXT) AS eth, block, token, log_index
-           FROM chain_trades_v2 WHERE wallet = ? AND block > ?
-           UNION ALL
-           SELECT curve, kind, tokens, eth, block, token, log_index
-           FROM chain_trades WHERE wallet = ? AND block > ?
-         ) ORDER BY block DESC, log_index DESC LIMIT ${cap}`
-      : `SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT ${cap}`;
-    const q = this.db.prepare(sql);
+    // every column the fold needs lives in the index, so this never
+    // touches the table itself
+    const q = this.db.prepare(
+      `SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT ${cap}`,
+    );
     for (const w of wallets) {
       const lw = w.toLowerCase();
-      const args = this.hasV2 ? [lw, Number(afterBlock), lw, Number(afterBlock)] : [lw, Number(afterBlock)];
-      const rows = q.all(...args) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; token: string | null }[];
+      const rows = q.all(lw, Number(afterBlock)) as { curve: string | null; kind: number; tokens: number; eth: number; block: number; token: string | null }[];
       if (rows.length === 0) continue;
       rows.reverse(); // ascending block order for the fold
       out.set(
         lw,
         rows.map((row) => ({
-          curve: row.curve,
-          kind: row.kind,
-          tokens: BigInt(row.tokens),
-          eth: BigInt(row.eth),
+          curve: row.curve ?? "",
+          kind: row.kind === 1 ? ("buy" as const) : ("sell" as const),
+          tokens: BigInt(Math.round(row.tokens)),
+          eth: BigInt(Math.round(row.eth)),
           block: BigInt(row.block),
           tx: "",
           token: row.token ?? undefined,
