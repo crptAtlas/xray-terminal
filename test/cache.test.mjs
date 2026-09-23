@@ -99,6 +99,52 @@ test("IN () queries survive thousands of keys (SQLite variable cap)", () => {
   c.close();
 });
 
+test("folded positions match the trades they came from", () => {
+  const c = new Cache(":memory:");
+  c.setMeta("positions_built", "1");
+  c.appendChainTrades([
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
+    { block: 110n, logIndex: 0, tx: "0x2", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 30n, eth: 18n },
+    { block: 120n, logIndex: 0, tx: "0x3", curve: "0xc1", wallet: "0xw1", kind: "sell", tokens: 20n, eth: 14n },
+    { block: 130n, logIndex: 0, tx: "0x4", curve: "", wallet: "0xw1", kind: "buy", tokens: 5n, eth: 1n, token: "0xt2" },
+    // same primary key twice: folded once, never doubled
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
+  ]);
+  const pos = c.walletPositions(["0xw1"]).get("0xw1");
+  const curve = pos.get("0xc1");
+  assert.equal(curve.buyTokens, 40);
+  assert.equal(curve.buyEth, 22);
+  assert.equal(curve.sellTokens, 20);
+  assert.equal(curve.sellEth, 14);
+  assert.equal(curve.trades, 3);
+  assert.equal(curve.lastBlock, 120);
+  assert.equal(curve.lastPrice, 14 / 20); // the newest trade's price
+  assert.equal(pos.get("0xt2").buyTokens, 5);
+  c.close();
+});
+
+test("positions stay untouched while the bulk fold still owns the history", () => {
+  const c = new Cache(":memory:");
+  // a database whose history predates the fold: the bulk pass owns it
+  c.setMeta("positions_built", "0");
+  c.appendChainTrades([
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
+  ]);
+  assert.equal(c.positionsReady(), false);
+  assert.equal(c.walletPositions(["0xw1"]).size, 0);
+  c.close();
+});
+
+test("a new database folds from its first trade", () => {
+  const c = new Cache(":memory:");
+  assert.equal(c.positionsReady(), true);
+  c.appendChainTrades([
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
+  ]);
+  assert.equal(c.walletPositions(["0xw1"]).get("0xw1").get("0xc1").buyTokens, 10);
+  c.close();
+});
+
 test("walletsTradedSince finds wallets with rows past a block", () => {
   const c = new Cache(":memory:");
   c.appendChainTrades([

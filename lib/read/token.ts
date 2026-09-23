@@ -1,5 +1,5 @@
-import { ADDR, DUST_USD, INFRA, type Hex } from "../chain.ts";
-import type { Cache } from "../cache.ts";
+import { ADDR, CHAIN, DUST_SUPPLY_SHARE, DUST_USD, INFRA, type Hex } from "../chain.ts";
+import type { Cache, MarketAggregate } from "../cache.ts";
 import { classify, type Trade, type TransferIn } from "../pnl/classify.ts";
 import { position, type Position } from "../pnl/position.ts";
 import type { Provider, TokenMeta } from "../providers/provider.ts";
@@ -74,13 +74,27 @@ export async function tokenSnapshot(
   let trades: Trade[];
   let transfersIn: TransferIn[];
   let syncedBlock: bigint;
+  // Every wallet's folded record of this token, when the fold covers the
+  // index. A position is four sums, so reading the sums beats reading the
+  // trades that make them: a busy token has a quarter of a million trades
+  // and thirty thousand holders.
+  let folded: Map<string, MarketAggregate> | null = null;
   if (indexCovers) {
-    trades = cache.tokenTradesFromIndex(meta.address, meta.curve);
+    syncedBlock = curveSpan!.tip < v4Span!.tip ? curveSpan!.tip : v4Span!.tip;
+    if (cache.positionsReady()) {
+      folded = cache.marketPositions(meta.address, meta.curve);
+      // the last day trade by trade: that window is what the 24h volume
+      // and the market price are read from
+      const dayAgo = syncedBlock > CHAIN.blocksPerDay ? syncedBlock - CHAIN.blocksPerDay : 0n;
+      trades = cache.tokenTradesFromIndex(meta.address, meta.curve, dayAgo);
+      onStage({ agent: "scanner", status: "done", detail: `${folded.size} holders (folded)` });
+    } else {
+      trades = cache.tokenTradesFromIndex(meta.address, meta.curve);
+      onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades (index)` });
+    }
     // transfers between wallets are not indexed; a wallet holding more
     // than it bought is caught by the position math anyway
     transfersIn = [];
-    syncedBlock = curveSpan!.tip < v4Span!.tip ? curveSpan!.tip : v4Span!.tip;
-    onStage({ agent: "scanner", status: "done", detail: `${trades.length} trades (index)` });
   } else {
     // incremental sync: cached trades + only the new blocks
     const state = cache.tokenState(meta.address);
@@ -101,6 +115,7 @@ export async function tokenSnapshot(
 
   // candidate wallets: anyone who ever traded or received tokens
   const wallets = new Set<string>();
+  if (folded) for (const w of folded.keys()) wallets.add(w);
   for (const t of trades) wallets.add(t.wallet);
   for (const t of transfersIn) wallets.add(t.wallet);
 
@@ -127,11 +142,29 @@ export async function tokenSnapshot(
   ]);
   const priceEth = priceFromProvider;
 
+  // A position is the sum of what a wallet bought and what it sold, so a
+  // folded record stands in for the trades exactly: one buy and one sell
+  // carrying the sums. The window of recent trades is already inside
+  // them and must not be added twice.
   const tradesByWallet = new Map<string, Trade[]>();
-  for (const t of trades) {
-    const list = tradesByWallet.get(t.wallet) ?? [];
-    list.push(t);
-    tradesByWallet.set(t.wallet, list);
+  if (folded) {
+    for (const [w, a] of folded) {
+      const list: Trade[] = [];
+      const at = BigInt(a.lastBlock);
+      if (a.buyTokens > 0 || a.buyEth > 0) {
+        list.push({ wallet: w, kind: "buy", tokens: BigInt(Math.round(a.buyTokens)), eth: BigInt(Math.round(a.buyEth)), block: at, tx: "" });
+      }
+      if (a.sellTokens > 0 || a.sellEth > 0) {
+        list.push({ wallet: w, kind: "sell", tokens: BigInt(Math.round(a.sellTokens)), eth: BigInt(Math.round(a.sellEth)), block: at, tx: "" });
+      }
+      tradesByWallet.set(w, list);
+    }
+  } else {
+    for (const t of trades) {
+      const list = tradesByWallet.get(t.wallet) ?? [];
+      list.push(t);
+      tradesByWallet.set(t.wallet, list);
+    }
   }
   const tinByWallet = new Map<string, bigint>();
   for (const t of transfersIn) {
@@ -140,7 +173,15 @@ export async function tokenSnapshot(
 
   const one = 10n ** BigInt(meta.decimals);
   const supplyFloat = Number(meta.totalSupply) / Number(one);
-  const dustTokens = priceEth > 0 ? (DUST_USD / usdRate / priceEth) : Infinity;
+  // A dollar threshold only means something when the token is priced in
+  // ETH. Against a stock or stablecoin pair the price is in pair units,
+  // and with no price at all nothing can be called dust - excluding every
+  // holder then reads as a dead token.
+  const dustTokens = meta.pairSymbol
+    ? supplyFloat * DUST_SUPPLY_SHARE
+    : priceEth > 0
+      ? DUST_USD / usdRate / priceEth
+      : 0;
 
   onStage({ agent: "ledger", status: "done", detail: `${candidates.length} wallets` });
   onStage({ agent: "flagger", status: "start" });

@@ -70,6 +70,9 @@ tokens(address PK, symbol, curve, created_block, synced_block, ...)
 trades(token, wallet, block, kind, tokens, eth, tx)   raw classified trades
 chain_trades(block, log_index PK, wallet, curve, token, kind, tokens, eth)
                                           the chain-wide trade index
+wallet_positions(wallet, market PK, buy_tokens, buy_eth, sell_tokens,
+                 sell_eth, trades, last_price, last_block)
+                                          every trade folded into sums
 launches(block, token, symbol, curve)     ticker index
 curve_tokens(curve PK, token)             curve to token map
 profiles(wallet PK, json, fetched_at)     global, 24h TTL, carries a ledger
@@ -98,6 +101,22 @@ re-decodes a range in place after a decoder fix. A digger yields the
 node to visitor scans through a flag file (`lib/scanflag.ts`) - the
 node serves one IP strictly in order, so a backfill would otherwise put
 every scan behind it.
+
+## Folded positions
+
+A position is four sums and a last price, never the trades that made
+them, so every trade is folded into `wallet_positions` as it is indexed:
+one row per wallet and market, where a market is the token for pool
+trades and the curve for pre-graduation ones. Both reads that matter go
+through it - a wallet's whole record for a profile, and every wallet's
+record of one token for a scan - which is thirty thousand rows where the
+raw trades run to a quarter of a million. `scripts/build-positions.mts`
+folds an index that predates the table and hands over to the follower
+when it reaches the tip; `scripts/verify-positions.mts` checks a token's
+folded rows against its trades, wallet by wallet.
+
+Raw trades stay for the window that needs trade by trade detail: the
+last day, which is where 24h volume and the market price come from.
 
 ## Wallet ledger
 

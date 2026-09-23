@@ -267,6 +267,7 @@ export async function runFollow(_opts: CliOpts): Promise<void> {
   const { makeClient } = await import("../providers/rpc.ts");
   const { Cache } = await import("../cache.ts");
   const { syncTradeIndexTail } = await import("../read/indexer.ts");
+  const { syncLaunches } = await import("../read/launches.ts");
   const client = makeClient();
   const cache = new Cache();
   console.error("following the chain head (tail sync every 30s; ctrl-c to stop)...");
@@ -275,6 +276,10 @@ export async function runFollow(_opts: CliOpts): Promise<void> {
     try {
       await syncTradeIndexTail(client, cache, "curve");
       await syncTradeIndexTail(client, cache, "v4");
+      // every launch it records is a curve a profile no longer has to ask
+      // the chain about, and an unindexed launch costs a scan of the whole
+      // launch history per unknown curve
+      await syncLaunches(client, cache);
     } catch (err) {
       console.error(`tail sync: ${err instanceof Error ? err.message.slice(0, 80) : err}`);
     }

@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS launches (
   block TEXT NOT NULL, token TEXT PRIMARY KEY, symbol TEXT NOT NULL, curve TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_launch_symbol ON launches(symbol);
+-- a thousand wallets name tens of thousands of curves to resolve, and
+-- without this every chunk of them scans the launch table
+CREATE INDEX IF NOT EXISTS idx_launch_curve ON launches(curve, token);
 CREATE TABLE IF NOT EXISTS profiles (
   wallet TEXT PRIMARY KEY, json TEXT NOT NULL, fetched_at INTEGER NOT NULL
 );
@@ -58,9 +61,82 @@ CREATE TABLE IF NOT EXISTS chain_trades (
   kind INTEGER NOT NULL, tokens REAL NOT NULL, eth REAL NOT NULL,
   PRIMARY KEY (block, log_index)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS idx_ct_wallet ON chain_trades(wallet, block, log_index, kind, tokens, eth, token, curve);
 CREATE TABLE IF NOT EXISTS pool_ids (token TEXT PRIMARY KEY, pool_id TEXT NOT NULL);
+-- One row per wallet and market, folded from the trades as they arrive.
+-- A profile needs four sums and a last price, never the trades that made
+-- them, so this is the shape a scan actually reads: a thousand wallets
+-- cost thirty thousand rows here against a million raw trades. "market"
+-- is the token address for pool trades and the curve address for
+-- pre-graduation ones, the same key the raw rows carry.
+CREATE TABLE IF NOT EXISTS wallet_positions (
+  wallet TEXT NOT NULL, market TEXT NOT NULL,
+  buy_tokens REAL NOT NULL, buy_eth REAL NOT NULL,
+  sell_tokens REAL NOT NULL, sell_eth REAL NOT NULL,
+  trades INTEGER NOT NULL, last_price REAL NOT NULL, last_block INTEGER NOT NULL,
+  PRIMARY KEY (wallet, market)
+) WITHOUT ROWID;
 `;
+
+/** Fold one trade into a wallet's record of a market. The last price is
+ * the price of the newest trade seen, whatever order they arrive in. */
+const FOLD_POSITION = `
+INSERT INTO wallet_positions (wallet, market, buy_tokens, buy_eth, sell_tokens, sell_eth, trades, last_price, last_block)
+VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+ON CONFLICT(wallet, market) DO UPDATE SET
+  buy_tokens = buy_tokens + excluded.buy_tokens,
+  buy_eth = buy_eth + excluded.buy_eth,
+  sell_tokens = sell_tokens + excluded.sell_tokens,
+  sell_eth = sell_eth + excluded.sell_eth,
+  trades = trades + 1,
+  last_price = CASE WHEN excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
+  last_block = MAX(last_block, excluded.last_block)`;
+
+export interface MarketAggregate {
+  buyTokens: number;
+  buyEth: number;
+  sellTokens: number;
+  sellEth: number;
+  trades: number;
+  lastPrice: number;
+  lastBlock: number;
+}
+
+// Indexes over the trade table, by the columns they cover rather than by
+// their name. A migration leaves its indexes behind under the names it
+// used, and CREATE INDEX IF NOT EXISTS only matches names: asking for a
+// name that is not there rebuilds an index that already exists, which on
+// a hundred and eighty million rows means hours of stalled startup and
+// tens of gigabytes of disk. Matching on columns makes the check honest.
+// Both carry every column a token scan reads: a narrow index costs one
+// random read into a table of tens of gigabytes per trade found, which
+// is half a minute for a busy token and nothing for a quiet one.
+const TRADE_INDEXES: { table: string; name: string; columns: string[] }[] = [
+  { table: "chain_trades", name: "idx_ct_curve", columns: ["curve", "block"] },
+  { table: "chain_trades", name: "idx_ct_token", columns: ["token", "block"] },
+  // Covering on purpose: a token scan reads every wallet's record of one
+  // market, and without the trailing columns each row costs a random
+  // read into a table of tens of gigabytes.
+  {
+    table: "wallet_positions",
+    name: "idx_wp_market",
+    columns: ["market", "wallet", "buy_tokens", "buy_eth", "sell_tokens", "sell_eth", "trades", "last_price", "last_block"],
+  },
+];
+
+/** The column list of a CREATE INDEX statement, lowercased and unquoted. */
+function columnsOf(sql: string): string[] {
+  const open = sql.indexOf("(");
+  const close = sql.lastIndexOf(")");
+  if (open < 0 || close < open) return [];
+  return sql
+    .slice(open + 1, close)
+    .split(",")
+    .map((c) => c.trim().replace(/^["'`[]|["'`\]]$/g, "").toLowerCase());
+}
+
+function sameColumns(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((c, i) => c === b[i]);
+}
 
 export function defaultCachePath(): string {
   const dir = join(homedir(), ".xray");
@@ -80,12 +156,40 @@ export class Cache {
     this.db.pragma("mmap_size = 8589934592");
     this.db.pragma("cache_size = -524288"); // 512 MB of page cache per connection
     this.db.exec(SCHEMA);
-    // on a large database these are built out of band, so this is a
-    // no-op there and instant on a fresh one
-    if (process.env.XRAY_BUILD_INDEXES !== "0") {
+    this.ensureTradeIndexes();
+  }
+
+  /**
+   * Create the trade indexes that are genuinely missing. An index whose
+   * columns are already covered under another name is left alone, and on
+   * a table that already holds rows nothing is built unless it is asked
+   * for with XRAY_BUILD_INDEXES=1 - a build there takes hours and blocks
+   * every reader, so it belongs in a maintenance window, never in the
+   * startup path of a scan.
+   */
+  private ensureTradeIndexes(): void {
+    if (process.env.XRAY_BUILD_INDEXES === "0") return;
+    const indexesOf = (table: string): string[][] =>
+      (
+        this.db
+          .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL")
+          .all(table) as { sql: string }[]
+      ).map((r) => columnsOf(r.sql));
+    const hasRows = (table: string): boolean => this.db.prepare(`SELECT 1 FROM ${table} LIMIT 1`).get() !== undefined;
+
+    // An empty index is folded by definition, so a new install folds
+    // every trade from its first one and never keeps a second copy of
+    // the history to read profiles from.
+    if (!hasRows("chain_trades") && this.getMeta("positions_built") === null) this.setMeta("positions_built", "1");
+
+    for (const want of TRADE_INDEXES) {
+      if (indexesOf(want.table).some((cols) => sameColumns(cols, want.columns))) continue;
+      if (hasRows(want.table) && process.env.XRAY_BUILD_INDEXES !== "1") {
+        console.warn(`xray: ${want.name} is missing on a populated ${want.table}; build it with XRAY_BUILD_INDEXES=1`);
+        continue;
+      }
       try {
-        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_curve ON chain_trades(curve, block)");
-        this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_token ON chain_trades(token, block)");
+        this.db.exec(`CREATE INDEX IF NOT EXISTS ${want.name} ON ${want.table}(${want.columns.join(", ")})`);
       } catch {
         /* a concurrent writer holds the lock; built out of band */
       }
@@ -245,11 +349,19 @@ export class Cache {
   /** Every indexed trade of one token: curve trades by its curve, pool
    * trades by the token itself. The scan reads these instead of pulling
    * the token's whole log history from the node again. */
-  tokenTradesFromIndex(token: string, curve: string): { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[] {
+  tokenTradesFromIndex(token: string, curve: string, fromBlock = 0n): { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[] {
+    // Two indexed lookups joined, not one OR: with a single OR the
+    // planner falls back to scanning a hundred and eighty million rows.
+    // fromBlock keeps a busy token's read to the window that needs trade
+    // by trade detail - the rest of its history is read folded.
     const q = this.db.prepare(
-      `SELECT wallet, kind, tokens, eth, block FROM chain_trades WHERE curve = ? OR token = ? ORDER BY block, log_index`,
+      `SELECT wallet, kind, tokens, eth, block, log_index FROM chain_trades WHERE curve = ? AND block >= ?
+       UNION ALL
+       SELECT wallet, kind, tokens, eth, block, log_index FROM chain_trades WHERE token = ? AND block >= ?
+       ORDER BY block, log_index`,
     );
-    return (q.all(curve.toLowerCase(), token.toLowerCase()) as { wallet: string; kind: number; tokens: number; eth: number; block: number }[]).map((r) => ({
+    const from = Number(fromBlock);
+    return (q.all(curve.toLowerCase(), from, token.toLowerCase(), from) as { wallet: string; kind: number; tokens: number; eth: number; block: number }[]).map((r) => ({
       wallet: r.wallet,
       kind: r.kind === 1 ? ("buy" as const) : ("sell" as const),
       tokens: BigInt(Math.round(r.tokens)),
@@ -264,10 +376,13 @@ export class Cache {
    * wallet trades again instead of sitting out a TTL. */
   walletsTradedSince(wallets: string[], afterBlock: bigint): Set<string> {
     const out = new Set<string>();
+    // The folded positions carry the block of each market's last trade,
+    // so the question is answered from a table a thousandth the size.
+    const table = this.positionsReady()
+      ? "SELECT DISTINCT wallet FROM wallet_positions WHERE last_block > ?"
+      : "SELECT DISTINCT wallet FROM chain_trades WHERE block > ?";
     for (const slice of chunks(wallets, IN_CHUNK)) {
-      const q = this.db.prepare(
-        `SELECT DISTINCT wallet FROM chain_trades WHERE block > ? AND wallet IN (${slice.map(() => "?").join(",")})`,
-      );
+      const q = this.db.prepare(`${table} AND wallet IN (${slice.map(() => "?").join(",")})`);
       for (const row of q.all(Number(afterBlock), ...slice.map((w) => w.toLowerCase())) as { wallet: string }[]) {
         out.add(row.wallet);
       }
@@ -369,12 +484,117 @@ export class Cache {
     const ins = this.db.prepare(
       "INSERT OR IGNORE INTO chain_trades (block, log_index, wallet, curve, token, kind, tokens, eth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
+    const fold = this.db.prepare(FOLD_POSITION);
     const tx = this.db.transaction(() => {
+      // While the bulk fold is still walking the history it will reach
+      // these blocks itself; folding them here too would count them
+      // twice. The flag flips in the same transaction as the bulk fold's
+      // last range, so exactly one of the two folds every trade.
+      const folding = this.positionsReady();
       for (const r of rows) {
-        ins.run(Number(r.block), r.logIndex, r.wallet, r.curve || null, r.token ?? null, r.kind === "buy" ? 1 : 0, Number(r.tokens), Number(r.eth));
+        const res = ins.run(Number(r.block), r.logIndex, r.wallet, r.curve || null, r.token ?? null, r.kind === "buy" ? 1 : 0, Number(r.tokens), Number(r.eth));
+        // a row the index already had must not be folded twice
+        if (res.changes !== 1 || !folding) continue;
+        const market = r.token || r.curve;
+        if (!market) continue;
+        const tokens = Number(r.tokens);
+        const eth = Number(r.eth);
+        const buy = r.kind === "buy";
+        fold.run(
+          r.wallet.toLowerCase(),
+          market.toLowerCase(),
+          buy ? tokens : 0,
+          buy ? eth : 0,
+          buy ? 0 : tokens,
+          buy ? 0 : eth,
+          tokens > 0 ? eth / tokens : 0,
+          Number(r.block),
+        );
       }
     });
     tx();
+  }
+
+  /** Per wallet, the folded record of every market it has traded. */
+  walletPositions(wallets: string[]): Map<string, Map<string, MarketAggregate>> {
+    const out = new Map<string, Map<string, MarketAggregate>>();
+    if (wallets.length === 0) return out;
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const q = this.db.prepare(
+        `SELECT wallet, market, buy_tokens, buy_eth, sell_tokens, sell_eth, trades, last_price, last_block
+         FROM wallet_positions WHERE wallet IN (${slice.map(() => "?").join(",")})`,
+      );
+      const rows = q.all(...slice.map((w) => w.toLowerCase())) as {
+        wallet: string; market: string; buy_tokens: number; buy_eth: number;
+        sell_tokens: number; sell_eth: number; trades: number; last_price: number; last_block: number;
+      }[];
+      for (const r of rows) {
+        const byMarket = out.get(r.wallet) ?? new Map<string, MarketAggregate>();
+        byMarket.set(r.market, {
+          buyTokens: r.buy_tokens,
+          buyEth: r.buy_eth,
+          sellTokens: r.sell_tokens,
+          sellEth: r.sell_eth,
+          trades: r.trades,
+          lastPrice: r.last_price,
+          lastBlock: r.last_block,
+        });
+        out.set(r.wallet, byMarket);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Every wallet's folded record of one token: its curve trades and its
+   * pool trades added together, which is what a holder's position on the
+   * token is made of. Reading this instead of the token's trades is the
+   * difference between thirty thousand rows and a quarter of a million.
+   */
+  marketPositions(token: string, curve: string): Map<string, MarketAggregate> {
+    const out = new Map<string, MarketAggregate>();
+    const q = this.db.prepare(
+      `SELECT wallet, buy_tokens, buy_eth, sell_tokens, sell_eth, trades, last_price, last_block
+       FROM wallet_positions WHERE market = ?`,
+    );
+    for (const market of [token.toLowerCase(), curve.toLowerCase()]) {
+      if (!market) continue;
+      const rows = q.all(market) as {
+        wallet: string; buy_tokens: number; buy_eth: number; sell_tokens: number;
+        sell_eth: number; trades: number; last_price: number; last_block: number;
+      }[];
+      for (const r of rows) {
+        const cur = out.get(r.wallet);
+        if (cur) {
+          cur.buyTokens += r.buy_tokens;
+          cur.buyEth += r.buy_eth;
+          cur.sellTokens += r.sell_tokens;
+          cur.sellEth += r.sell_eth;
+          cur.trades += r.trades;
+          if (r.last_block > cur.lastBlock) {
+            cur.lastBlock = r.last_block;
+            cur.lastPrice = r.last_price;
+          }
+        } else {
+          out.set(r.wallet, {
+            buyTokens: r.buy_tokens,
+            buyEth: r.buy_eth,
+            sellTokens: r.sell_tokens,
+            sellEth: r.sell_eth,
+            trades: r.trades,
+            lastPrice: r.last_price,
+            lastBlock: r.last_block,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Whether the folded positions cover the whole index. Until the bulk
+   * fold finishes, profiles keep reading raw trades. */
+  positionsReady(): boolean {
+    return this.getMeta("positions_built") === "1";
   }
 
   chainTradesFor(wallets: string[], afterBlock = -1n): Map<string, { curve: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string; token?: string }[]> {
@@ -428,10 +648,39 @@ export class Cache {
   }
 
   saveProfile(wallet: string, json: string, now = Date.now()): void {
-    this.db
-      .prepare(
-        "INSERT INTO profiles (wallet, json, fetched_at) VALUES (?, ?, ?) ON CONFLICT(wallet) DO UPDATE SET json = excluded.json, fetched_at = excluded.fetched_at",
-      )
-      .run(wallet.toLowerCase(), json, now);
+    this.saveProfiles([{ wallet, json }], now);
+  }
+
+  /**
+   * Write many profiles at once. Each write is its own transaction
+   * otherwise, and a transaction ends in an fsync: a thousand of them
+   * cost a minute and a half on a busy disk, against well under a second
+   * for the same rows written together.
+   */
+  saveProfiles(entries: { wallet: string; json: string }[], now = Date.now()): void {
+    if (entries.length === 0) return;
+    const put = this.db.prepare(
+      "INSERT INTO profiles (wallet, json, fetched_at) VALUES (?, ?, ?) ON CONFLICT(wallet) DO UPDATE SET json = excluded.json, fetched_at = excluded.fetched_at",
+    );
+    const tx = this.db.transaction(() => {
+      for (const e of entries) put.run(e.wallet.toLowerCase(), e.json, now);
+    });
+    tx();
+  }
+
+  /** Fresh cached profiles for many wallets, read in chunks rather than
+   * one query per wallet. */
+  freshProfiles(wallets: string[], now = Date.now()): Map<string, string> {
+    const out = new Map<string, string>();
+    if (wallets.length === 0) return out;
+    for (const slice of chunks(wallets, IN_CHUNK)) {
+      const q = this.db.prepare(
+        `SELECT wallet, json, fetched_at FROM profiles WHERE wallet IN (${slice.map(() => "?").join(",")})`,
+      );
+      for (const row of q.all(...slice.map((w) => w.toLowerCase())) as { wallet: string; json: string; fetched_at: number }[]) {
+        if (now - row.fetched_at <= PROFILE_TTL_MS) out.set(row.wallet, row.json);
+      }
+    }
+    return out;
   }
 }

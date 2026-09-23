@@ -243,7 +243,7 @@ export class RpcProvider implements Provider {
   async ethBalances(wallets: string[]): Promise<Map<string, bigint>> {
     const abi = parseAbi(["function getEthBalance(address addr) view returns (uint256)"]);
     const out = new Map<string, bigint>();
-    const chunk = 500;
+    const chunk = 1000;
     for (let i = 0; i < wallets.length; i += chunk) {
       const slice = wallets.slice(i, i + chunk);
       const res = await this.client.multicall({
@@ -254,7 +254,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
-        batchSize: 20_000,
+        batchSize: 80_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);
@@ -265,9 +265,14 @@ export class RpcProvider implements Provider {
 
   async balances(token: TokenMeta, wallets: string[]): Promise<Map<string, bigint>> {
     const out = new Map<string, bigint>();
-    // one multicall per chunk (viem's own calldata chunking is raised to
-    // fit), small enough that the node answers it in one piece
-    const chunk = 250;
+    // One multicall per chunk, with viem's calldata chunking raised to
+    // fit the whole chunk in one request. A thousand balances per request
+    // is what this node answers in one piece: measured against the same
+    // wallets read in chunks of 250, same answers, a quarter of the
+    // requests. Larger chunks are where a node starts failing the call
+    // silently, and allowFailure would read that as every wallet holding
+    // nothing.
+    const chunk = 1000;
     for (let i = 0; i < wallets.length; i += chunk) {
       const slice = wallets.slice(i, i + chunk);
       const res = await this.client.multicall({
@@ -278,7 +283,7 @@ export class RpcProvider implements Provider {
           args: [w as Hex],
         })),
         allowFailure: true,
-        batchSize: 20_000,
+        batchSize: 80_000,
       });
       res.forEach((r, j) => {
         out.set(slice[j] as string, r.status === "success" ? (r.result as bigint) : 0n);

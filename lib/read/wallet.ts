@@ -36,12 +36,22 @@ interface CachedWallet {
 
 const FRESH_ENOUGH_MS = 10 * 60 * 1000;
 
+/** Step timings for a profile phase, on stderr under XRAY_TIMING=1. The
+ * phase reads several sources and one slow step hides in the total. */
+function timer(label: string) {
+  const on = process.env.XRAY_TIMING === "1";
+  let t = Date.now();
+  return (step: string, extra = ""): void => {
+    if (on) console.error(`  ${label} ${step}: ${Date.now() - t}ms ${extra}`);
+    t = Date.now();
+  };
+}
+
 function currentFloor(cache: Cache, lane: "curve" | "v4" = "curve"): bigint {
   return cache.tradeIndexSpan(lane)?.floor ?? 0n;
 }
 
-function readCached(cache: Cache, wallet: string): CachedWallet | null {
-  const raw = cache.freshProfile(wallet);
+function readCached(cache: Cache, wallet: string, raw = cache.freshProfile(wallet)): CachedWallet | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<CachedWallet>;
@@ -68,9 +78,33 @@ function curveResolver(rpc: RpcProvider, cache: Cache) {
     const known = cache.curveTokens(curves);
     const missing = curves.filter((c) => !known.has(c.toLowerCase()));
     if (missing.length) {
+      // With the launch index at the head it already names every curve
+      // there is, so an address missing from it is not one - no need to
+      // ask the chain, which answers by scanning every launch ever made.
+      // Nothing is written down: a launch indexed a moment later must
+      // still be able to resolve, so this holds only for this scan.
+      // The slack is generous on purpose: the follower indexes launches
+      // right after trades, so it trails the head by a few hundred blocks
+      // at all times, and a curve younger than the slack is a token
+      // launched minutes ago - worth skipping in someone's record rather
+      // than paying a full launch-history scan for.
+      const tip = cache.tradeIndexSpan("curve")?.tip ?? 0n;
+      if (cache.launchesTip() + 50_000n >= tip) {
+        for (const c of missing) known.set(c.toLowerCase(), "");
+        return known;
+      }
       const fetched = await rpc.curvesToTokens(missing);
-      cache.saveCurveTokens(fetched);
-      for (const [c, t] of fetched) known.set(c, t);
+      // Asking the chain costs a scan of every launch ever made, so an
+      // address the factory never launched is remembered as such: the
+      // pair tokens and infrastructure addresses that ride the same
+      // pools would otherwise be asked about on every single scan.
+      const learned = new Map(fetched);
+      for (const c of missing) {
+        const lc = c.toLowerCase();
+        if (!learned.has(lc)) learned.set(lc, "");
+      }
+      cache.saveCurveTokens(learned);
+      for (const [c, t] of learned) known.set(c, t);
     }
     return known;
   };
@@ -121,15 +155,20 @@ export async function walletProfilesBatch(
 ): Promise<Map<string, Profile>> {
   const out = new Map<string, Profile>();
   const deadline = Date.now() + deadlineMs;
+  const lap = timer("batch");
   const rate = await ethUsd().catch(() => 0);
+  lap("ethUsd");
   const misses: string[] = [];
   const increments = new Map<string, CachedWallet>();
   const hits = new Map<string, CachedWallet>();
+  // one chunked read for the whole set, not a query per wallet
+  const cachedJson = cache.freshProfiles(wallets);
   for (const w of wallets) {
-    const cached = readCached(cache, w);
+    const cached = readCached(cache, w, cachedJson.get(w.toLowerCase()) ?? null);
     if (cached) hits.set(w, cached);
     else misses.push(w);
   }
+  lap("cached", `${hits.size} hits, ${misses.length} misses`);
   // a cached profile goes stale the moment its wallet trades again; the
   // check is a local indexed query per distinct capture tip (profiles
   // cached in one scan share a tip, so this is one or two queries)
@@ -159,14 +198,18 @@ export async function walletProfilesBatch(
     }
   }
 
+  lap("staleness", `${increments.size} to extend`);
   const span = cache.tradeIndexSpan();
   if (increments.size && span && span.tip > span.floor) {
     await profilesFromIndex(rpc, cache, [...increments.keys()], excludeToken, rate, out, increments);
+    lap("extend");
   }
   if (misses.length && span && span.tip > span.floor) {
     await profilesFromIndex(rpc, cache, misses, excludeToken, rate, out);
+    lap("rebuild");
   } else if (misses.length) {
     await profilesFromRpc(rpc, cache, misses, deadline, excludeToken, rate, out);
+    lap("rebuild from rpc");
   }
   for (const w of wallets) {
     if (!out.has(w)) out.set(w, notRead(w));
@@ -185,6 +228,7 @@ async function profilesFromIndex(
 ): Promise<void> {
   // the head is followed by a dedicated process (xray follow) wherever
   // one runs; a scan only syncs the tail itself when nobody else does
+  const lap = timer(`index(${misses.length})`);
   if (process.env.XRAY_FOLLOWER !== "external") {
     const { syncTradeIndexTail } = await import("./indexer.ts");
     try {
@@ -193,11 +237,16 @@ async function profilesFromIndex(
     } catch (err) {
       console.warn(`trade index tail sync: ${err instanceof Error ? err.message : err}`);
     }
+    lap("tail sync");
   }
   const floorNow = currentFloor(cache, "curve");
   const floorV4Now = currentFloor(cache, "v4");
   const tipNow = cache.tradeIndexSpan("curve")?.tip ?? 0n;
   const lower = misses.map((w) => w.toLowerCase());
+  // The folded positions hold every wallet's whole record already, so
+  // when they are built a profile is one indexed read of a few dozen
+  // rows rather than a fold over its trades.
+  const folded = cache.positionsReady();
   // Wallets with a prior ledger read only what happened past their synced
   // block; fresh ones read their history once.
   const rowsByWallet = new Map<string, ReturnType<Cache["chainTradesFor"]> extends Map<string, infer R> ? R : never>();
@@ -212,12 +261,18 @@ async function profilesFromIndex(
       byPriorBlock.set(p.syncedBlock, list);
     } else fresh.push(lw);
   }
-  for (const [block, ws] of byPriorBlock) {
-    for (const [lw, rows] of cache.chainTradesFor(ws, BigInt(block))) rowsByWallet.set(lw, rows);
+  if (!folded) {
+    for (const [block, ws] of byPriorBlock) {
+      for (const [lw, rows] of cache.chainTradesFor(ws, BigInt(block))) rowsByWallet.set(lw, rows);
+    }
+    for (const [lw, rows] of cache.chainTradesFor(fresh)) rowsByWallet.set(lw, rows);
   }
-  for (const [lw, rows] of cache.chainTradesFor(fresh)) rowsByWallet.set(lw, rows);
   // per wallet and token, the sums a ledger needs
-  const aggByWallet = new Map<string, Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>>();
+  lap("trade rows", `${rowsByWallet.size} wallets`);
+  const aggByWallet = folded
+    ? cache.walletPositions(lower)
+    : new Map<string, Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>>();
+  if (folded) lap("folded positions", `${aggByWallet.size} wallets`);
   for (const [lw, rows] of rowsByWallet) {
     const byKey = new Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>();
     for (const r of rows) {
@@ -253,11 +308,20 @@ async function profilesFromIndex(
       curves.add(key);
     }
   }
-  const tokenOf = await curveResolver(rpc, cache)([...curves]);
+  lap("aggregate");
   // v4 rows name their token directly, but pair tokens (NVDA, SPCX, ...)
   // ride the same pools; only launched tokens count as positions
   const launched = cache.launchTokens([...directTokens]);
+  lap("launch lookup", `${directTokens.size} tokens`);
+  // a key that is a launched token is a pool trade, never a curve: asking
+  // the chain to resolve it as one is a full launch-history scan for an
+  // answer that does not exist
+  const tokenOf = await curveResolver(rpc, cache)([...curves].filter((k) => !launched.has(k)));
+  lap("resolve curves", `${curves.size} keys`);
   const ethWei = await rpc.ethBalances(lower).catch(() => new Map<string, bigint>());
+  lap("eth balances");
+  // every rebuilt profile lands in one transaction at the end
+  const writes: { wallet: string; json: string }[] = [];
   for (const w of misses) {
     const lw = w.toLowerCase();
     const byToken = new Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>();
@@ -279,13 +343,15 @@ async function profilesFromIndex(
         }
       } else byToken.set(token, { ...a });
     }
-    const before = prior.get(w)?.ledger ?? emptyLedger();
+    // folded positions are the whole record, so they fold onto nothing;
+    // raw rows continue whatever ledger the wallet already had
+    const before = folded ? emptyLedger() : (prior.get(w)?.ledger ?? emptyLedger());
     const ledger = applyAggregates(before, byToken, tipNow);
     const positions = ledgerPositions(ledger);
     const eth = ethWei.get(lw) ?? 0n;
-    cache.saveProfile(
-      w,
-      JSON.stringify({
+    writes.push({
+      wallet: w,
+      json: JSON.stringify({
         positions,
         ethWei: eth.toString(),
         ledger,
@@ -294,9 +360,12 @@ async function profilesFromIndex(
         tip: tipNow.toString(),
         at: Date.now(),
       } satisfies CachedWallet),
-    );
+    });
     out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
   }
+  lap("fold ledgers");
+  cache.saveProfiles(writes);
+  lap("save", `${writes.length} profiles`);
 }
 
 async function profilesFromRpc(
@@ -320,16 +389,18 @@ async function profilesFromRpc(
         rpc.ethBalances(chunk.map((w) => w.toLowerCase())),
       ]);
       failures = 0;
+      const writes: { wallet: string; json: string }[] = [];
       for (const w of chunk) {
         const byToken = byWallet.get(w.toLowerCase()) ?? new Map();
         const positions = buildPositions(byToken, ledgerRemaining(byToken));
         const eth = ethWei.get(w.toLowerCase()) ?? 0n;
-        cache.saveProfile(
-          w,
-          JSON.stringify({ positions, ethWei: eth.toString(), floor: "0", floorV4: currentFloor(cache, "v4").toString() } satisfies CachedWallet),
-        );
+        writes.push({
+          wallet: w,
+          json: JSON.stringify({ positions, ethWei: eth.toString(), floor: "0", floorV4: currentFloor(cache, "v4").toString() } satisfies CachedWallet),
+        });
         out.set(w, profileFromPositions(w, positions, eth, excludeToken, rate));
       }
+      cache.saveProfiles(writes);
     } catch (err) {
       failures++;
       console.warn(`profile batch ${i / CHUNK}: ${err instanceof Error ? err.message : err}`);

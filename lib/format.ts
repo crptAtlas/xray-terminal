@@ -69,8 +69,11 @@ function textCheck(r: CheckResult): string {
   lines.push(
     `$${s.meta.symbol}  ${s.meta.address}  age ${fmtAge(h.ageMs)}  phase ${phaseStr(h.phase)}`,
   );
+  // a token paired against a stock or a stablecoin is priced in that
+  // pair, so there is no dollar figure to print
+  const usd = (v: number) => (s.meta.pairSymbol ? "n/a" : fmtUsd(v));
   lines.push(
-    `mcap ${fmtUsd(h.mcapUsd)}   liquidity ${fmtUsd(h.liquidityUsd)}   volume 24h ${fmtUsd(h.volume24hUsd)}   holders ${h.holders.toLocaleString("en-US").replace(/,/g, " ")}`,
+    `mcap ${usd(h.mcapUsd)}   liquidity ${usd(h.liquidityUsd)}   volume 24h ${usd(h.volume24hUsd)}   holders ${h.holders.toLocaleString("en-US").replace(/,/g, " ")}`,
   );
   lines.push("");
   if (isDead(r)) {

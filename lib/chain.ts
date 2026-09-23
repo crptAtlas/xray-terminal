@@ -54,3 +54,9 @@ export const INFRA: ReadonlySet<string> = new Set([
 export const GETLOGS_MAX = 10_000;
 
 export const DUST_USD = 50;
+
+// Two in five launches are paired against a stock or a stablecoin rather
+// than ETH, and their prices are quoted in that pair: there is no dollar
+// value to compare against. A share of supply stands in - a millionth of
+// the float is dust in any currency.
+export const DUST_SUPPLY_SHARE = 1e-6;
