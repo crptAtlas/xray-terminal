@@ -70,6 +70,8 @@ export function defaultCachePath(): string {
 
 export class Cache {
   private db: Database.Database;
+  /** the compact table exists while or after a migration; reads span both */
+  private hasV2 = false;
 
   constructor(path?: string) {
     this.db = new Database(path ?? defaultCachePath());
@@ -90,6 +92,8 @@ export class Cache {
     // indexes that need the token column exist only after it does; on a
     // big database the caller builds them once out of band, so this is a
     // no-op there and instant on a fresh one
+    this.hasV2 =
+      (this.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='chain_trades_v2'").get() as { n: number }).n > 0;
     if (process.env.XRAY_BUILD_INDEXES !== "0") {
       try {
         this.db.exec("CREATE INDEX IF NOT EXISTS idx_ct_curve_block ON chain_trades(curve, block, log_index)");
@@ -254,12 +258,21 @@ export class Cache {
    * trades by the token itself. The scan reads these instead of pulling
    * the token's whole log history from the node again. */
   tokenTradesFromIndex(token: string, curve: string): { wallet: string; kind: "buy" | "sell"; tokens: bigint; eth: bigint; block: bigint; tx: string }[] {
-    const q = this.db.prepare(
-      `SELECT wallet, kind, tokens, eth, block, tx FROM chain_trades
-       WHERE curve = ? OR token = ?
-       ORDER BY block, log_index`,
-    );
-    return (q.all(curve.toLowerCase(), token.toLowerCase()) as { wallet: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]).map((r) => ({
+    const sql = this.hasV2
+      ? `SELECT wallet, kind, tokens, eth, block, tx FROM (
+           SELECT wallet, CASE kind WHEN 1 THEN 'buy' ELSE 'sell' END AS kind,
+                  CAST(tokens AS TEXT) AS tokens, CAST(eth AS TEXT) AS eth, block, '' AS tx, log_index
+           FROM chain_trades_v2 WHERE curve = ? OR token = ?
+           UNION ALL
+           SELECT wallet, kind, tokens, eth, block, tx, log_index
+           FROM chain_trades WHERE curve = ? OR token = ?
+         ) ORDER BY block, log_index`
+      : `SELECT wallet, kind, tokens, eth, block, tx FROM chain_trades
+         WHERE curve = ? OR token = ?
+         ORDER BY block, log_index`;
+    const q = this.db.prepare(sql);
+    const a = [curve.toLowerCase(), token.toLowerCase()];
+    return (q.all(...(this.hasV2 ? [...a, ...a] : a)) as { wallet: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; tx: string }[]).map((r) => ({
       wallet: r.wallet,
       kind: r.kind,
       tokens: BigInt(r.tokens),
@@ -397,12 +410,23 @@ export class Cache {
     // them says the same thing about how it trades in the last few
     // thousand, and the cap is what keeps a thousand-wallet phase quick.
     const cap = Number(process.env.XRAY_WALLET_TRADE_CAP ?? 5000);
-    const q = this.db.prepare(
-      `SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT ${cap}`,
-    );
+    // The compact table holds migrated rows, the original holds whatever
+    // has not moved yet; during a migration a wallet's history spans both.
+    const sql = this.hasV2
+      ? `SELECT curve, kind, tokens, eth, block, token FROM (
+           SELECT curve, CASE kind WHEN 1 THEN 'buy' ELSE 'sell' END AS kind,
+                  CAST(tokens AS TEXT) AS tokens, CAST(eth AS TEXT) AS eth, block, token, log_index
+           FROM chain_trades_v2 WHERE wallet = ? AND block > ?
+           UNION ALL
+           SELECT curve, kind, tokens, eth, block, token, log_index
+           FROM chain_trades WHERE wallet = ? AND block > ?
+         ) ORDER BY block DESC, log_index DESC LIMIT ${cap}`
+      : `SELECT curve, kind, tokens, eth, block, token FROM chain_trades WHERE wallet = ? AND block > ? ORDER BY block DESC, log_index DESC LIMIT ${cap}`;
+    const q = this.db.prepare(sql);
     for (const w of wallets) {
       const lw = w.toLowerCase();
-      const rows = q.all(lw, Number(afterBlock)) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; token: string | null }[];
+      const args = this.hasV2 ? [lw, Number(afterBlock), lw, Number(afterBlock)] : [lw, Number(afterBlock)];
+      const rows = q.all(...args) as { curve: string; kind: "buy" | "sell"; tokens: string; eth: string; block: number; token: string | null }[];
       if (rows.length === 0) continue;
       rows.reverse(); // ascending block order for the fold
       out.set(

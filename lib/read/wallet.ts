@@ -198,9 +198,9 @@ async function profilesFromIndex(
   const floorV4Now = currentFloor(cache, "v4");
   const tipNow = cache.tradeIndexSpan("curve")?.tip ?? 0n;
   const lower = misses.map((w) => w.toLowerCase());
-  // The database sums a wallet's trades per token; wallets with a prior
-  // ledger only sum what happened past their synced block.
-  const aggByWallet = new Map<string, ReturnType<Cache["walletAggregates"]> extends Map<string, infer R> ? R : never>();
+  // Wallets with a prior ledger read only what happened past their synced
+  // block; fresh ones read their history once.
+  const rowsByWallet = new Map<string, ReturnType<Cache["chainTradesFor"]> extends Map<string, infer R> ? R : never>();
   const fresh: string[] = [];
   const byPriorBlock = new Map<string, string[]>();
   for (const w of misses) {
@@ -213,9 +213,36 @@ async function profilesFromIndex(
     } else fresh.push(lw);
   }
   for (const [block, ws] of byPriorBlock) {
-    for (const [lw, agg] of cache.walletAggregates(ws, BigInt(block))) aggByWallet.set(lw, agg);
+    for (const [lw, rows] of cache.chainTradesFor(ws, BigInt(block))) rowsByWallet.set(lw, rows);
   }
-  for (const [lw, agg] of cache.walletAggregates(fresh)) aggByWallet.set(lw, agg);
+  for (const [lw, rows] of cache.chainTradesFor(fresh)) rowsByWallet.set(lw, rows);
+  // per wallet and token, the sums a ledger needs
+  const aggByWallet = new Map<string, Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>>();
+  for (const [lw, rows] of rowsByWallet) {
+    const byKey = new Map<string, { buyTokens: number; buyEth: number; sellTokens: number; sellEth: number; trades: number; lastPrice: number; lastBlock: number }>();
+    for (const r of rows) {
+      const k = r.token && r.token !== "" ? r.token : r.curve;
+      if (!k) continue;
+      const cur = byKey.get(k) ?? { buyTokens: 0, buyEth: 0, sellTokens: 0, sellEth: 0, trades: 0, lastPrice: 0, lastBlock: 0 };
+      const tok = Number(r.tokens);
+      const eth = Number(r.eth);
+      if (r.kind === "buy") {
+        cur.buyTokens += tok;
+        cur.buyEth += eth;
+      } else {
+        cur.sellTokens += tok;
+        cur.sellEth += eth;
+      }
+      cur.trades++;
+      const b = Number(r.block);
+      if (b >= cur.lastBlock) {
+        cur.lastBlock = b;
+        if (tok > 0) cur.lastPrice = eth / tok;
+      }
+      byKey.set(k, cur);
+    }
+    aggByWallet.set(lw, byKey);
+  }
   // an aggregate key is either a token address (pool trades) or a curve
   const curves = new Set<string>();
   const directTokens = new Set<string>();
