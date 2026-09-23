@@ -1,7 +1,7 @@
 import { ADDR, CHAIN, DUST_SUPPLY_SHARE, DUST_USD, INFRA, type Hex } from "../chain.ts";
 import type { Cache, MarketAggregate } from "../cache.ts";
 import { classify, type Trade, type TransferIn } from "../pnl/classify.ts";
-import { position, type Position } from "../pnl/position.ts";
+import { MIN_COST_WEI, position, type Position } from "../pnl/position.ts";
 import type { Provider, TokenMeta } from "../providers/provider.ts";
 import { ethUsd } from "../usd.ts";
 import type { StageReporter } from "../stages.ts";
@@ -178,6 +178,10 @@ export async function tokenSnapshot(
 
   const one = 10n ** BigInt(meta.decimals);
   const supplyFloat = Number(meta.totalSupply) / Number(one);
+  // quote amounts are in the pair's units, so the floor below which a
+  // cost basis means nothing has to be in those units too
+  const pairDec = meta.pairDecimals ?? 18;
+  const minCost = pairDec >= 18 ? MIN_COST_WEI * 10n ** BigInt(pairDec - 18) : MIN_COST_WEI / 10n ** BigInt(18 - pairDec);
   // A dollar threshold only means something when the token is priced in
   // ETH. Against a stock or stablecoin pair the price is in pair units,
   // and with no price at all nothing can be called dust - excluding every
@@ -199,7 +203,7 @@ export async function tokenSnapshot(
   for (const w of candidates) {
     const bal = balances.get(w) ?? 0n;
     if (bal > 0n) holdersTotal++;
-    const pos = position(tradesByWallet.get(w) ?? [], tinByWallet.get(w) ?? 0n, bal, priceEth, meta.decimals);
+    const pos = position(tradesByWallet.get(w) ?? [], tinByWallet.get(w) ?? 0n, bal, priceEth, meta.decimals, minCost);
     const balFloat = Number(bal) / Number(one);
     const share = supplyFloat > 0 ? balFloat / supplyFloat : 0;
 

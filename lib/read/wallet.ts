@@ -37,7 +37,7 @@ interface CachedWallet {
 const FRESH_ENOUGH_MS = 10 * 60 * 1000;
 
 /** A record with nothing in it: no Pons position, so no closed trade. */
-const EMPTY_FOLD = { taken: 0, closed: 0, wins: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
+const EMPTY_FOLD = { taken: 0, closed: 0, wins: 0, winsClosed: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
 
 /** Step timings for a profile phase, on stderr under XRAY_TIMING=1. The
  * phase reads several sources and one slow step hides in the total. */

@@ -4,7 +4,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { TokenMeta } from "./providers/provider.ts";
 import type { Trade, TransferIn } from "./pnl/classify.ts";
-import { MIN_COST_WEI } from "./pnl/position.ts";
 
 /**
  * Incremental store. Two zones:
@@ -109,7 +108,10 @@ export interface RecordFold {
   taken: number;
   /** positions it has fully exited */
   closed: number;
+  /** positions in profit, open ones included */
   wins: number;
+  /** positions in profit among those it exited */
+  winsClosed: number;
   pnlPctSum: number;
   realizedWei: number;
   openValueWei: number;
@@ -542,7 +544,9 @@ export class Cache {
           tokens > 0 ? eth / tokens : 0,
           Number(r.block),
         );
-        if (tokens > 0) price.run(market.toLowerCase(), eth / tokens, Number(r.block));
+        // a dust trade sets an absurd price and would value every open
+        // position in that market against it
+        if (tokens >= 1e12 && eth >= 1e12) price.run(market.toLowerCase(), eth / tokens, Number(r.block));
       }
     });
     tx();
@@ -662,14 +666,16 @@ export class Cache {
         SELECT w,
           SUM(CASE WHEN shown THEN 1 ELSE 0 END) AS taken_s,
           SUM(CASE WHEN shown AND closed THEN 1 ELSE 0 END) AS closed_s,
-          SUM(CASE WHEN shown AND closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_s,
-          SUM(CASE WHEN shown THEN pnl / bc * 100 ELSE 0 END) AS pct_s,
+          SUM(CASE WHEN shown AND pnl > 0 THEN 1 ELSE 0 END) AS wins_s,
+          SUM(CASE WHEN shown AND closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_closed_s,
+          SUM(CASE WHEN shown THEN MAX(-100.0, MIN(500.0, pnl / bc * 100)) ELSE 0 END) AS pct_s,
           SUM(CASE WHEN shown AND closed THEN pnl ELSE 0 END) AS realized_s,
           SUM(CASE WHEN shown AND NOT closed THEN value ELSE 0 END) AS open_s,
           COUNT(*) AS taken_f,
           SUM(CASE WHEN closed THEN 1 ELSE 0 END) AS closed_f,
-          SUM(CASE WHEN closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_f,
-          SUM(pnl / bc * 100) AS pct_f,
+          SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) AS wins_f,
+          SUM(CASE WHEN closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_closed_f,
+          SUM(MAX(-100.0, MIN(500.0, pnl / bc * 100))) AS pct_f,
           SUM(CASE WHEN NOT closed THEN value ELSE 0 END) AS open_f
         FROM (
           SELECT w, tok, bc, (tok <> ?) AS shown,
@@ -694,17 +700,27 @@ export class Cache {
             WHERE wp.wallet IN (${marks})
             GROUP BY w, tok
           )
-          WHERE tok IS NOT NULL AND st <= bt AND bc >= ${Number(MIN_COST_WEI)}
+          -- a cost basis of nothing is no basis; anything above that
+          -- joins the average inside the clamped band, so a position
+          -- bought for a rounding error cannot run away with it
+          WHERE tok IS NOT NULL AND st <= bt * 1.000000001 AND bc > 0
         )
         GROUP BY w`);
       const rows = q.all(ex, ...slice.map((w) => w.toLowerCase())) as {
-        w: string; taken_s: number; closed_s: number; wins_s: number; pct_s: number; realized_s: number;
-        open_s: number; taken_f: number; closed_f: number; wins_f: number; pct_f: number; open_f: number;
+        w: string; taken_s: number; closed_s: number; wins_s: number; wins_closed_s: number; pct_s: number;
+        realized_s: number; open_s: number; taken_f: number; closed_f: number; wins_f: number;
+        wins_closed_f: number; pct_f: number; open_f: number;
       }[];
       for (const r of rows) {
         out.set(r.w, {
-          shown: { taken: r.taken_s, closed: r.closed_s, wins: r.wins_s, pnlPctSum: r.pct_s, realizedWei: r.realized_s, openValueWei: r.open_s },
-          full: { taken: r.taken_f, closed: r.closed_f, wins: r.wins_f, pnlPctSum: r.pct_f, realizedWei: 0, openValueWei: r.open_f },
+          shown: {
+            taken: r.taken_s, closed: r.closed_s, wins: r.wins_s, winsClosed: r.wins_closed_s,
+            pnlPctSum: r.pct_s, realizedWei: r.realized_s, openValueWei: r.open_s,
+          },
+          full: {
+            taken: r.taken_f, closed: r.closed_f, wins: r.wins_f, winsClosed: r.wins_closed_f,
+            pnlPctSum: r.pct_f, realizedWei: 0, openValueWei: r.open_f,
+          },
         });
       }
     }

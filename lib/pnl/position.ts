@@ -34,6 +34,7 @@ export function position(
   remaining: bigint,
   priceNowEthPerToken: number,
   decimals: number,
+  minCostWei = MIN_COST_WEI,
 ): Position {
   let boughtTokens = 0n;
   let boughtCostWei = 0n;
@@ -55,11 +56,19 @@ export function position(
   const valueNowWei = (remaining * priceWad) / one;
 
   const pnlWei = soldProceedsWei + valueNowWei - boughtCostWei;
-  const unknownBasis =
-    transfersInTokens > 0n ||
-    soldTokens + remaining > boughtTokens ||
-    boughtCostWei < MIN_COST_WEI;
-  const pnlPct = unknownBasis && boughtCostWei < MIN_COST_WEI ? null : (Number(pnlWei) / Number(boughtCostWei)) * 100;
+  // The amounts are summed as doubles in the index, so a wallet that sold
+  // exactly what it bought lands a few wei either side of it. Compared
+  // exactly, half of those read as tokens that arrived some other way.
+  const out = soldTokens + remaining;
+  const overBought = out * 1_000_000_000n > boughtTokens * 1_000_000_001n;
+  // A cost basis of a few units is unreliable whatever the currency, but
+  // the floor has to be read in that currency: two launches in five are
+  // quoted in a stock or a stablecoin, and one of those carries eight
+  // decimals where ETH carries eighteen. A fixed floor in wei condemned
+  // every holder such a token had.
+  const tooSmall = boughtCostWei < minCostWei;
+  const unknownBasis = transfersInTokens > 0n || overBought || tooSmall;
+  const pnlPct = tooSmall ? null : (Number(pnlWei) / Number(boughtCostWei)) * 100;
 
   return {
     boughtTokens,

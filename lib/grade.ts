@@ -21,18 +21,22 @@ export const GRADE_CONFIG = {
 } as const;
 
 /**
- * What a number means on this chain, measured over every wallet with two
- * or more closed trades rather than guessed. Winrate is penalized by
- * design (wins / (trades + 1)), so a median trader sits near 36%, not 50.
+ * What a number means on this chain, measured over every wallet holding
+ * two or more positions rather than guessed (scripts/measure-benchmarks,
+ * twenty thousand wallets sampled 2026-09-23). Open positions count,
+ * marked at the price their market last traded at, which is why the
+ * typical record is a loss: most of what a launchpad launches goes down.
+ * Winrate is penalized by design (wins / (positions + 1)), so a median
+ * trader sits near 20%, not 50.
  *
- *   winrate      p25 27   median 36   p75 49
- *   avg pnl      p25 -13  median  0   p75 11
+ *   winrate      p25  0   median  20   p75 33
+ *   avg pnl      p25 -56  median -24   p75 -1
  *
  * weak = bottom quartile, strong = top quartile.
  */
 export const HOLDER_BENCHMARKS = {
-  winrate: { weak: 27, typical: 36, strong: 49 },
-  avgPnl: { weak: -13, typical: 0, strong: 11 },
+  winrate: { weak: 0, typical: 20, strong: 33 },
+  avgPnl: { weak: -56, typical: -23, strong: -1 },
 } as const;
 
 /**
@@ -42,11 +46,11 @@ export const HOLDER_BENCHMARKS = {
  * nothing, and the card should say so.
  */
 export const GRADE_THRESHOLDS = {
-  // Calibrated on this chain: the median wallet averages 0% a trade and
-  // only the top tenth clears +39%, so green marks a room that is
-  // genuinely ahead rather than an impossible bar.
-  healthy: 25, // holders averaging +25% a trade or better
-  cracked: 0, // 0% to +25%: at or above the chain's own median
+  // Measured on this chain, open positions included: the median wallet
+  // averages -23% a position and only the top quarter is above -1%, so
+  // a room that is net up is genuinely rare. Green says exactly that.
+  healthy: 0, // holders net ahead across Pons
+  cracked: -25, // -25% to 0%: around what the chain itself averages
 } as const;
 
 export function gradeOf(

@@ -79,7 +79,7 @@ for (const w of wallets) {
     exclude,
     0,
   );
-  const empty = { taken: 0, closed: 0, wins: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
+  const empty = { taken: 0, closed: 0, wins: 0, winsClosed: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
   // no row means no Pons position at all, which is a record of zero trades
   const folded = profileFromStats(w, stats.get(w) ?? { shown: empty, full: empty }, 0n, 0);
   compared++;

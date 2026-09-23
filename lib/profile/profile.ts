@@ -77,6 +77,7 @@ function foldStats(positions: PositionSummary[], exclude?: string) {
   let taken = 0;
   let closed = 0;
   let wins = 0;
+  let winsClosed = 0;
   let pnlPctSum = 0;
   let realizedWei = 0n;
   let openValueWei = 0n;
@@ -85,17 +86,20 @@ function foldStats(positions: PositionSummary[], exclude?: string) {
     // every position counts toward the average; only a closed one counts
     // toward winrate, where a win has to have been taken
     taken++;
-    if (p.pnlPct !== null) pnlPctSum += p.pnlPct;
+    // one position bought for a rounding error can read as a million
+    // percent; every position joins the average inside the same band
+    if (p.pnlPct !== null) pnlPctSum += Math.max(-100, Math.min(500, p.pnlPct));
+    if ((p.pnlPct ?? 0) > 0) wins++;
     if (p.closed) {
       closed++;
       const pnlWei = BigInt(p.pnlWei);
-      if (pnlWei > 0n) wins++;
+      if (pnlWei > 0n) winsClosed++;
       realizedWei += pnlWei;
     } else {
       openValueWei += BigInt(p.valueWei);
     }
   }
-  return { taken, closed, wins, avg: taken > 0 ? pnlPctSum / taken : null, wr: winrate(closed, wins), realizedWei, openValueWei };
+  return { taken, closed, wins, winsClosed, avg: taken > 0 ? pnlPctSum / taken : null, wr: winrate(taken, wins), realizedWei, openValueWei };
 }
 
 export function profileFromPositions(
@@ -150,13 +154,13 @@ export function profileFromStats(
     trades: shown.taken,
     wins: shown.wins,
     avgPnlPerTrade: shown.taken > 0 ? shown.pnlPctSum / shown.taken : null,
-    winrate: winrate(shown.closed, shown.wins),
+    winrate: winrate(shown.taken, shown.wins),
     realizedTotalEth: shown.realizedWei / 1e18,
     balanceEth: ethFloat + shown.openValueWei / 1e18,
     badges: badges({
       trades: full.closed,
       avgPnlPerTrade: full.taken > 0 ? full.pnlPctSum / full.taken : null,
-      winrate: winrate(full.closed, full.wins),
+      winrate: winrate(full.taken, full.wins),
       balanceUsd: (ethFloat + full.openValueWei / 1e18) * ethUsdRate,
     }),
   };

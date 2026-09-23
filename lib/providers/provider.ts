@@ -23,6 +23,7 @@ export interface TokenMeta {
   // ETH-based pnl math does not apply.
   pairToken: Hex;
   pairSymbol: string | null; // null when the pair is native ETH
+  pairDecimals?: number | null; // decimals of the pair token, 18 for ETH
 }
 
 export interface RawTransfer {

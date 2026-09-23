@@ -114,7 +114,7 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   noglow();
   x.fillStyle = "#D9D9D9";
   x.font = '400 26px "JetBrains Mono"';
-  x.fillText("avg winrate of holders across Pons (chain median 36%)", 72 + wrW + 20, 316);
+  x.fillText("avg winrate of holders across Pons (chain median 20%)", 72 + wrW + 20, 316);
   const bx = 72;
   const bw = 936;
   const by = 344;

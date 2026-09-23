@@ -7,7 +7,7 @@ const E = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
 const buy = (tokens, eth, block = 1n) => ({ wallet: "0xw", kind: "buy", tokens, eth, block, tx: "0x1" });
 const sell = (tokens, eth, block = 2n) => ({ wallet: "0xw", kind: "sell", tokens, eth, block, tx: "0x2" });
 
-test("every position counts toward the average; winrate counts only closed ones", () => {
+test("every position counts, open ones marked at the price they last traded at", () => {
   const byToken = new Map([
     // closed winner: +1 ETH, +100%
     ["0xt1", [buy(T(100), E(1)), sell(T(100), E(2))]],
@@ -19,9 +19,9 @@ test("every position counts toward the average; winrate counts only closed ones"
   const remaining = (t) => (t === "0xt3" ? T(100) : 0n);
   const p = buildProfile("0xW", byToken, remaining, 0n);
   assert.equal(p.trades, 3); // positions taken, the open one included
-  assert.equal(p.wins, 1);
+  assert.equal(p.wins, 1); // the held one is flat, not a win
   assert.ok(Math.abs(p.avgPnlPerTrade - 50 / 3) < 1e-9); // (100 - 50 + 0) / 3
-  assert.equal(Math.round(p.winrate * 10) / 10, 33.3); // 1 win of 2 closed, +1
+  assert.equal(p.winrate, 25); // 1 win of 3 positions, +1
   assert.ok(Math.abs(p.realizedTotalEth - 0.5) < 1e-9); // realized stays realized
 });
 
@@ -61,7 +61,8 @@ test("the scanned token is excluded from the profile: insiders get no credit fro
   const withoutIt = profileFromPositions("0xw", positions, 0n, "0xscanned");
   assert.equal(withIt.trades, 3);
   assert.equal(withoutIt.trades, 2);
-  assert.ok(withIt.avgPnlPerTrade > 1000, "insider pump inflates the naive profile");
+  // the pump reads as +500%, the band every position joins an average in
+  assert.ok(Math.abs(withIt.avgPnlPerTrade - 500 / 3) < 1e-9, "insider pump inflates the naive profile");
   assert.equal(withoutIt.avgPnlPerTrade, 0); // (+20 - 20) / 2
   assert.equal(Math.round(withoutIt.winrate * 10) / 10, 33.3); // 1 / (2 + 1)
 });

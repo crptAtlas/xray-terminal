@@ -232,7 +232,7 @@ export function Terminal() {
         gradeColor: live.card.gradeColor,
         dead: live.dead,
         bands: live.bands.map((b) => ({ range: b.range, color: pnlColor(b.mid), supply: b.supply + "%", wallets: b.wallets, avg: b.avg, avgColor: b.avg.startsWith("+") ? "var(--profit)" : b.avg === "—" ? "var(--text-dim)" : "var(--loss)" })),
-        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "—", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? "—", badges: r.badges })),
+        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "no trades", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? "no trades", badges: r.badges })),
         exited: { wallets: String(live.exited.wallets), pnl: live.exited.avgPnl ?? "—", pnlColor: live.exited.avgPnl?.startsWith("+") ? "var(--profit)" : "var(--loss)", wr: "—" },
         flags: [
           ["dust", String(live.flags.dust)],
@@ -307,16 +307,16 @@ export function Terminal() {
 
   const pnlPos = D.pnlNum === null ? 0 : Math.max(0, Math.min(100, (D.pnlNum + 100) / 3));
   // scales calibrated on every wallet with 2+ closed trades on this chain:
-  // avg pnl p25 -13 / median 0 / p75 +11, winrate p25 27 / median 36 / p75 49
-  const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, ((D.holdersPnlNum + 50) / 150) * 100));
-  // the same thresholds the grade uses: +25 and above green, 0 to +25
-  // yellow, below zero red
+  // avg pnl p25 -56 / median -24 / p75 -1, winrate p25 0 / median 20 / p75 33
+  const holdersPnlPos = D.holdersPnlNum === null ? 0 : Math.max(0, Math.min(100, ((D.holdersPnlNum + 100) / 200) * 100));
+  // the same thresholds the grade uses: net up is green, down to -25%
+  // yellow, below that red
   const holdersPnlColor =
     D.holdersPnlNum === null
       ? "var(--bone-dark)"
-      : D.holdersPnlNum >= 25
+      : D.holdersPnlNum >= 0
         ? "var(--profit)"
-        : D.holdersPnlNum >= 0
+        : D.holdersPnlNum >= -25
           ? "var(--neutral)"
           : "var(--loss)";
   const wrPos = D.winrate === null ? 0 : parseFloat(D.winrate);
@@ -584,7 +584,7 @@ export function Terminal() {
                 D.holdersPnl,
                 holdersPnlColor,
                 holdersPnlPos,
-                ["−50%", "0", "+25%", "+100%"],
+                ["−100%", "−25%", "0", "+100%"],
                 D.holdersPnl !== null ? (
                   <>chain-wide record of <span style={{ color: "var(--text)" }}>{D.holdersPnlWallets}</span> holders · this token excluded</>
                 ) : D.profilesRead !== null && D.profilesRead > 0 ? (
@@ -597,11 +597,11 @@ export function Terminal() {
               {metric(
                 "avg winrate",
                 D.winrate,
-                D.winrate === null ? "var(--bone-dark)" : wrPos >= 49 ? "var(--profit)" : wrPos >= 27 ? "var(--neutral)" : "var(--loss)",
+                D.winrate === null ? "var(--bone-dark)" : wrPos >= 33 ? "var(--profit)" : wrPos >= 20 ? "var(--neutral)" : "var(--loss)",
                 wrPos,
-                ["0", "27", "49", "100"],
+                ["0", "20", "33", "100"],
                 D.winrate !== null ? (
-                  <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ trades · chain median 36%</>
+                  <>across <span style={{ color: "var(--text)" }}>{D.traced}</span> holders with 2+ positions · chain median 20%</>
                 ) : D.profilesRead === 0 ? (
                   <>wallet histories unavailable right now - retry the scan</>
                 ) : D.profilesRead !== null ? (

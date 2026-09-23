@@ -1,5 +1,4 @@
 import type { Trade } from "../pnl/classify.ts";
-import { MIN_COST_WEI } from "../pnl/position.ts";
 import type { PositionSummary } from "./profile.ts";
 
 /**
@@ -114,11 +113,13 @@ export function ledgerPositions(
     const st = BigInt(p.soldTokens);
     const sp = BigInt(p.soldProceedsWei);
     const remaining = bt > st ? bt - st : 0n;
-    // no honest basis: sold more than bought (tokens arrived some other
-    // way) or the cost is dust - skip from the stats, same rule as position()
-    if (st > bt || bc < MIN_COST_WEI) continue;
     const market = priceOf?.(p.token);
     const priceWad = market !== undefined && market > 0 ? BigInt(Math.round(market * 1e18)) : BigInt(p.lastPriceWad);
+    // no honest basis: sold more than bought, tokens that arrived some
+    // other way. A cost of nothing is no basis either; above that the
+    // clamped band keeps a rounding-error buy from running away with an
+    // average.
+    if (st * 1_000_000_000n > bt * 1_000_000_001n || bc <= 0n) continue;
     const valueWei = (remaining * priceWad) / 10n ** 18n;
     const pnlWei = sp + valueWei - bc;
     // sums of doubles never land exactly on zero; a position is closed

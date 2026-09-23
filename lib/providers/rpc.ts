@@ -128,10 +128,20 @@ export class RpcProvider implements Provider {
 
     const ethPaired = launched.pairToken === ZERO || launched.pairToken === ADDR.weth;
     let pairSymbol: string | null = null;
+    // the pair's own decimals: quote amounts are denominated in it, and
+    // a stablecoin or a wrapped coin is rarely eighteen decimals
+    let pairDecimals: number | null = null;
     if (!ethPaired) {
-      pairSymbol = (await this.client
-        .readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "symbol" })
-        .catch(() => "?" as string)) as string;
+      const [sym, dec] = await Promise.all([
+        this.client
+          .readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "symbol" })
+          .catch(() => "?" as string),
+        this.client
+          .readContract({ address: launched.pairToken, abi: erc20Abi, functionName: "decimals" })
+          .catch(() => 18),
+      ]);
+      pairSymbol = sym as string;
+      pairDecimals = Number(dec);
     }
 
     return {
@@ -152,6 +162,7 @@ export class RpcProvider implements Provider {
       phase,
       pairToken: launched.pairToken,
       pairSymbol,
+      pairDecimals,
     };
   }
 
