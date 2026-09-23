@@ -38,6 +38,8 @@ export interface LiveHolderRow {
   avgPnl: string | null;
   avgPnlNum: number | null;
   winrate: string | null;
+  /** positions the wallet has taken across Pons, this token excluded */
+  positions: number;
   badges: { text: string; color: string }[];
 }
 
@@ -126,6 +128,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     avgPnl: null,
     avgPnlNum: null,
     winrate: null,
+    positions: 0,
     badges: [], // SMART / WHALE arrive with the profile phase
   }));
 
@@ -233,6 +236,7 @@ function withProfiles(
       ...r,
       avgPnl: p.avgPnlPerTrade === null ? null : pct(p.avgPnlPerTrade),
       avgPnlNum: p.avgPnlPerTrade ?? null,
+      positions: p.trades ?? 0,
       winrate: p.winrate === null ? null : p.winrate.toFixed(0) + "%",
       badges,
     };

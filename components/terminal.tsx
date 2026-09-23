@@ -232,7 +232,7 @@ export function Terminal() {
         gradeColor: live.card.gradeColor,
         dead: live.dead,
         bands: live.bands.map((b) => ({ range: b.range, color: pnlColor(b.mid), supply: b.supply + "%", wallets: b.wallets, avg: b.avg, avgColor: b.avg.startsWith("+") ? "var(--profit)" : b.avg === "—" ? "var(--text-dim)" : "var(--loss)" })),
-        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "no trades", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? "no trades", badges: r.badges })),
+        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "no trades", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? (r.positions === 1 ? "1 position" : "no trades"), badges: r.badges })),
         exited: { wallets: String(live.exited.wallets), pnl: live.exited.avgPnl ?? "—", pnlColor: live.exited.avgPnl?.startsWith("+") ? "var(--profit)" : "var(--loss)", wr: "—" },
         flags: [
           ["dust", String(live.flags.dust)],
