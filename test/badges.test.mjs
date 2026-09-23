@@ -15,11 +15,11 @@ test("smart denied one notch below each threshold", () => {
   assert.deepEqual(badges({ ...base, avgPnlPerTrade: null }), []);
 });
 
-test("whale is wealth: 10k usd total balance, any tokens", () => {
-  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 10_000 }), ["whale"]);
-  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 9_999 }), []);
+test("whale is wealth: 50k usd total balance, any tokens", () => {
+  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 50_000 }), ["whale"]);
+  assert.deepEqual(badges({ trades: 0, avgPnlPerTrade: null, winrate: null, balanceUsd: 49_999 }), []);
 });
 
 test("both badges together", () => {
-  assert.deepEqual(badges({ ...base, balanceUsd: 25_000 }), ["smart", "whale"]);
+  assert.deepEqual(badges({ ...base, balanceUsd: 80_000 }), ["smart", "whale"]);
 });

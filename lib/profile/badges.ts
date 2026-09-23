@@ -2,12 +2,12 @@
  * Wallet badges. Thresholds live here as config; >= semantics on every
  * boundary. smart is impossible below 30 closed trades. whale is wealth:
  * the wallet's total balance (ETH plus open token positions) worth
- * $10,000 or more - not a share of any one token's supply.
+ * $50,000 or more - not a share of any one token's supply.
  */
 
 export const BADGE_CONFIG = {
   smart: { avgPnlPct: 25, winrate: 55, trades: 30 },
-  whale: { balanceUsd: 10_000 },
+  whale: { balanceUsd: 50_000 },
 } as const;
 
 export interface BadgeInput {

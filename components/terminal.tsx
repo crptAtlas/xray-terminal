@@ -37,7 +37,8 @@ const ERRS: Record<string, [string, string, string]> = {
 };
 
 const DEMO_ADDR = "0x7a3f19c0b8e2d4a6f51c93e0a7b2d8f4c6e19c41";
-const STAGE_INDEX: Record<string, number> = { scanner: 0, ledger: 1, tracer: 2, auditor: 3, sorter: 4, flagger: 5 };
+// same order as AGENTS, which is the order the engine runs them in
+const STAGE_INDEX: Record<string, number> = { scanner: 0, ledger: 1, flagger: 2, sorter: 3, auditor: 4, tracer: 5 };
 
 interface StageState {
   status: "idle" | "start" | "done" | "skip";

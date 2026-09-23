@@ -88,13 +88,17 @@ export interface AgentMeta {
   run: string;
 }
 
+// In the order the engine runs them: the strip is a progress bar, so a
+// box that lights up out of turn reads as a bug. tracer is last because
+// wallet histories are the slow part and everything else is ready by
+// then.
 export const AGENTS: AgentMeta[] = [
   { name: "SCANNER", src: "/assets/work-scanner.gif", cap: "pulling every trade of this token", done: "1 043 holders · 18 920 trades", run: "pulling trades…" },
   { name: "LEDGER", src: "/assets/work-ledger.gif", cap: "rebuilding each wallet's book", done: "1 043 books rebuilt", run: "rebuilding books…" },
-  { name: "TRACER", src: "/assets/work-tracer.gif", cap: "following the same wallets across other tokens", done: "212 wallets traced", run: "reading wallet histories, this usually takes ~20s…" },
-  { name: "AUDITOR", src: "/assets/work-auditor.gif", cap: "avg pnl and winrate, wallet by wallet", done: "winrate for 212 · pnl for 956", run: "auditing…" },
-  { name: "SORTER", src: "/assets/work-sorter.gif", cap: "banding holders by pnl", done: "3 bands · 72.5% of supply", run: "banding…" },
   { name: "FLAGGER", src: "/assets/work-flagger.gif", cap: "dust, transfers in, first-ever trades", done: "619 flagged", run: "flagging…" },
+  { name: "SORTER", src: "/assets/work-sorter.gif", cap: "banding holders by pnl", done: "3 bands · 72.5% of supply", run: "banding…" },
+  { name: "AUDITOR", src: "/assets/work-auditor.gif", cap: "avg pnl and winrate, wallet by wallet", done: "winrate for 212 · pnl for 956", run: "auditing…" },
+  { name: "TRACER", src: "/assets/work-tracer.gif", cap: "following the same wallets across other tokens", done: "212 wallets traced", run: "reading wallet histories, this usually takes ~20s…" },
 ];
 
 export interface GradeFixture {

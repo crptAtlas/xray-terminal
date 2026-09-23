@@ -129,7 +129,10 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
   const rows: LiveHolderRow[] = s.holders.slice(0, MAX_ROWS).map((r) => ({
     addr: short(r.wallet),
     addrFull: r.wallet,
-    supply: (r.supplyShare * 100).toFixed(2) + "%",
+    // a wallet that sold out holds nothing, and printing that as 0.00%
+    // reads as a holder of nothing rather than someone who left; a live
+    // holder below a hundredth of a percent gets a floor, not a zero
+    supply: r.supplyShare <= 0 ? "exited" : r.supplyShare * 100 < 0.01 ? "<0.01%" : (r.supplyShare * 100).toFixed(2) + "%",
     pnlHere: pct(r.position.pnlPct),
     pnlNum: r.position.pnlPct,
     avgPnl: null,
