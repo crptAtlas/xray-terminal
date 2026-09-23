@@ -322,23 +322,33 @@ export function Terminal() {
   const liveDone = liveStages.filter((s) => s.status === "done" || s.status === "skip").length;
   const liveActiveIdx = liveStages.findIndex((s) => s.status === "start");
   const stageIdx = isLiveRun ? (liveActiveIdx >= 0 ? liveActiveIdx : Math.min(liveDone, 5)) : Math.min(step, 5);
-  // the bar creeps steadily toward the next stage boundary so a long
-  // stage never looks frozen; a completed stage snaps it forward
+  // The bar's left edge sits under the box that is lit: a stage owns one
+  // sixth of it, and the stage's own progress fills that sixth. The
+  // tracer counts wallets as it reads them ("500 of 2000"), so its
+  // sixth fills for real; the stages that cannot count themselves creep
+  // so a slow one never looks frozen.
   const [smooth, setSmooth] = useState(0);
-  const stageTarget = isRunning ? (isLiveRun ? liveDone : step) / 6 : 0;
+  const activeDetail = isLiveRun ? liveStages[stageIdx]?.detail ?? "" : "";
+  const counted = /(\d[\d\s]*) of (\d[\d\s]*)/.exec(activeDetail);
+  const within = counted
+    ? Math.min(1, Number(counted[1]!.replace(/\s/g, "")) / Math.max(1, Number(counted[2]!.replace(/\s/g, ""))))
+    : null;
+  const base = isRunning ? (isLiveRun ? stageIdx : step) / 6 : 0;
+  const stageTarget = within === null ? base : base + within / 6;
   useEffect(() => {
     if (!isRunning) {
       setSmooth(0);
       return;
     }
     const floor = stageTarget * 100;
-    const ceil = Math.min((stageTarget + 1 / 6) * 100 - 2, 98);
+    const ceil = Math.min((base + 1 / 6) * 100 - 2, 98);
     setSmooth((s) => Math.max(s, floor));
+    if (within !== null) return; // the stage reports its own progress
     const t = setInterval(() => {
       setSmooth((s) => (s < ceil ? Math.min(s + Math.max(0.15, (ceil - s) * 0.02), ceil) : s));
     }, 250);
     return () => clearInterval(t);
-  }, [isRunning, stageTarget]);
+  }, [isRunning, stageTarget, base, within]);
   const progress = isRunning ? Math.round(smooth) : 0;
 
   const showHeader = isResult || (!isLiveRun && isRunning && step >= 1);
