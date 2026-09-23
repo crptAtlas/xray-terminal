@@ -76,6 +76,12 @@ CREATE TABLE IF NOT EXISTS wallet_positions (
   trades INTEGER NOT NULL, last_price REAL NOT NULL, last_block INTEGER NOT NULL,
   PRIMARY KEY (wallet, market)
 ) WITHOUT ROWID;
+-- The price of each market's newest trade, whoever made it. A wallet
+-- that still holds what it bought is marked against this, not against
+-- the price of its own last trade, which may be weeks stale.
+CREATE TABLE IF NOT EXISTS market_price (
+  market TEXT PRIMARY KEY, last_price REAL NOT NULL, last_block INTEGER NOT NULL
+) WITHOUT ROWID;
 `;
 
 /** Fold one trade into a wallet's record of a market. The last price is
@@ -92,7 +98,16 @@ ON CONFLICT(wallet, market) DO UPDATE SET
   last_price = CASE WHEN excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
   last_block = MAX(last_block, excluded.last_block)`;
 
+const FOLD_MARKET_PRICE = `
+INSERT INTO market_price (market, last_price, last_block) VALUES (?, ?, ?)
+ON CONFLICT(market) DO UPDATE SET
+  last_price = CASE WHEN excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
+  last_block = MAX(last_block, excluded.last_block)`;
+
 export interface RecordFold {
+  /** positions the wallet has taken, open ones included */
+  taken: number;
+  /** positions it has fully exited */
   closed: number;
   wins: number;
   pnlPctSum: number;
@@ -501,6 +516,7 @@ export class Cache {
       "INSERT OR IGNORE INTO chain_trades (block, log_index, wallet, curve, token, kind, tokens, eth) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
     const fold = this.db.prepare(FOLD_POSITION);
+    const price = this.db.prepare(FOLD_MARKET_PRICE);
     const tx = this.db.transaction(() => {
       // While the bulk fold is still walking the history it will reach
       // these blocks itself; folding them here too would count them
@@ -526,9 +542,25 @@ export class Cache {
           tokens > 0 ? eth / tokens : 0,
           Number(r.block),
         );
+        if (tokens > 0) price.run(market.toLowerCase(), eth / tokens, Number(r.block));
       }
     });
     tx();
+  }
+
+  /** Where each of these markets last traded, whoever traded it. */
+  marketPrices(markets: string[]): Map<string, number> {
+    const out = new Map<string, number>();
+    if (markets.length === 0) return out;
+    for (const slice of chunks(markets, IN_CHUNK)) {
+      const q = this.db.prepare(
+        `SELECT market, last_price FROM market_price WHERE market IN (${slice.map(() => "?").join(",")})`,
+      );
+      for (const r of q.all(...slice.map((m) => m.toLowerCase())) as { market: string; last_price: number }[]) {
+        out.set(r.market, r.last_price);
+      }
+    }
+    return out;
   }
 
   /** Per wallet, the folded record of every market it has traded. */
@@ -628,30 +660,37 @@ export class Cache {
       const marks = slice.map(() => "?").join(",");
       const q = this.db.prepare(`
         SELECT w,
+          SUM(CASE WHEN shown THEN 1 ELSE 0 END) AS taken_s,
           SUM(CASE WHEN shown AND closed THEN 1 ELSE 0 END) AS closed_s,
           SUM(CASE WHEN shown AND closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_s,
-          SUM(CASE WHEN shown AND closed THEN pnl / bc * 100 ELSE 0 END) AS pct_s,
+          SUM(CASE WHEN shown THEN pnl / bc * 100 ELSE 0 END) AS pct_s,
           SUM(CASE WHEN shown AND closed THEN pnl ELSE 0 END) AS realized_s,
           SUM(CASE WHEN shown AND NOT closed THEN value ELSE 0 END) AS open_s,
+          COUNT(*) AS taken_f,
           SUM(CASE WHEN closed THEN 1 ELSE 0 END) AS closed_f,
           SUM(CASE WHEN closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_f,
-          SUM(CASE WHEN closed THEN pnl / bc * 100 ELSE 0 END) AS pct_f,
+          SUM(pnl / bc * 100) AS pct_f,
           SUM(CASE WHEN NOT closed THEN value ELSE 0 END) AS open_f
         FROM (
           SELECT w, tok, bc, (tok <> ?) AS shown,
-                 ((bt - st) = 0) AS closed,
-                 ((bt - st) * lp) AS value,
-                 (sp + ((bt - st) * lp) - bc) AS pnl
+                 -- sums of doubles never land exactly on zero, so a
+                 -- position is closed when what is left is a billionth
+                 -- of what was bought
+                 ((bt - st) <= bt * 1e-9) AS closed,
+                 (CASE WHEN bt > st THEN (bt - st) * lp ELSE 0 END) AS value,
+                 (sp + (CASE WHEN bt > st THEN (bt - st) * lp ELSE 0 END) - bc) AS pnl
           FROM (
             SELECT wp.wallet AS w,
                    COALESCE(lt.token, lc.token, NULLIF(ct.token, '')) AS tok,
                    SUM(wp.buy_tokens) AS bt, SUM(wp.buy_eth) AS bc,
                    SUM(wp.sell_tokens) AS st, SUM(wp.sell_eth) AS sp,
-                   MAX(wp.last_block) AS lb, wp.last_price AS lp
+                   MAX(wp.last_block) AS lb,
+                   COALESCE(mp.last_price, wp.last_price) AS lp
             FROM wallet_positions wp
             LEFT JOIN launches lt ON lt.token = wp.market
             LEFT JOIN launches lc ON lc.curve = wp.market
             LEFT JOIN curve_tokens ct ON ct.curve = wp.market
+            LEFT JOIN market_price mp ON mp.market = wp.market
             WHERE wp.wallet IN (${marks})
             GROUP BY w, tok
           )
@@ -659,13 +698,13 @@ export class Cache {
         )
         GROUP BY w`);
       const rows = q.all(ex, ...slice.map((w) => w.toLowerCase())) as {
-        w: string; closed_s: number; wins_s: number; pct_s: number; realized_s: number;
-        open_s: number; closed_f: number; wins_f: number; pct_f: number; open_f: number;
+        w: string; taken_s: number; closed_s: number; wins_s: number; pct_s: number; realized_s: number;
+        open_s: number; taken_f: number; closed_f: number; wins_f: number; pct_f: number; open_f: number;
       }[];
       for (const r of rows) {
         out.set(r.w, {
-          shown: { closed: r.closed_s, wins: r.wins_s, pnlPctSum: r.pct_s, realizedWei: r.realized_s, openValueWei: r.open_s },
-          full: { closed: r.closed_f, wins: r.wins_f, pnlPctSum: r.pct_f, realizedWei: 0, openValueWei: r.open_f },
+          shown: { taken: r.taken_s, closed: r.closed_s, wins: r.wins_s, pnlPctSum: r.pct_s, realizedWei: r.realized_s, openValueWei: r.open_s },
+          full: { taken: r.taken_f, closed: r.closed_f, wins: r.wins_f, pnlPctSum: r.pct_f, realizedWei: 0, openValueWei: r.open_f },
         });
       }
     }

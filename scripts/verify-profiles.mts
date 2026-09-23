@@ -34,6 +34,10 @@ const keys = new Set<string>();
 for (const byMarket of positions.values()) for (const k of byMarket.keys()) keys.add(k);
 for (const k of cache.launchTokens([...keys])) launched.add(k);
 for (const [c, tok] of cache.curveTokens([...keys])) curves.set(c, tok);
+// a position is marked at the price its market last traded at, and the
+// merged position takes the price of whichever market traded last
+const priceByMarket = cache.marketPrices([...keys]);
+const marketPrice = new Map<string, number>();
 const rowMs = Date.now() - t;
 
 const near = (a: number | null, b: number | null) => {
@@ -61,15 +65,21 @@ for (const w of wallets) {
         cur.lastPrice = a.lastPrice;
       }
     } else byToken.set(token, { ...a });
+    const at = marketPrice.get(token);
+    const known = priceByMarket.get(key);
+    if (known !== undefined && (at === undefined || a.lastBlock >= (byToken.get(token) as { lastBlock: number }).lastBlock)) {
+      marketPrice.set(token, known);
+    }
   }
   const reference = profileFromPositions(
     w,
-    ledgerPositions(applyAggregates(emptyLedger(), byToken as never, 0n)),
+    // the same market prices the database folds against
+    ledgerPositions(applyAggregates(emptyLedger(), byToken as never, 0n), (t) => marketPrice.get(t)),
     0n,
     exclude,
     0,
   );
-  const empty = { closed: 0, wins: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
+  const empty = { taken: 0, closed: 0, wins: 0, pnlPctSum: 0, realizedWei: 0, openValueWei: 0 };
   // no row means no Pons position at all, which is a record of zero trades
   const folded = profileFromStats(w, stats.get(w) ?? { shown: empty, full: empty }, 0n, 0);
   compared++;

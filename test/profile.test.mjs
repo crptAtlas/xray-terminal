@@ -7,22 +7,22 @@ const E = (n) => BigInt(Math.round(n * 1e6)) * 10n ** 12n;
 const buy = (tokens, eth, block = 1n) => ({ wallet: "0xw", kind: "buy", tokens, eth, block, tx: "0x1" });
 const sell = (tokens, eth, block = 2n) => ({ wallet: "0xw", kind: "sell", tokens, eth, block, tx: "0x2" });
 
-test("closed positions count as trades; open ones do not", () => {
+test("every position counts toward the average; winrate counts only closed ones", () => {
   const byToken = new Map([
     // closed winner: +1 ETH, +100%
     ["0xt1", [buy(T(100), E(1)), sell(T(100), E(2))]],
     // closed loser: -0.5 ETH, -50%
     ["0xt2", [buy(T(100), E(1)), sell(T(100), E(0.5))]],
-    // open position: not a trade yet
+    // still held: marked at the last price it traded at, so flat
     ["0xt3", [buy(T(100), E(1))]],
   ]);
   const remaining = (t) => (t === "0xt3" ? T(100) : 0n);
   const p = buildProfile("0xW", byToken, remaining, 0n);
-  assert.equal(p.trades, 2);
+  assert.equal(p.trades, 3); // positions taken, the open one included
   assert.equal(p.wins, 1);
-  assert.equal(p.avgPnlPerTrade, 25); // (100 - 50) / 2
-  assert.equal(Math.round(p.winrate * 10) / 10, 33.3); // 1/(2+1)
-  assert.ok(Math.abs(p.realizedTotalEth - 0.5) < 1e-9);
+  assert.ok(Math.abs(p.avgPnlPerTrade - 50 / 3) < 1e-9); // (100 - 50 + 0) / 3
+  assert.equal(Math.round(p.winrate * 10) / 10, 33.3); // 1 win of 2 closed, +1
+  assert.ok(Math.abs(p.realizedTotalEth - 0.5) < 1e-9); // realized stays realized
 });
 
 test("balance = eth + open positions at last trade price", () => {

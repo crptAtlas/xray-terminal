@@ -74,6 +74,7 @@ export function buildPositions(
 
 /** Fold position summaries into a profile, optionally excluding one token. */
 function foldStats(positions: PositionSummary[], exclude?: string) {
+  let taken = 0;
   let closed = 0;
   let wins = 0;
   let pnlPctSum = 0;
@@ -81,17 +82,20 @@ function foldStats(positions: PositionSummary[], exclude?: string) {
   let openValueWei = 0n;
   for (const p of positions) {
     if (exclude && p.token === exclude) continue;
+    // every position counts toward the average; only a closed one counts
+    // toward winrate, where a win has to have been taken
+    taken++;
+    if (p.pnlPct !== null) pnlPctSum += p.pnlPct;
     if (p.closed) {
       closed++;
       const pnlWei = BigInt(p.pnlWei);
       if (pnlWei > 0n) wins++;
-      if (p.pnlPct !== null) pnlPctSum += p.pnlPct;
       realizedWei += pnlWei;
     } else {
       openValueWei += BigInt(p.valueWei);
     }
   }
-  return { closed, wins, avg: closed > 0 ? pnlPctSum / closed : null, wr: winrate(closed, wins), realizedWei, openValueWei };
+  return { taken, closed, wins, avg: taken > 0 ? pnlPctSum / taken : null, wr: winrate(closed, wins), realizedWei, openValueWei };
 }
 
 export function profileFromPositions(
@@ -108,7 +112,7 @@ export function profileFromPositions(
   const balanceEth = Number(ethWei + shown.openValueWei) / 1e18;
   return {
     wallet: wallet.toLowerCase(),
-    trades: shown.closed,
+    trades: shown.taken,
     wins: shown.wins,
     avgPnlPerTrade: shown.avg,
     winrate: shown.wr,
@@ -137,17 +141,21 @@ export function profileFromStats(
   const shown = stats.shown;
   const full = stats.full;
   const ethFloat = Number(ethWei) / 1e18;
+  // Every position counts toward the average, open ones marked at the
+  // price their market last traded at. Counting only the closed ones
+  // left nine holders in ninety with a record: most of a launchpad's
+  // holders are still holding.
   return {
     wallet: wallet.toLowerCase(),
-    trades: shown.closed,
+    trades: shown.taken,
     wins: shown.wins,
-    avgPnlPerTrade: shown.closed > 0 ? shown.pnlPctSum / shown.closed : null,
+    avgPnlPerTrade: shown.taken > 0 ? shown.pnlPctSum / shown.taken : null,
     winrate: winrate(shown.closed, shown.wins),
     realizedTotalEth: shown.realizedWei / 1e18,
     balanceEth: ethFloat + shown.openValueWei / 1e18,
     badges: badges({
       trades: full.closed,
-      avgPnlPerTrade: full.closed > 0 ? full.pnlPctSum / full.closed : null,
+      avgPnlPerTrade: full.taken > 0 ? full.pnlPctSum / full.taken : null,
       winrate: winrate(full.closed, full.wins),
       balanceUsd: (ethFloat + full.openValueWei / 1e18) * ethUsdRate,
     }),

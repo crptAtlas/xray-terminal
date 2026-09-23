@@ -96,8 +96,17 @@ export function applyTrades(ledger: WalletLedger, byToken: Map<string, Trade[]>,
   return { positions, syncedBlock: upToBlock.toString() };
 }
 
-/** Position summaries from the ledger, the shape the profile math expects. */
-export function ledgerPositions(ledger: WalletLedger): PositionSummary[] {
+/**
+ * Position summaries from the ledger, the shape the profile math expects.
+ * priceOf gives the price a market last traded at, whoever traded it:
+ * what a wallet still holds is worth what the market says, not what its
+ * own last trade said weeks ago. Without it the wallet's own last price
+ * stands in.
+ */
+export function ledgerPositions(
+  ledger: WalletLedger,
+  priceOf?: (token: string) => number | undefined,
+): PositionSummary[] {
   const out: PositionSummary[] = [];
   for (const p of Object.values(ledger.positions)) {
     const bt = BigInt(p.boughtTokens);
@@ -108,9 +117,13 @@ export function ledgerPositions(ledger: WalletLedger): PositionSummary[] {
     // no honest basis: sold more than bought (tokens arrived some other
     // way) or the cost is dust - skip from the stats, same rule as position()
     if (st > bt || bc < MIN_COST_WEI) continue;
-    const valueWei = (remaining * BigInt(p.lastPriceWad)) / 10n ** 18n;
+    const market = priceOf?.(p.token);
+    const priceWad = market !== undefined && market > 0 ? BigInt(Math.round(market * 1e18)) : BigInt(p.lastPriceWad);
+    const valueWei = (remaining * priceWad) / 10n ** 18n;
     const pnlWei = sp + valueWei - bc;
-    const closed = remaining === 0n;
+    // sums of doubles never land exactly on zero; a position is closed
+    // when what is left is a billionth of what was bought
+    const closed = remaining * 1_000_000_000n <= bt;
     out.push({
       token: p.token,
       trades: p.trades,
