@@ -52,7 +52,7 @@ export async function* check(
   onStage({ agent: "sorter", status: "start" });
   const groups = findGroups(
     snapshot.holders
-      .filter((h) => h.position.pnlPct !== null)
+      .filter((h) => !h.excluded && h.position.pnlPct !== null)
       .map((h) => ({ pnlPct: h.position.pnlPct as number, supplyShare: h.supplyShare })),
   );
   onStage({ agent: "sorter", status: "done", detail: `${groups.length} groups` });

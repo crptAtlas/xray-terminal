@@ -53,6 +53,10 @@ export const INFRA: ReadonlySet<string> = new Set([
 // The public RPC truncates responses at this many logs.
 export const GETLOGS_MAX = 10_000;
 
+/** Block explorer for this chain: one place, so a link is never wrong
+ * in one corner of the site and right in another. */
+export const EXPLORER = "https://robinhoodchain.blockscout.com";
+
 export const DUST_USD = 50;
 
 // Two in five launches are paired against a stock or a stablecoin rather

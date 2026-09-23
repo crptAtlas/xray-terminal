@@ -60,7 +60,7 @@ export function gradeOf(
   config = GRADE_CONFIG,
 ): Grade {
   if (dead) return "shattered";
-  const holding = holders.filter((h) => h.supplyShare > 0 && h.position.pnlPct !== null);
+  const holding = holders.filter((h) => !h.excluded && h.supplyShare > 0 && h.position.pnlPct !== null);
   if (holding.length === 0) return "shattered";
   const inProfit = holding.filter((h) => (h.position.pnlPct as number) > 0).length / holding.length;
   // The holders' record is the grade. Until the profile phase lands it

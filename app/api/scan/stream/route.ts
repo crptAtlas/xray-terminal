@@ -50,7 +50,10 @@ export function GET(req: NextRequest): Response {
         const result = await runScan(
           outcome.address!,
           (e) => send("stage", e),
-          (partial) => send("partial", partial),
+          // the half-built scan is only a progress signal; its holder
+          // rows are the same thousand rows the finished one carries, so
+          // they are left out rather than sent twice
+          (partial) => send("partial", { ...partial, holders: [] }),
         );
         send("result", result);
       } catch (err) {

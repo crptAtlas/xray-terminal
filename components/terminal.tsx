@@ -1,5 +1,6 @@
 "use client";
 
+import { EXPLORER } from "../lib/chain.ts";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -76,7 +77,11 @@ export function Terminal() {
   const [view, setView] = useState<View>("empty");
   const [step, setStep] = useState(0); // fixture demo runs
   const [query, setQuery] = useState(initialQ);
-  const [loaded, setLoaded] = useState(10);
+  const [loaded, setLoaded] = useState(50);
+  // the table is the argument, so it sorts by the holders' record first;
+  // every column is a way to re-read it
+  const [sortBy, setSortBy] = useState<"record" | "supply" | "here" | "winrate">("record");
+  const [sortDesc, setSortDesc] = useState(true);
   const [copied, setCopied] = useState(false);
   const [linked, setLinked] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
@@ -114,7 +119,7 @@ export function Terminal() {
         if (s + 1 >= 6) {
           if (timer.current) clearInterval(timer.current);
           setView("result");
-          setLoaded(10);
+          setLoaded(50);
           return 6;
         }
         return s + 1;
@@ -131,7 +136,7 @@ export function Terminal() {
       setLivePicks(null);
       setLiveStages(freshStages());
       setView("running");
-      setLoaded(10);
+      setLoaded(50);
       const src = new EventSource(`/api/scan/stream?token=${encodeURIComponent(q)}`);
       es.current = src;
       src.addEventListener("stage", (e) => {
@@ -232,7 +237,7 @@ export function Terminal() {
         gradeColor: live.card.gradeColor,
         dead: live.dead,
         bands: live.bands.map((b) => ({ range: b.range, color: pnlColor(b.mid), supply: b.supply + "%", wallets: b.wallets, avg: b.avg, avgColor: b.avg.startsWith("+") ? "var(--profit)" : b.avg === "—" ? "var(--text-dim)" : "var(--loss)" })),
-        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? "no trades", avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? (r.positions === 1 ? "1 position" : "no trades"), badges: r.badges })),
+        rows: live.holders.map((r) => ({ addr: r.addr, addrFull: r.addrFull as string | undefined, supply: r.supply, pnl: r.pnlHere, pnlNum: r.pnlNum, pnlColor: r.pnlNum === null ? "var(--text-dim)" : pnlColor(r.pnlNum), avg: r.avgPnl ?? (r.positions < 0 ? "not read" : r.positions === 0 ? "only this token" : "no trades"), avgNum: r.avgPnlNum ?? null, avgColor: r.avgPnlNum === null || r.avgPnlNum === undefined ? "var(--text-dim)" : pnlColor(r.avgPnlNum), winrate: r.winrate ?? (r.positions < 0 ? "not read" : r.positions === 1 ? "1 position" : r.positions === 0 ? "only this token" : "no trades"), winrateNum: r.winrate === null ? null : parseFloat(r.winrate), note: r.note, badges: r.badges })),
         exited: { wallets: String(live.exited.wallets), pnl: live.exited.avgPnl ?? "—", pnlColor: live.exited.avgPnl?.startsWith("+") ? "var(--profit)" : "var(--loss)", wr: "—" },
         flags: [
           ["dust", String(live.flags.dust)],
@@ -261,7 +266,7 @@ export function Terminal() {
       gradeColor: G.color,
       dead: false,
       bands: G.groups.map((x) => ({ range: x[2], color: pnlColor(x[3]), supply: x[0] + "%", wallets: x[1], avg: x[4], avgColor: x[4].startsWith("+") ? "var(--profit)" : "var(--loss)" })),
-      rows: fixtureRows.map((r) => ({ addr: r.addr, addrFull: undefined as string | undefined, supply: r.supply, pnl: r.pnl, pnlColor: r.pnlColor, avg: r.avg, avgColor: r.avgColor, winrate: r.winrate, badges: r.badges })),
+      rows: fixtureRows.map((r) => ({ addr: r.addr, addrFull: undefined as string | undefined, supply: r.supply, pnl: r.pnl, pnlNum: parseFloat(r.pnl) || null, pnlColor: r.pnlColor, avg: r.avg, avgNum: parseFloat(r.avg) || null, avgColor: r.avgColor, winrate: r.winrate, winrateNum: parseFloat(r.winrate) || null, note: null as "dust" | "no basis" | null, badges: r.badges })),
       exited: { wallets: G.exited, pnl: G.exitPnl, pnlColor: G.exitColor, wr: G.exitWr },
       flags: [
         ["dust", "214"],
@@ -274,7 +279,39 @@ export function Terminal() {
     };
   }, [live, G, fixtureRows]);
 
-  const rows = D.rows.slice(0, loaded);
+  const sortKey = (r: (typeof D.rows)[number]): number => {
+    if (sortBy === "supply") return parseFloat(r.supply) || 0;
+    if (sortBy === "here") return r.pnlNum ?? -Infinity;
+    if (sortBy === "winrate") return r.winrateNum ?? -Infinity;
+    return r.avgNum ?? -Infinity;
+  };
+  // a wallet with nothing to show sinks to the end whichever way the
+  // column is pointed, so the rows that carry a record stay readable
+  const sortedRows = D.rows
+    .slice()
+    .sort((a, b) => {
+      const ka = sortKey(a);
+      const kb = sortKey(b);
+      if (ka === kb) return 0;
+      if (ka === -Infinity) return 1;
+      if (kb === -Infinity) return -1;
+      return sortDesc ? kb - ka : ka - kb;
+    });
+  const rows = sortedRows.slice(0, loaded);
+  const sortHead = (label: string, key: typeof sortBy) => (
+    <span
+      onClick={() => {
+        if (sortBy === key) setSortDesc((d) => !d);
+        else {
+          setSortBy(key);
+          setSortDesc(true);
+        }
+      }}
+      style={{ textAlign: "center", cursor: "pointer", color: sortBy === key ? "var(--bone-light)" : undefined }}
+    >
+      {label}{sortBy === key ? (sortDesc ? " \u25be" : " \u25b4") : ""}
+    </span>
+  );
   const picks: PickRow[] = livePicks ?? PICKS;
 
   // loader: fixture demo runs on `step`; live runs on real stage events
@@ -517,7 +554,7 @@ export function Terminal() {
             <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>token</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
               <span className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>{D.token.ticker}</span>
-              <a href={`https://robinhood.blockscout.com/token/${D.token.address}`} target="_blank" rel="noopener" style={{ fontSize: 12, color: "var(--bone-light)" }}>
+              <a href={`${EXPLORER}/token/${D.token.address}`} target="_blank" rel="noopener" style={{ fontSize: 12, color: "var(--bone-light)" }}>
                 {D.token.address.slice(0, 10)}…{D.token.address.slice(-4)}
               </a>
               <button
@@ -538,7 +575,7 @@ export function Terminal() {
             ["mcap", D.token.mcap],
             ["liquidity", D.token.liquidity],
             ["vol 24h", D.token.vol24h],
-            ["holders", D.token.holders],
+            ["holders (bought on pons)", D.token.holders],
           ].map(([t, v]) => (
             <div key={t} style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderRight: "1px solid var(--border)", borderBottom: "1px solid var(--border)", marginRight: -1, marginBottom: -1 }}>
               <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>{t}</div>
@@ -669,22 +706,22 @@ export function Terminal() {
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
               <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-bright)" }}>HOLDERS</div>
-              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>sorted by holder avg pnl once histories land · every address opens on Blockscout</div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>click a column to sort · marked rows sit out of the averages · every address opens on Blockscout</div>
             </div>
             {rows.length > 0 && !isMobile && (
               <div className="tabular" style={{ fontSize: 13, borderTop: "1px solid var(--border)" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .9fr 1.1fr .8fr 1.2fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-dim)", letterSpacing: ".08em", textTransform: "uppercase" }}>
                   <span>wallet</span>
-                  <span style={{ textAlign: "center" }}>supply</span>
-                  <span style={{ textAlign: "center" }}>pnl here</span>
-                  <span style={{ textAlign: "center" }}>avg pnl / trade</span>
-                  <span style={{ textAlign: "center" }}>winrate</span>
+                  {sortHead("supply", "supply")}
+                  {sortHead("pnl here", "here")}
+                  {sortHead("avg pnl / trade", "record")}
+                  {sortHead("winrate", "winrate")}
                   <span />
                 </div>
                 {rows.map((r) => (
                   <div key={r.addr} style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .9fr 1.1fr .8fr 1.2fr", gap: 12, padding: "10px 24px", borderBottom: "1px solid var(--border)", alignItems: "center" }}>
                     {r.addrFull ? (
-                      <a href={`https://robinhood.blockscout.com/address/${r.addrFull}`} target="_blank" rel="noopener" style={{ color: "var(--bone-light)" }}>{r.addr}</a>
+                      <a href={`${EXPLORER}/address/${r.addrFull}`} target="_blank" rel="noopener" style={{ color: "var(--bone-light)" }}>{r.addr}</a>
                     ) : (
                       <Link href="/holders" style={{ color: "var(--bone-light)" }}>{r.addr}</Link>
                     )}
@@ -693,6 +730,9 @@ export function Terminal() {
                     <span style={{ textAlign: "center", color: r.avgColor }}>{r.avg}</span>
                     <span style={{ textAlign: "center", color: r.winrate === "—" ? "var(--text-dim)" : "var(--text)" }}>{r.winrate}</span>
                     <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      {r.note && (
+                        <span title={r.note === "dust" ? "holds less than $50 - out of the averages" : "tokens arrived without a purchase we can price - out of the averages"} style={{ fontSize: 10, letterSpacing: ".1em", border: "1px solid var(--border)", color: "var(--text-dim)", padding: "2px 6px", textTransform: "uppercase" }}>{r.note}</span>
+                      )}
                       {r.badges.map((b) => (
                         <span key={b.text} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b.color}`, color: b.color, padding: "2px 6px" }}>{b.text}</span>
                       ))}
@@ -724,10 +764,15 @@ export function Terminal() {
               </div>
             )}
             <div style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", borderTop: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>showing {Math.min(loaded, D.rows.length)} of {D.total}</span>
-              <button onClick={() => setLoaded((l) => Math.min(40, l + 10))} style={smallBtn}>
-                load 10 more
-              </button>
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>showing {Math.min(loaded, D.rows.length)} of {D.rows.length} wallets · {D.total} still hold</span>
+              <span style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setLoaded((l) => Math.min(D.rows.length, l + 50))} style={smallBtn} disabled={loaded >= D.rows.length}>
+                  load 50 more
+                </button>
+                <button onClick={() => setLoaded(D.rows.length)} style={smallBtn} disabled={loaded >= D.rows.length}>
+                  show all
+                </button>
+              </span>
             </div>
           </div>
 

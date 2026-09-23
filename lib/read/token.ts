@@ -16,6 +16,8 @@ export interface HolderRow {
   wallet: string;
   position: Position;
   supplyShare: number; // 0..1 of circulating (non-market) supply
+  /** why this holder sits out of the averages, when it does */
+  excluded?: "dust" | "no basis";
 }
 
 export interface TokenSnapshot {
@@ -207,21 +209,26 @@ export async function tokenSnapshot(
     const balFloat = Number(bal) / Number(one);
     const share = supplyFloat > 0 ? balFloat / supplyFloat : 0;
 
+    // A holder is never dropped from the list, only marked: the averages
+    // and the bands read the clean rows, the table shows everyone who
+    // holds the token. Hiding them made a token with four hundred and
+    // fifty holders show forty.
+    let excluded: HolderRow["excluded"];
     if (pos.unknownBasis) {
+      excluded = "no basis";
       if (bal > 0n) {
         ubWallets++;
         ubSupply += share;
       }
-      continue;
-    }
-    // dust: remaining balance worth less than $50; fully exited wallets
-    // (balance zero) stay - their realized pnl is part of the story
-    if (bal > 0n && balFloat < dustTokens) {
+    } else if (bal > 0n && balFloat < dustTokens) {
+      // remaining balance worth less than $50; fully exited wallets
+      // (balance zero) stay - their realized pnl is part of the story
+      excluded = "dust";
       dust++;
-      continue;
+    } else if (bal === 0n && pos.boughtTokens === 0n) {
+      continue; // never really in
     }
-    if (bal === 0n && pos.boughtTokens === 0n) continue; // never really in
-    holders.push({ wallet: w, position: pos, supplyShare: share });
+    holders.push({ wallet: w, position: pos, supplyShare: share, excluded });
   }
 
   onStage({

@@ -1,5 +1,6 @@
 "use client";
 
+import { EXPLORER } from "../lib/chain.ts";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AgentGif } from "./motion";
@@ -187,7 +188,7 @@ export function Holders() {
           <div style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", padding: "16px 20px", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 700, fontSize: 18, lineHeight: 1, color: "var(--bone-bright)", letterSpacing: ".02em" }}>{liveData.addr.slice(0, 10)}…{liveData.addr.slice(-4)}</span>
-              <a href={`https://robinhood.blockscout.com/address/${liveData.addr}`} target="_blank" rel="noopener" style={{ fontSize: 12 }}>blockscout</a>
+              <a href={`${EXPLORER}/address/${liveData.addr}`} target="_blank" rel="noopener" style={{ fontSize: 12 }}>blockscout</a>
               <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{liveData.tokensTouched} Pons tokens in the {""}window · {liveData.openPositions} still open</span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>

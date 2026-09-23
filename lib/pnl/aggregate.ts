@@ -55,8 +55,11 @@ function weightedMean(pairs: { value: number; weight: number }[]): number | null
 
 export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>): Aggregates {
   // current holders only: an exited wallet (share 0) must not steer the
-  // averages of what is being held right now
-  const holding = rows.filter((r) => r.supplyShare > 0);
+  // averages of what is being held right now. A marked holder - dust, or
+  // tokens that arrived without a purchase - is in the table but never in
+  // an average.
+  const counted = rows.filter((r) => !r.excluded);
+  const holding = counted.filter((r) => r.supplyShare > 0);
   const pnls = holding
     .filter((r) => r.position.pnlPct !== null)
     .map((r) => ({ value: r.position.pnlPct as number, weight: r.supplyShare }));
@@ -108,7 +111,7 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
     firstTrade = { wallets: ftWallets, supplyShare: ftSupply };
   }
 
-  const exitedRows = rows.filter((r) => r.position.closed && r.position.boughtTokens > 0n);
+  const exitedRows = counted.filter((r) => r.position.closed && r.position.boughtTokens > 0n);
   const exitedPnls = exitedRows.map((r) => r.position.pnlPct).filter((p): p is number => p !== null);
   let exitedWr: number | null = null;
   if (profiles) {

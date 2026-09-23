@@ -29,6 +29,10 @@ export interface LiveBand {
   avg: string;
 }
 
+/** Every holder the scan knows of reaches the table; the cap is a guard
+ * against a payload nobody can render, not a view of the top. */
+const MAX_ROWS = 2000;
+
 export interface LiveHolderRow {
   addr: string;
   addrFull: string;
@@ -38,8 +42,11 @@ export interface LiveHolderRow {
   avgPnl: string | null;
   avgPnlNum: number | null;
   winrate: string | null;
-  /** positions the wallet has taken across Pons, this token excluded */
+  /** positions the wallet has taken across Pons, this token excluded;
+   * -1 when the wallet's history was not read in this scan */
   positions: number;
+  /** why the holder sits out of the averages, when it does */
+  note: "dust" | "no basis" | null;
   badges: { text: string; color: string }[];
 }
 
@@ -96,12 +103,12 @@ export function cachePath(): string | undefined {
 
 export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): LiveScan {
   const { snapshot: s, header: h, groups, aggregates: a } = phase;
-  const holding = s.holders.filter((r) => r.supplyShare > 0);
+  const holding = s.holders.filter((r) => !r.excluded && r.supplyShare > 0);
   const dead = holding.length < DEAD_HOLDERS_MIN;
   const grade = gradeOf(a, s.holders, dead);
 
-  const bands: LiveBand[] = groups.map((g) => {
-    const inBand = s.holders.filter((r) => r.position.pnlPct !== null && r.position.pnlPct >= g.minPct && r.position.pnlPct <= g.maxPct);
+  const bands: LiveBand[] = [...groups].sort((x, y) => x.minPct - y.minPct).map((g) => {
+    const inBand = s.holders.filter((r) => !r.excluded && r.position.pnlPct !== null && r.position.pnlPct >= g.minPct && r.position.pnlPct <= g.maxPct);
     const avg = inBand.length ? inBand.reduce((sum, r) => sum + (r.position.pnlPct as number), 0) / inBand.length : null;
     const f = (v: number) => {
       const sign = v >= 0 ? "+" : "−";
@@ -119,7 +126,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     };
   });
 
-  const rows: LiveHolderRow[] = s.holders.slice(0, 40).map((r) => ({
+  const rows: LiveHolderRow[] = s.holders.slice(0, MAX_ROWS).map((r) => ({
     addr: short(r.wallet),
     addrFull: r.wallet,
     supply: (r.supplyShare * 100).toFixed(2) + "%",
@@ -129,6 +136,7 @@ export function toLiveScan(phase: PhaseOne, seconds: number, requests: number): 
     avgPnlNum: null,
     winrate: null,
     positions: 0,
+    note: r.excluded ?? null,
     badges: [], // SMART / WHALE arrive with the profile phase
   }));
 
@@ -230,7 +238,9 @@ function withProfiles(
 ): LiveScan {
   const holders = scan.holders.map((r) => {
     const p = profiles.get(r.addrFull);
-    if (!p || p.notRead) return r;
+    // the profile phase reads the top wallets by supply; the rest are
+    // unread, which the table must not print as "no trades"
+    if (!p || p.notRead) return { ...r, positions: -1 };
     const badges = p.badges.map((b) => ({ text: b.toUpperCase(), color: b === "smart" ? "#78DCFF" : "#FFD640" }));
     return {
       ...r,
@@ -328,7 +338,7 @@ export function runScan(
       let snapHolders: HolderRow[] = [];
       for await (const phase of check(provider, cache, key as `0x${string}`, {
         profiles: true,
-        profileLimit: 1000,
+        profileLimit: MAX_ROWS, // every row the table shows carries a record
         profileDeadlineMs: Number(process.env.XRAY_PROFILE_DEADLINE_MS ?? 90_000),
         onStage: (e) => {
           touchScan(); // hold back any background digger while we read
