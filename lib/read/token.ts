@@ -1,4 +1,4 @@
-import { ADDR, CHAIN, DUST_SUPPLY_SHARE, DUST_USD, INFRA, type Hex } from "../chain.ts";
+import { ADDR, CHAIN, DUST_SUPPLY_SHARE, INFRA, type Hex } from "../chain.ts";
 import type { Cache, MarketAggregate } from "../cache.ts";
 import { classify, type Trade, type TransferIn } from "../pnl/classify.ts";
 import { MIN_COST_WEI, position, type Position } from "../pnl/position.ts";
@@ -184,15 +184,9 @@ export async function tokenSnapshot(
   // cost basis means nothing has to be in those units too
   const pairDec = meta.pairDecimals ?? 18;
   const minCost = pairDec >= 18 ? MIN_COST_WEI * 10n ** BigInt(pairDec - 18) : MIN_COST_WEI / 10n ** BigInt(18 - pairDec);
-  // A dollar threshold only means something when the token is priced in
-  // ETH. Against a stock or stablecoin pair the price is in pair units,
-  // and with no price at all nothing can be called dust - excluding every
-  // holder then reads as a dead token.
-  const dustTokens = meta.pairSymbol
-    ? supplyFloat * DUST_SUPPLY_SHARE
-    : priceEth > 0
-      ? DUST_USD / usdRate / priceEth
-      : 0;
+  // the dust line is a share of the float, so it does not move when the
+  // price does (see DUST_SUPPLY_SHARE)
+  const dustTokens = supplyFloat * DUST_SUPPLY_SHARE;
 
   onStage({ agent: "ledger", status: "done", detail: `${candidates.length} wallets` });
   onStage({ agent: "flagger", status: "start" });
@@ -221,8 +215,8 @@ export async function tokenSnapshot(
         ubSupply += share;
       }
     } else if (bal > 0n && balFloat < dustTokens) {
-      // remaining balance worth less than $50; fully exited wallets
-      // (balance zero) stay - their realized pnl is part of the story
+      // too small a share of the float to be a holder; fully exited
+      // wallets (balance zero) stay - their realized pnl is the story
       excluded = "dust";
       dust++;
     } else if (bal === 0n && pos.boughtTokens === 0n) {

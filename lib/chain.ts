@@ -57,10 +57,16 @@ export const GETLOGS_MAX = 10_000;
  * in one corner of the site and right in another. */
 export const EXPLORER = "https://robinhoodchain.blockscout.com";
 
-export const DUST_USD = 50;
-
-// Two in five launches are paired against a stock or a stablecoin rather
-// than ETH, and their prices are quoted in that pair: there is no dollar
-// value to compare against. A share of supply stands in - a millionth of
-// the float is dust in any currency.
-export const DUST_SUPPLY_SHARE = 1e-6;
+/**
+ * Dust: a holder too small to be a holder. Measured as a share of the
+ * float, never in dollars.
+ *
+ * A dollar line moves with the price, and a launchpad token's price
+ * moves by the minute: the same token read twice an hour apart put
+ * either a hundred and twenty nine wallets or five into its own
+ * average, because the ones in between had crossed fifty dollars on the
+ * way down. A thousandth of a percent of the supply is the same line
+ * whatever the token is worth that minute, and it keeps roughly two
+ * holders in three.
+ */
+export const DUST_SUPPLY_SHARE = 1e-5;

@@ -389,7 +389,10 @@ export function Terminal() {
   ) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0, ...extraStyle }}>
       <div style={{ fontSize: 11, color: "var(--text-dim)", letterSpacing: ".14em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: value === null ? "var(--bone-dark)" : valueColor, letterSpacing: "-.03em", textShadow: value === null ? "none" : `0 0 18px ${valueColor},0 0 40px ${valueColor}55`, whiteSpace: "nowrap" }}>{value ?? "—"}</div>
+      <div className="tabular" style={{ fontWeight: 700, fontSize: isMobile ? 48 : 56, lineHeight: 1, color: value === null ? "var(--bone-dark)" : valueColor, letterSpacing: "-.03em", // a css variable cannot take a hex suffix: "var(--profit)55" is
+        // invalid and drops the whole shadow, which is why these numbers
+        // sat flat next to the card's glowing ones
+        textShadow: value === null ? "none" : `0 0 18px ${valueColor}, 0 0 44px color-mix(in srgb, ${valueColor} 40%, transparent)`, whiteSpace: "nowrap" }}>{value ?? "—"}</div>
       <div style={{ position: "relative", height: 8, marginTop: 6 }}>
         <div style={{ position: "absolute", inset: 0, display: "flex", gap: 2 }}>
           <div style={{ flex: 1, background: "rgba(255,96,92,.35)" }} />
@@ -740,7 +743,7 @@ export function Terminal() {
                     <span style={{ textAlign: "center", color: r.winrate === "—" ? "var(--text-dim)" : "var(--text)" }}>{r.winrate}</span>
                     <span style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                       {r.note && (
-                        <span title={r.note === "dust" ? "holds less than $50 - out of the averages" : "tokens arrived without a purchase we can price - out of the averages"} style={{ fontSize: 10, letterSpacing: ".1em", border: "1px solid var(--border)", color: "var(--text-dim)", padding: "2px 6px", textTransform: "uppercase" }}>{r.note}</span>
+                        <span title={r.note === "dust" ? "holds less than a thousandth of a percent of the float - out of the averages" : "tokens arrived without a purchase we can price - out of the averages"} style={{ fontSize: 10, letterSpacing: ".1em", border: "1px solid var(--border)", color: "var(--text-dim)", padding: "2px 6px", textTransform: "uppercase" }}>{r.note}</span>
                       )}
                       {r.badges.map((b) => (
                         <span key={b.text} style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", border: `1px solid ${b.color}`, color: b.color, padding: "2px 6px" }}>{b.text}</span>
