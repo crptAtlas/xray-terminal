@@ -23,13 +23,15 @@ const markets = db
   .all() as { market: string; last_block: number }[];
 console.error(`rebuilding prices for ${markets.length} markets`);
 
-// the trailing trades of one market, whichever key it goes under
-const recent = db.prepare(
-  `SELECT tokens, eth FROM (
-     SELECT block, log_index, tokens, eth FROM chain_trades WHERE token = ?
-     UNION ALL
-     SELECT block, log_index, tokens, eth FROM chain_trades WHERE curve = ?
-   ) ORDER BY block DESC, log_index DESC LIMIT 20`,
+// The trailing trades of one market, one indexed side at a time. Asking
+// for both sides in a union and sorting that reads the market's whole
+// history before it can take twenty rows: on a busy market that is a
+// hundred thousand random reads for a number twenty rows can answer.
+const recentToken = db.prepare(
+  "SELECT tokens, eth FROM chain_trades WHERE token = ? ORDER BY block DESC, log_index DESC LIMIT 20",
+);
+const recentCurve = db.prepare(
+  "SELECT tokens, eth FROM chain_trades WHERE curve = ? ORDER BY block DESC, log_index DESC LIMIT 20",
 );
 const put = db.prepare("UPDATE market_price SET last_price = ? WHERE market = ?");
 
@@ -38,7 +40,10 @@ let changed = 0;
 const started = Date.now();
 const batch = db.transaction((slice: { market: string }[]) => {
   for (const m of slice) {
-    const rows = recent.all(m.market, m.market) as { tokens: number; eth: number }[];
+    const rows = [
+      ...(recentToken.all(m.market) as { tokens: number; eth: number }[]),
+      ...(recentCurve.all(m.market) as { tokens: number; eth: number }[]),
+    ];
     // a trade too small on either side prices nothing
     const prices = rows
       .filter((r) => r.tokens >= 1e12 && r.eth >= 1e12)

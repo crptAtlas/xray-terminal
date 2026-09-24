@@ -731,15 +731,14 @@ export class Cache {
                    SUM(wp.buy_tokens) AS bt, SUM(wp.buy_eth) AS bc,
                    SUM(wp.sell_tokens) AS st, SUM(wp.sell_eth) AS sp,
                    MAX(wp.last_block) AS lb,
-                   COALESCE(mp.last_price, wp.last_price) AS lp,
-                   -- amounts in a market quoted in a stock or a stablecoin
-                   -- are not wei and cannot be added to a balance
+                   -- a market quoted in a stock or a stablecoin carries
+                   -- amounts that are not wei; kept for readers of this
+                   -- table, the record itself is a ratio either way
                    MAX(CASE WHEN COALESCE(lt.pair_token, lc.pair_token) IN (?, ?) THEN 1 ELSE 0 END) AS eth_quoted
             FROM wallet_positions wp
             LEFT JOIN launches lt ON lt.token = wp.market
             LEFT JOIN launches lc ON lc.curve = wp.market
             LEFT JOIN curve_tokens ct ON ct.curve = wp.market
-            LEFT JOIN market_price mp ON mp.market = wp.market
             WHERE wp.wallet IN (${marks})
             GROUP BY w, tok
           )
