@@ -615,7 +615,7 @@ export function Terminal() {
             style={{ position: "relative", width: isMobile ? "100%" : 520, height: isMobile ? "auto" : 520, aspectRatio: isMobile ? "1/1" : undefined, border: "1px solid var(--loss)", background: "var(--bg-deep)", cursor: "zoom-in", overflow: "hidden", boxSizing: "border-box" }}
           >
             {cardUrl ? (
-              <div role="img" aria-label="XRAY share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+              <div role="img" aria-label="Xray-terminal share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-dim)" }}>rendering card…</div>
             )}
@@ -703,7 +703,7 @@ export function Terminal() {
             style={{ position: "relative", width: isMobile ? "100%" : 520, height: isMobile ? "auto" : 520, aspectRatio: isMobile ? "1/1" : undefined, border: "1px solid var(--accent)", background: "var(--bg-deep)", cursor: "zoom-in", overflow: "hidden", boxSizing: "border-box", boxShadow: "0 0 0 1px rgba(120,220,255,.15),0 0 48px rgba(120,220,255,.25)" }}
           >
             {cardUrl ? (
-              <div role="img" aria-label="XRAY share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+              <div role="img" aria-label="Xray-terminal share card" style={{ position: "absolute", inset: 0, backgroundImage: `url(${cardUrl})`, backgroundSize: "cover", backgroundPosition: "center" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-dim)" }}>rendering card…</div>
             )}

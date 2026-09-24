@@ -53,7 +53,7 @@ export function Header() {
             textShadow: "0 0 12px rgba(120,220,255,.6)",
           }}
         >
-          XRAY
+          Xray-terminal
         </span>
         <span
           style={{

@@ -101,7 +101,7 @@ export function Holders() {
             ONE WALLET, <span style={{ color: "var(--accent)" }}>READ</span>
           </div>
           <div style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text)", maxWidth: 640, textWrap: "pretty" }}>
-            nothing connects. nothing gets signed. paste a public address and XRAY reads its Pons record the same way a block
+            nothing connects. nothing gets signed. paste a public address and Xray-terminal reads its Pons record the same way a block
             explorer would - trades, tokens, what each one made or lost.
           </div>
         </div>

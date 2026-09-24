@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/brand/banner.gif" width="100%" alt="XRAY - Shows future token's PnL. $XRAY, holder pnl terminal for pons v2, read-only. An animated negatoscope scans a pixel ribcage."></p>
+<p align="center"><img src="assets/brand/banner.gif" width="100%" alt="Xray-terminal - Shows future token's PnL. $XRAY, holder pnl terminal for pons v2, read-only. An animated negatoscope scans a pixel ribcage."></p>
 
 <p align="center">
   <a href="https://github.com/crptAtlas/xray-terminal/actions/workflows/ci.yml"><img src="https://github.com/crptAtlas/xray-terminal/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>

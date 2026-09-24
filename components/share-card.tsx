@@ -49,7 +49,7 @@ export function CardLightbox({ url, onClose }: { url: string; onClose: () => voi
       {url ? (
         <div
           role="img"
-          aria-label="XRAY share card"
+          aria-label="Xray-terminal share card"
           style={{
             width: "min(90vw,90vh)",
             height: "min(90vw,90vh)",

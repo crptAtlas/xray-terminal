@@ -51,7 +51,7 @@ export function VerdictPanel() {
           {url ? (
             <div
               role="img"
-              aria-label="XRAY share card for $MARROW"
+              aria-label="Xray-terminal share card for $MARROW"
               style={{ width: "100%", height: "100%", backgroundImage: `url(${url})`, backgroundSize: "cover", backgroundPosition: "center" }}
             />
           ) : (

@@ -1,5 +1,5 @@
 {
-  "name": "xray",
+  "name": "xray-terminal",
   "version": "0.1.0",
   "main": "index.js",
   "directories": {
@@ -25,7 +25,7 @@
     "url": "https://github.com/crptAtlas/xray-terminal/issues"
   },
   "homepage": "https://github.com/crptAtlas/xray-terminal#readme",
-  "description": "",
+  "description": "Holder PnL terminal for Pons V2 tokens on Robinhood Chain. Read-only.",
   "type": "module",
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",

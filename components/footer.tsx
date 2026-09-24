@@ -27,7 +27,7 @@ export function Footer() {
         </a>
         <span>· read-only, holds no keys</span>
       </span>
-      <span>XRAY - who is in profit, who is underwater and can they trade at all · Robinhood Chain</span>
+      <span>Xray-terminal - who is in profit, who is underwater and can they trade at all · Robinhood Chain</span>
     </footer>
   );
 }

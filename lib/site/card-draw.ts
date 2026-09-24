@@ -183,12 +183,10 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   x.fillStyle = gc;
   x.font = "64px Tiny5";
   glow(gc, 20);
-  x.fillText("XRAY", 72, 950);
+  // one wordmark, not a name split over two lines
+  x.fillText("Xray-terminal", 72, 950);
   noglow();
-  x.fillStyle = "#D9D9D9";
-  x.font = '400 30px "JetBrains Mono"';
-  x.fillText("Terminal", 72, 988);
   x.fillStyle = "#6E8291";
   x.font = '400 22px "JetBrains Mono"';
-  x.fillText(d.time, 72, 1024);
+  x.fillText(d.time, 72, 992);
 }
