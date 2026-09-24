@@ -102,24 +102,28 @@ test("IN () queries survive thousands of keys (SQLite variable cap)", () => {
 test("folded positions match the trades they came from", () => {
   const c = new Cache(":memory:");
   c.setMeta("positions_built", "1");
+  const T = (n) => BigInt(n) * 10n ** 18n;
   c.appendChainTrades([
-    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
-    { block: 110n, logIndex: 0, tx: "0x2", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 30n, eth: 18n },
-    { block: 120n, logIndex: 0, tx: "0x3", curve: "0xc1", wallet: "0xw1", kind: "sell", tokens: 20n, eth: 14n },
-    { block: 130n, logIndex: 0, tx: "0x4", curve: "", wallet: "0xw1", kind: "buy", tokens: 5n, eth: 1n, token: "0xt2" },
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: T(10), eth: T(4) },
+    { block: 110n, logIndex: 0, tx: "0x2", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: T(30), eth: T(18) },
+    { block: 120n, logIndex: 0, tx: "0x3", curve: "0xc1", wallet: "0xw1", kind: "sell", tokens: T(20), eth: T(14) },
+    // a sliver of tokens for a sliver of quote: counted, but it prices
+    // nothing and must not become the position's last price
+    { block: 125n, logIndex: 0, tx: "0x5", curve: "0xc1", wallet: "0xw1", kind: "sell", tokens: 4n, eth: 900n },
+    { block: 130n, logIndex: 0, tx: "0x4", curve: "", wallet: "0xw1", kind: "buy", tokens: T(5), eth: T(1), token: "0xt2" },
     // same primary key twice: folded once, never doubled
-    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: 10n, eth: 4n },
+    { block: 100n, logIndex: 0, tx: "0x1", curve: "0xc1", wallet: "0xw1", kind: "buy", tokens: T(10), eth: T(4) },
   ]);
   const pos = c.walletPositions(["0xw1"]).get("0xw1");
   const curve = pos.get("0xc1");
-  assert.equal(curve.buyTokens, 40);
-  assert.equal(curve.buyEth, 22);
-  assert.equal(curve.sellTokens, 20);
-  assert.equal(curve.sellEth, 14);
-  assert.equal(curve.trades, 3);
-  assert.equal(curve.lastBlock, 120);
-  assert.equal(curve.lastPrice, 14 / 20); // the newest trade's price
-  assert.equal(pos.get("0xt2").buyTokens, 5);
+  assert.equal(curve.buyTokens, 40e18);
+  assert.equal(curve.buyEth, 22e18);
+  assert.equal(curve.sellTokens, 20e18 + 4);
+  assert.equal(curve.sellEth, 14e18 + 900);
+  assert.equal(curve.trades, 4);
+  assert.equal(curve.lastBlock, 125);
+  assert.equal(curve.lastPrice, 14 / 20); // the newest trade that prices anything
+  assert.equal(pos.get("0xt2").buyTokens, 5e18);
   c.close();
 });
 

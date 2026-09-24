@@ -113,15 +113,15 @@ export function ledgerPositions(
     const st = BigInt(p.soldTokens);
     const sp = BigInt(p.soldProceedsWei);
     const remaining = bt > st ? bt - st : 0n;
-    const market = priceOf?.(p.token);
-    const priceWad = market !== undefined && market > 0 ? BigInt(Math.round(market * 1e18)) : BigInt(p.lastPriceWad);
-    // no honest basis: sold more than bought, tokens that arrived some
-    // other way. A cost of nothing is no basis either; above that the
-    // clamped band keeps a rounding-error buy from running away with an
-    // average.
-    if (st * 1_000_000_000n > bt * 1_000_000_001n || bc <= 0n) continue;
-    const valueWei = (remaining * priceWad) / 10n ** 18n;
-    const pnlWei = sp + valueWei - bc;
+    // Realized only: what a wallet still holds cannot be checked from
+    // trades, because tokens leave a wallet by transfer about as often as
+    // by sale here. The cost of what it sold, against what it got for it,
+    // is the part nobody can argue with. No sale, no number.
+    if (st * 1_000_000_000n > bt * 1_000_000_001n || bc <= 0n || st <= 0n || bt <= 0n) continue;
+    const cost = (bc * st) / bt;
+    if (cost <= 0n) continue;
+    const valueWei = 0n;
+    const pnlWei = sp - cost;
     // sums of doubles never land exactly on zero; a position is closed
     // when what is left is a billionth of what was bought
     const closed = remaining * 1_000_000_000n <= bt;
@@ -129,7 +129,7 @@ export function ledgerPositions(
       token: p.token,
       trades: p.trades,
       closed,
-      pnlPct: bc > 0n ? (Number(pnlWei) / Number(bc)) * 100 : null,
+      pnlPct: (Number(pnlWei) / Number(cost)) * 100,
       pnlWei: pnlWei.toString(),
       valueWei: valueWei.toString(),
     });

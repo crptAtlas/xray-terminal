@@ -37,12 +37,18 @@ export async function syncLaunches(client: PublicClient, cache: Cache): Promise<
       fromBlock: tip === 0n ? 0n : tip + 1n,
       toBlock: latest,
     });
-    const rows: { block: bigint; token: string; symbol: string; curve: string }[] = [];
+    const rows: { block: bigint; token: string; symbol: string; curve: string; pairToken: string }[] = [];
     // symbols are not in the event; read them in one multicall batch
     const decoded = logs.map((l) => {
       const d = decodeEventLog({ abi: factoryAbi, topics: l.topics as [Hex, ...Hex[]], data: l.data });
-      const args = d.args as unknown as { token: Hex; curve: Hex };
-      return { block: l.blockNumber, token: args.token.toLowerCase(), curve: args.curve.toLowerCase() };
+      const args = d.args as unknown as { token: Hex; curve: Hex; pairToken: Hex };
+      return {
+        block: l.blockNumber,
+        token: args.token.toLowerCase(),
+        curve: args.curve.toLowerCase(),
+        // the currency the launch is quoted in, straight from the event
+        pairToken: (args.pairToken ?? "0x0000000000000000000000000000000000000000").toLowerCase(),
+      };
     });
     const chunk = 500;
     for (let i = 0; i < decoded.length; i += chunk) {
@@ -63,6 +69,7 @@ export async function syncLaunches(client: PublicClient, cache: Cache): Promise<
           token: d.token,
           symbol: r.status === "success" ? (r.result as string) : "?",
           curve: d.curve,
+          pairToken: d.pairToken,
         });
       });
     }

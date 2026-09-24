@@ -21,22 +21,20 @@ export const GRADE_CONFIG = {
 } as const;
 
 /**
- * What a number means on this chain, measured over every wallet holding
- * two or more positions rather than guessed (scripts/measure-benchmarks,
- * twenty thousand wallets sampled 2026-09-23). Open positions count,
- * marked at the price their market last traded at, which is why the
- * typical record is a loss: most of what a launchpad launches goes down.
- * Winrate is penalized by design (wins / (positions + 1)), so a median
- * trader sits near 20%, not 50.
+ * What a number means on this chain, measured over every wallet with two
+ * or more realized positions rather than guessed
+ * (scripts/measure-benchmarks, twenty thousand wallets sampled
+ * 2026-09-24). Winrate is penalized by design (wins / (positions + 1)),
+ * so a median trader sits near 31%, not 50.
  *
- *   winrate      p25  0   median  20   p75 33
- *   avg pnl      p25 -56  median -24   p75 -1
+ *   winrate      p25  0   median  31   p75 44
+ *   avg pnl      p25 -30  median  -7   p75  9
  *
  * weak = bottom quartile, strong = top quartile.
  */
 export const HOLDER_BENCHMARKS = {
-  winrate: { weak: 0, typical: 20, strong: 33 },
-  avgPnl: { weak: -56, typical: -23, strong: -1 },
+  winrate: { weak: 0, typical: 31, strong: 44 },
+  avgPnl: { weak: -30, typical: -7, strong: 9 },
 } as const;
 
 /**
@@ -46,12 +44,32 @@ export const HOLDER_BENCHMARKS = {
  * nothing, and the card should say so.
  */
 export const GRADE_THRESHOLDS = {
-  // Measured on this chain, open positions included: the median wallet
-  // averages -23% a position and only the top quarter is above -1%, so
-  // a room that is net up is genuinely rare. Green says exactly that.
-  healthy: 0, // holders net ahead across Pons
-  cracked: -25, // -25% to 0%: around what the chain itself averages
+  // The owner's numbers: green has to mean a room that is clearly ahead,
+  // not merely above water. On this chain that is the top tenth.
+  healthy: 25, // holders averaging +25% a position or better
+  cracked: 0, // 0% to +25%: in profit, but not by much
 } as const;
+
+/** The three colours, in one place: a number on the card and the same
+ * number in the terminal have to agree, and they only do if they read
+ * the same thresholds. */
+export const GRADE_COLORS = { healthy: "#60F080", cracked: "#FFD640", shattered: "#FF605C" } as const;
+
+/** Where a holders' record sits: the same bands the grade uses. */
+export function recordLevel(pnlPct: number | null): Grade {
+  if (pnlPct === null) return "shattered";
+  if (pnlPct >= GRADE_THRESHOLDS.healthy) return "healthy";
+  if (pnlPct >= GRADE_THRESHOLDS.cracked) return "cracked";
+  return "shattered";
+}
+
+/** Where a winrate sits against what this chain actually does. */
+export function winrateLevel(wr: number | null): Grade {
+  if (wr === null) return "shattered";
+  if (wr >= HOLDER_BENCHMARKS.winrate.strong) return "healthy";
+  if (wr >= HOLDER_BENCHMARKS.winrate.typical) return "cracked";
+  return "shattered";
+}
 
 export function gradeOf(
   aggregates: Aggregates,

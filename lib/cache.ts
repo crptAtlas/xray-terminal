@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { ADDR, ZERO } from "./chain.ts";
 import type { TokenMeta } from "./providers/provider.ts";
 import type { Trade, TransferIn } from "./pnl/classify.ts";
 
@@ -43,7 +44,10 @@ CREATE TABLE IF NOT EXISTS transfers_in (
 );
 CREATE INDEX IF NOT EXISTS idx_tin_token ON transfers_in(token);
 CREATE TABLE IF NOT EXISTS launches (
-  block TEXT NOT NULL, token TEXT PRIMARY KEY, symbol TEXT NOT NULL, curve TEXT NOT NULL
+  block TEXT NOT NULL, token TEXT PRIMARY KEY, symbol TEXT NOT NULL, curve TEXT NOT NULL,
+  -- what the token is quoted in: two launches in five are priced in a
+  -- stock or a stablecoin, and their amounts are in that currency
+  pair_token TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_launch_symbol ON launches(symbol);
 -- a thousand wallets name tens of thousands of curves to resolve, and
@@ -94,7 +98,7 @@ ON CONFLICT(wallet, market) DO UPDATE SET
   sell_tokens = sell_tokens + excluded.sell_tokens,
   sell_eth = sell_eth + excluded.sell_eth,
   trades = trades + 1,
-  last_price = CASE WHEN excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
+  last_price = CASE WHEN excluded.last_price > 0 AND excluded.last_block >= last_block THEN excluded.last_price ELSE last_price END,
   last_block = MAX(last_block, excluded.last_block)`;
 
 const FOLD_MARKET_PRICE = `
@@ -300,18 +304,46 @@ export class Cache {
     return row ? BigInt(row.value) : 0n;
   }
 
-  appendLaunches(rows: { block: bigint; token: string; symbol: string; curve: string }[], tip: bigint): void {
+  appendLaunches(
+    rows: { block: bigint; token: string; symbol: string; curve: string; pairToken?: string }[],
+    tip: bigint,
+  ): void {
     const ins = this.db.prepare(
-      "INSERT OR IGNORE INTO launches (block, token, symbol, curve) VALUES (?, ?, ?, ?)",
+      "INSERT INTO launches (block, token, symbol, curve, pair_token) VALUES (?, ?, ?, ?, ?)\n       ON CONFLICT(token) DO UPDATE SET pair_token = COALESCE(excluded.pair_token, pair_token)",
     );
     const setTip = this.db.prepare(
       "INSERT INTO meta (key, value) VALUES ('launches_tip', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     );
     const tx = this.db.transaction(() => {
-      for (const r of rows) ins.run(r.block.toString(), r.token.toLowerCase(), r.symbol, r.curve.toLowerCase());
+      for (const r of rows) {
+        ins.run(r.block.toString(), r.token.toLowerCase(), r.symbol, r.curve.toLowerCase(), r.pairToken?.toLowerCase() ?? null);
+      }
       setTip.run(tip.toString());
     });
     tx();
+  }
+
+  /** Which of these markets are quoted in ETH: only those carry a value
+   * this scan can add up, since the rest are priced in a stock or a
+   * stablecoin whose units mean nothing next to wei. */
+  ethQuotedMarkets(markets: string[]): Set<string> {
+    const out = new Set<string>();
+    if (markets.length === 0) return out;
+    for (const slice of chunks(markets, IN_CHUNK)) {
+      const marks = slice.map(() => "?").join(",");
+      const q = this.db.prepare(
+        `SELECT token, curve, pair_token FROM launches WHERE (token IN (${marks}) OR curve IN (${marks}))
+           AND (pair_token IS NULL OR pair_token = '${ZERO}' OR pair_token = '${ADDR.weth.toLowerCase()}')`,
+      );
+      const args = slice.map((m) => m.toLowerCase());
+      for (const r of q.all(...args, ...args) as { token: string; curve: string; pair_token: string | null }[]) {
+        // unknown pair is treated as not ETH until the backfill fills it
+        if (r.pair_token === null) continue;
+        out.add(r.token);
+        out.add(r.curve);
+      }
+    }
+    return out;
   }
 
   findTicker(symbol: string): { token: string; symbol: string; curve: string; block: bigint }[] {
@@ -534,6 +566,9 @@ export class Cache {
         const tokens = Number(r.tokens);
         const eth = Number(r.eth);
         const buy = r.kind === "buy";
+        // a leg that moves a sliver of tokens for a normal amount of
+        // quote prices nothing; it must not become anyone's last price
+        const priced = tokens >= 1e12 && eth >= 1e12;
         fold.run(
           r.wallet.toLowerCase(),
           market.toLowerCase(),
@@ -541,7 +576,7 @@ export class Cache {
           buy ? eth : 0,
           buy ? 0 : tokens,
           buy ? 0 : eth,
-          tokens > 0 ? eth / tokens : 0,
+          priced ? eth / tokens : 0,
           Number(r.block),
         );
         // a dust trade sets an absurd price and would value every open
@@ -668,30 +703,38 @@ export class Cache {
           SUM(CASE WHEN shown AND closed THEN 1 ELSE 0 END) AS closed_s,
           SUM(CASE WHEN shown AND pnl > 0 THEN 1 ELSE 0 END) AS wins_s,
           SUM(CASE WHEN shown AND closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_closed_s,
-          SUM(CASE WHEN shown THEN MAX(-100.0, MIN(500.0, pnl / bc * 100)) ELSE 0 END) AS pct_s,
-          SUM(CASE WHEN shown AND closed THEN pnl ELSE 0 END) AS realized_s,
-          SUM(CASE WHEN shown AND NOT closed THEN value ELSE 0 END) AS open_s,
+          SUM(CASE WHEN shown THEN MAX(-100.0, MIN(500.0, pnl / cost * 100)) ELSE 0 END) AS pct_s,
+          SUM(CASE WHEN shown THEN pnl ELSE 0 END) AS realized_s,
+          SUM(value) AS open_s,
           COUNT(*) AS taken_f,
           SUM(CASE WHEN closed THEN 1 ELSE 0 END) AS closed_f,
           SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) AS wins_f,
           SUM(CASE WHEN closed AND pnl > 0 THEN 1 ELSE 0 END) AS wins_closed_f,
-          SUM(MAX(-100.0, MIN(500.0, pnl / bc * 100))) AS pct_f,
-          SUM(CASE WHEN NOT closed THEN value ELSE 0 END) AS open_f
+          SUM(MAX(-100.0, MIN(500.0, pnl / cost * 100))) AS pct_f,
+          SUM(value) AS open_f
         FROM (
-          SELECT w, tok, bc, (tok <> ?) AS shown,
-                 -- sums of doubles never land exactly on zero, so a
-                 -- position is closed when what is left is a billionth
-                 -- of what was bought
+          -- Only what a wallet actually took out counts. What it still
+          -- holds cannot be checked from trades alone: tokens leave a
+          -- wallet by transfer as often as by sale here, so a remainder
+          -- computed as buys minus sells is frequently a position the
+          -- wallet no longer has, and marking that to market invents
+          -- money. The cost of the tokens it did sell, against what it
+          -- got for them, is arithmetic nobody can argue with.
+          SELECT w, tok, (tok <> ?) AS shown,
+                 (bc * st / bt) AS cost,
                  ((bt - st) <= bt * 1e-9) AS closed,
-                 (CASE WHEN bt > st THEN (bt - st) * lp ELSE 0 END) AS value,
-                 (sp + (CASE WHEN bt > st THEN (bt - st) * lp ELSE 0 END) - bc) AS pnl
+                 0 AS value,
+                 (sp - bc * st / bt) AS pnl
           FROM (
             SELECT wp.wallet AS w,
                    COALESCE(lt.token, lc.token, NULLIF(ct.token, '')) AS tok,
                    SUM(wp.buy_tokens) AS bt, SUM(wp.buy_eth) AS bc,
                    SUM(wp.sell_tokens) AS st, SUM(wp.sell_eth) AS sp,
                    MAX(wp.last_block) AS lb,
-                   COALESCE(mp.last_price, wp.last_price) AS lp
+                   COALESCE(mp.last_price, wp.last_price) AS lp,
+                   -- amounts in a market quoted in a stock or a stablecoin
+                   -- are not wei and cannot be added to a balance
+                   MAX(CASE WHEN COALESCE(lt.pair_token, lc.pair_token) IN (?, ?) THEN 1 ELSE 0 END) AS eth_quoted
             FROM wallet_positions wp
             LEFT JOIN launches lt ON lt.token = wp.market
             LEFT JOIN launches lc ON lc.curve = wp.market
@@ -703,10 +746,12 @@ export class Cache {
           -- a cost basis of nothing is no basis; anything above that
           -- joins the average inside the clamped band, so a position
           -- bought for a rounding error cannot run away with it
-          WHERE tok IS NOT NULL AND st <= bt * 1.000000001 AND bc > 0
+          -- a position with no sale has no realized number, and a
+          -- position that sold more than it bought has no honest basis
+          WHERE tok IS NOT NULL AND st <= bt * 1.000000001 AND st > 0 AND bt > 0 AND bc > 0
         )
         GROUP BY w`);
-      const rows = q.all(ex, ...slice.map((w) => w.toLowerCase())) as {
+      const rows = q.all(ex, ZERO, ADDR.weth.toLowerCase(), ...slice.map((w) => w.toLowerCase())) as {
         w: string; taken_s: number; closed_s: number; wins_s: number; wins_closed_s: number; pct_s: number;
         realized_s: number; open_s: number; taken_f: number; closed_f: number; wins_f: number;
         wins_closed_f: number; pct_f: number; open_f: number;

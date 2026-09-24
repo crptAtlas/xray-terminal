@@ -4,6 +4,8 @@ import type { CardData } from "./types";
 // the server OG route both call drawCard with their own canvas context and
 // pre-loaded images. Geometry is the design/card.js original.
 
+import { GRADE_COLORS, recordLevel, winrateLevel } from "../grade.ts";
+
 export const PNL = (v: number): string => (v > 20 ? "#60F080" : v < -20 ? "#FF605C" : "#FFD640");
 
 export interface CardImages {
@@ -91,7 +93,7 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   x.fillText(d.addr.slice(0, 10) + "…" + d.addr.slice(-8), 200, 176);
   // big pnl top-right, colored by its own sign (the grade keeps the frame)
   const pnlNum = parseFloat(d.pnl.replace("\u2212", "-"));
-  const pnlCol = Number.isNaN(pnlNum) ? gc : PNL(pnlNum);
+  const pnlCol = Number.isNaN(pnlNum) ? gc : GRADE_COLORS[recordLevel(pnlNum)];
   x.textAlign = "right";
   x.fillStyle = pnlCol;
   x.font = '700 108px "JetBrains Mono"';
@@ -100,21 +102,24 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   noglow();
   x.fillStyle = "#6E8291";
   x.font = '400 22px "JetBrains Mono"';
-  x.fillText("avg holder pnl across Pons", 1008, 206);
+  x.fillText("avg realized pnl of holders across Pons", 1008, 206);
   if (d.pnlHere) {
     x.fillText(`on this token ${d.pnlHere}`, 1008, 236);
   }
   x.textAlign = "left";
-  // winrate + scale bar
-  x.fillStyle = gc;
+  // winrate + scale bar, coloured by where it sits on this chain rather
+  // than by the token's grade
+  const wrNum = parseFloat(d.winrate);
+  const wrCol = Number.isNaN(wrNum) ? gc : GRADE_COLORS[winrateLevel(wrNum)];
+  x.fillStyle = wrCol;
   x.font = '700 48px "JetBrains Mono"';
   const wrW = x.measureText(d.winrate).width;
-  glow(gc, 16);
+  glow(wrCol, 16);
   x.fillText(d.winrate, 72, 316);
   noglow();
   x.fillStyle = "#D9D9D9";
   x.font = '400 26px "JetBrains Mono"';
-  x.fillText("avg winrate of holders across Pons (chain median 20%)", 72 + wrW + 20, 316);
+  x.fillText("avg winrate of holders across Pons (chain median 31%)", 72 + wrW + 20, 316);
   const bx = 72;
   const bw = 936;
   const by = 344;

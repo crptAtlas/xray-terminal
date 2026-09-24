@@ -50,23 +50,34 @@ export function buildPositions(
 ): PositionSummary[] {
   const out: PositionSummary[] = [];
   for (const [token, trades] of byToken) {
+    let bought = 0n;
+    let cost = 0n;
+    let sold = 0n;
+    let proceeds = 0n;
+    for (const t of trades) {
+      if (t.kind === "buy") {
+        bought += t.tokens;
+        cost += t.eth;
+      } else {
+        sold += t.tokens;
+        proceeds += t.eth;
+      }
+    }
+    // realized only, the same rule the folded path uses: what a wallet
+    // still holds cannot be checked from its trades
+    if (bought <= 0n || sold <= 0n || cost <= 0n) continue;
+    if (sold * 1_000_000_000n > bought * 1_000_000_001n) continue; // no honest basis
+    const soldCost = (cost * sold) / bought;
+    if (soldCost <= 0n) continue;
+    const pnlWei = proceeds - soldCost;
     const remaining = remainingOf(token);
-    const decimals = decimalsOf(token);
-    // last trade price in ETH per whole token, for open position value
-    const last = trades[trades.length - 1];
-    const one = 10n ** BigInt(decimals);
-    const lastPrice = last && last.tokens > 0n ? Number(last.eth) / 1e18 / (Number(last.tokens) / Number(one)) : 0;
-    const pos = position(trades, 0n, remaining, lastPrice, decimals);
-    if (pos.unknownBasis) continue; // no honest basis, skip from the stats
-    const priceWad = BigInt(Math.round(lastPrice * 1e18));
-    const valueWei = pos.closed ? 0n : (remaining * priceWad) / one;
     out.push({
       token,
       trades: trades.length,
-      closed: pos.closed,
-      pnlPct: pos.pnlPct,
-      pnlWei: pos.pnlWei.toString(),
-      valueWei: valueWei.toString(),
+      closed: remaining * 1_000_000_000n <= bought,
+      pnlPct: (Number(pnlWei) / Number(soldCost)) * 100,
+      pnlWei: pnlWei.toString(),
+      valueWei: "0",
     });
   }
   return out;
@@ -89,12 +100,13 @@ function foldStats(positions: PositionSummary[], exclude?: string) {
     // one position bought for a rounding error can read as a million
     // percent; every position joins the average inside the same band
     if (p.pnlPct !== null) pnlPctSum += Math.max(-100, Math.min(500, p.pnlPct));
-    if ((p.pnlPct ?? 0) > 0) wins++;
+    // every counted position is realized, so its profit is realized too
+    const pnlWei = BigInt(p.pnlWei);
+    if (pnlWei > 0n) wins++;
+    realizedWei += pnlWei;
     if (p.closed) {
       closed++;
-      const pnlWei = BigInt(p.pnlWei);
       if (pnlWei > 0n) winsClosed++;
-      realizedWei += pnlWei;
     } else {
       openValueWei += BigInt(p.valueWei);
     }
