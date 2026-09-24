@@ -72,3 +72,4 @@ export function findGroups(rows: GroupInput[], maxGroups = 3, widthPct = 5): Gro
     };
   });
 }
+

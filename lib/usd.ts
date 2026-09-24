@@ -33,3 +33,4 @@ export async function ethUsd(fetchImpl: typeof fetch = fetch): Promise<number> {
     );
   }
 }
+

@@ -90,3 +90,4 @@ test("all three moods render a real PNG", async () => {
     assert.ok(buf.length > 5000, `png too small: ${buf.length}`);
   }
 });
+

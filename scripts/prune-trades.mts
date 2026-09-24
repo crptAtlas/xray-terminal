@@ -87,3 +87,4 @@ while (cursor < keepFrom) {
 }
 process.stderr.write("\n");
 db.close();
+

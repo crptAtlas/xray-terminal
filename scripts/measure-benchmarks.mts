@@ -49,3 +49,4 @@ line("avg pnl per position", avg);
 line("winrate all positions", wrAll);
 line("winrate closed only", wrClosed);
 cache.close();
+

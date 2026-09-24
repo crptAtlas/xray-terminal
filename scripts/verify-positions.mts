@@ -57,3 +57,4 @@ const extra = [...folded.keys()].filter((w) => !raw.has(w)).length;
 console.log(`missing from folded: ${missing}, mismatched: ${mismatched}, only in folded: ${extra}`);
 console.log(mismatched === 0 && missing === 0 && extra === 0 ? "MATCH" : "DIFFERS");
 cache.close();
+

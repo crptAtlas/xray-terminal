@@ -378,3 +378,4 @@ export function tradeIndexDepthDays(cache: Cache, lane: Lane = "curve"): number 
   if (!span || span.tip <= span.floor) return null;
   return Number(span.tip - span.floor) / Number(CHAIN.blocksPerDay);
 }
+

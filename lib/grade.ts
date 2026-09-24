@@ -94,3 +94,4 @@ export function gradeOf(
   if (inProfit < 1 - config.majority) return "shattered";
   return "cracked";
 }
+

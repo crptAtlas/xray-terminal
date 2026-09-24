@@ -128,3 +128,4 @@ export async function renderCard(r: CheckResult): Promise<Buffer> {
 
   return canvas.toBuffer("image/png");
 }
+

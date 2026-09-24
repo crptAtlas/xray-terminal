@@ -102,3 +102,4 @@ console.log(`sql fold ${sqlMs}ms, row fold ${rowMs}ms (read only)`);
 console.log(`compared ${compared}, differ ${differ}`);
 console.log(differ === 0 ? "MATCH" : "DIFFERS");
 cache.close();
+

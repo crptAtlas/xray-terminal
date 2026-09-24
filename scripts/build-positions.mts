@@ -113,3 +113,4 @@ if (!budgetHit) {
   console.error(`done: ${rows} folded positions, profiles now read them`);
 }
 db.close();
+

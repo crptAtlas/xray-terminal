@@ -65,3 +65,4 @@ test("aggregates fold into the same position as trade-by-trade", async () => {
   assert.equal(viaAgg[0].closed, viaTrades[0].closed);
   assert.ok(Math.abs(viaAgg[0].pnlPct - viaTrades[0].pnlPct) < 0.01, `${viaAgg[0].pnlPct} vs ${viaTrades[0].pnlPct}`);
 });
+

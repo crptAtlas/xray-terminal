@@ -103,3 +103,4 @@ for (const token of tokens) {
 }
 console.log(bad === 0 ? "ALL TOKENS MATCH" : `${bad} of ${tokens.length} tokens mismatch`);
 cache.close();
+

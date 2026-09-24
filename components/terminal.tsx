@@ -831,3 +831,4 @@ export function Terminal() {
     </div>
   );
 }
+

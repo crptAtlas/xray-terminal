@@ -132,3 +132,4 @@ GitHub Actions: `typecheck`, `test` and `no-signer` - greps `lib/` and
 `bin/` for `PRIVATE_KEY`, `privateKeyToAccount`, `signTransaction`,
 `sendTransaction`, `writeContract`, `walletClient`, `signMessage`; any
 match fails the build.
+

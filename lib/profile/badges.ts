@@ -33,3 +33,4 @@ export function badges(p: BadgeInput, config = BADGE_CONFIG): ("smart" | "whale"
   }
   return out;
 }
+

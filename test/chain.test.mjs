@@ -35,3 +35,4 @@ test("curve event abi matches the spec topics", () => {
 test("chain id", () => {
   assert.equal(CHAIN.id, 4663);
 });
+

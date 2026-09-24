@@ -482,3 +482,4 @@ export async function pickProvider(flag?: "rpc" | "bitquery"): Promise<Provider>
   }
   return new RpcProvider();
 }
+

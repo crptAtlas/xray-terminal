@@ -453,3 +453,4 @@ source rpc   34 requests   18.2s
 - winrate is hidden at one trade and penalized from two trades up
 - the tool only reads; it never touches keys and never signs anything
 - the `demo` command works offline and requires nothing
+

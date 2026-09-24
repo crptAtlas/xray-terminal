@@ -135,3 +135,4 @@ export function aggregate(rows: HolderRow[], profiles?: Map<string, ProfileLite>
     exited: { wallets: exitedRows.length, avgPnlPct: mean(exitedPnls), avgWinrate: exitedWr },
   };
 }
+

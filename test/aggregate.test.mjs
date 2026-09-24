@@ -154,3 +154,4 @@ test("grade waits for the holders record and then respects it", async () => {
   // a dead token is shattered regardless
   assert.equal(gradeOf({ ...base, avgProfilePnl: 50 }, holders, true), "shattered");
 });
+
