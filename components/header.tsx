@@ -90,7 +90,7 @@ export function Header() {
         <a href="https://x.com" target="_blank" rel="noopener" style={navLink}>
           X
         </a>
-        <a href="https://github.com/Skynet-inisghts/holder-pnl" target="_blank" rel="noopener" style={navLink}>
+        <a href="https://github.com/crptAtlas/xray-terminal" target="_blank" rel="noopener" style={navLink}>
           github
         </a>
       </nav>

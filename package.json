@@ -16,15 +16,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Skynet-inisghts/holder-pnl.git"
+    "url": "git+https://github.com/crptAtlas/xray-terminal.git"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Skynet-inisghts/holder-pnl/issues"
+    "url": "https://github.com/crptAtlas/xray-terminal/issues"
   },
-  "homepage": "https://github.com/Skynet-inisghts/holder-pnl#readme",
+  "homepage": "https://github.com/crptAtlas/xray-terminal#readme",
   "description": "",
   "type": "module",
   "dependencies": {

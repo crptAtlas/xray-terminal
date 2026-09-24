@@ -19,7 +19,7 @@ export function Footer() {
         <a href="https://x.com" style={{ color: "var(--text-dim)" }}>
           x
         </a>
-        <a href="https://github.com/Skynet-inisghts/holder-pnl" style={{ color: "var(--text-dim)" }}>
+        <a href="https://github.com/crptAtlas/xray-terminal" style={{ color: "var(--text-dim)" }}>
           github
         </a>
         <a href="https://t.me" style={{ color: "var(--text-dim)" }}>

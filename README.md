@@ -1,7 +1,7 @@
 <p align="center"><img src="assets/brand/banner.gif" width="100%" alt="XRAY - Shows future token's PnL. $XRAY, holder pnl terminal for pons v2, read-only. An animated negatoscope scans a pixel ribcage."></p>
 
 <p align="center">
-  <a href="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml"><img src="https://github.com/Skynet-inisghts/holder-pnl/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/crptAtlas/xray-terminal/actions/workflows/ci.yml"><img src="https://github.com/crptAtlas/xray-terminal/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <img src="https://img.shields.io/badge/Node-20%2B-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Node 20 or newer">
   <img src="https://img.shields.io/badge/Robinhood_Chain-4663-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="Robinhood Chain 4663">
   <img src="https://img.shields.io/badge/signing-none-9fd9ff?style=flat-square&labelColor=0a0a0a" alt="No signing">
@@ -70,8 +70,8 @@ xray check 0x… --card card.png
 ## Start in one minute
 
 ```bash
-git clone https://github.com/Skynet-inisghts/holder-pnl.git
-cd holder-pnl
+git clone https://github.com/crptAtlas/xray-terminal.git
+cd xray-terminal
 npm install
 npm test              # 92 tests, offline, on bundled fixtures
 npm run cli -- demo
