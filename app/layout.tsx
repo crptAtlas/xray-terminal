@@ -17,11 +17,18 @@ const mono = localFont({
   display: "swap",
 });
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://xray-terminal.com";
+
 export const metadata: Metadata = {
+  // Without this every og:image resolves against localhost, so a link
+  // shared anywhere shows a broken card - the preview points at a host
+  // only this machine can reach.
+  metadataBase: new URL(SITE),
   title: "Xray-terminal - see the bones of any token",
   description:
     "Holder PnL terminal for Pons V2 tokens on Robinhood Chain. Who is in profit, who is underwater and whether those wallets can trade at all. Read-only.",
   icons: { icon: "/assets/cage.png" },
+  openGraph: { siteName: "Xray-terminal", type: "website", url: SITE },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
