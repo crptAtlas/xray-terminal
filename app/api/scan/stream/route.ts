@@ -80,4 +80,3 @@ export function GET(req: NextRequest): Response {
     },
   });
 }
-

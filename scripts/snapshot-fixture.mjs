@@ -38,4 +38,3 @@ writeFileSync(join(outdir, "balances.json"), json([...balances.entries()]));
 console.log(
   `${meta.symbol}: ${activity.transfers.length} transfers, ${activity.quotes.length} quotes, ${candidates.length} wallets -> ${outdir}`,
 );
-

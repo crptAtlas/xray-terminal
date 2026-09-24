@@ -339,4 +339,3 @@ export async function runDemo(opts: CliOpts): Promise<void> {
   }
   cache.close();
 }
-

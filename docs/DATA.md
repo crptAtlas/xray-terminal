@@ -136,4 +136,3 @@ unknown-basis filters, bands, badges, grades, the insider exclusion
 (the scanned token never feeds its own holders' shown stats; badges
 still judge the full record) - is computed by our code and covered by
 tests, so the provider can be swapped without touching the product.
-

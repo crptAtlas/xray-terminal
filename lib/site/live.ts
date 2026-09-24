@@ -370,4 +370,3 @@ export function runScan(
   inflight.set(key, { promise, ...entry });
   return promise;
 }
-

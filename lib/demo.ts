@@ -86,4 +86,3 @@ export class FixtureProvider implements Provider {
 
 export const DEMO_FIXTURE = "graduated-token";
 export const DEMO_ETH_USD = "2400";
-

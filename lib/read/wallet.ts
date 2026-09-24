@@ -465,4 +465,3 @@ function notRead(wallet: string): Profile {
     notRead: true,
   };
 }
-

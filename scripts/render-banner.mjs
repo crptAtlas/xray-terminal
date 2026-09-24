@@ -65,4 +65,3 @@ ctx.fillText("$XRAY   ·   holder pnl terminal for pons v2   ·   read-only", 15
 
 await writeFile(brand + "banner-base.png", canvas.toBuffer("image/png"));
 console.log("assets/brand/banner-base.png");
-

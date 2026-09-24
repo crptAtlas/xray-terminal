@@ -462,4 +462,3 @@ if __name__ == "__main__":
 
     (OUT / "agents.css").write_text("\n".join(css))
     print("ok")
-

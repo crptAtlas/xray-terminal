@@ -81,4 +81,3 @@ test("badges still judge the full record including the scanned token", async () 
   assert.equal(p.trades, 0); // shown stats exclude the token
   assert.deepEqual(p.badges, ["whale"]); // the wallet's own ETH says whale
 });
-

@@ -82,4 +82,3 @@ export function position(
     closed: remaining === 0n,
   };
 }
-

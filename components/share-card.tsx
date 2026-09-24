@@ -83,4 +83,3 @@ export function useCardActions(data: CardData, filename: string) {
   }, [data, filename]);
   return { copied, copy, download };
 }
-

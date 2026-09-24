@@ -80,4 +80,3 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     cache.close();
   }
 }
-

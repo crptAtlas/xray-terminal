@@ -90,4 +90,3 @@ if (cursor > maxBlock) {
 }
 db.pragma("journal_mode = WAL"); // back to the mode the site reads in
 db.close();
-

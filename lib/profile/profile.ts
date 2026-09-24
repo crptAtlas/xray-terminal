@@ -189,4 +189,3 @@ export function buildProfile(
 ): Profile {
   return profileFromPositions(wallet, buildPositions(byToken, remainingOf, decimalsOf), ethWei, excludeToken, ethUsdRate);
 }
-

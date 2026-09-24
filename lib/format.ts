@@ -217,4 +217,3 @@ export function writeOutput(text: string, file?: string): void {
   writeFileSync(file, text + "\n");
   console.error(`written to ${file}`);
 }
-

@@ -42,4 +42,3 @@ export async function repairWindow(client: PublicClient, cache: Cache, fromBlock
   if (rows.length) cache.appendChainTrades(rows);
   return { rows: rows.length, splits };
 }
-

@@ -67,4 +67,3 @@ for (let i = 0; i < markets.length; i += 500) {
 }
 process.stderr.write("\n");
 db.close();
-

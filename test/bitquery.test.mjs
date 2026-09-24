@@ -68,4 +68,3 @@ test("tokens are grouped separately and quotes match per token", () => {
   assert.equal(map.get(TOKEN)[0].eth, 5n * 10n ** 17n);
   assert.equal(map.get(OTHER)[0].eth, 7n * 10n ** 17n);
 });
-

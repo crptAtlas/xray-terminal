@@ -89,4 +89,3 @@ export interface CardData {
   time: string;
   groups: { supply: number; range: string; mid: number; wallets: number }[];
 }
-

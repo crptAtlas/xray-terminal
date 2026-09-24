@@ -70,4 +70,3 @@ export const EXPLORER = "https://robinhoodchain.blockscout.com";
  * holders in three.
  */
 export const DUST_SUPPLY_SHARE = 1e-5;
-

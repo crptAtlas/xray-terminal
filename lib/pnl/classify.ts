@@ -105,4 +105,3 @@ export function classify(
   const transfersIn = [...transfersInByWallet.entries()].map(([wallet, tokens]) => ({ wallet, tokens }));
   return { trades, transfersIn };
 }
-

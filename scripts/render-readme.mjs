@@ -186,4 +186,3 @@ for (const [grade, ca] of targets) {
   await cmd(["check", ca, "--card", cardPath]);
   console.log(`cards/card-${grade}.png`);
 }
-

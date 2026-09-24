@@ -58,4 +58,3 @@ console.log(`content  ${contentOk ? "OK" : `FAILED (${mismatches} of ${sample.le
 console.log("");
 console.log(countsOk && boundsOk && contentOk ? "SAFE TO DROP THE ORIGINAL TABLE" : "DO NOT DROP - the move is not finished");
 db.close();
-

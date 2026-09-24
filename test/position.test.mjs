@@ -77,4 +77,3 @@ test("microscopic cost basis is unknown basis, not astronomy", () => {
   assert.equal(p.unknownBasis, true);
   assert.equal(p.pnlPct, null);
 });
-

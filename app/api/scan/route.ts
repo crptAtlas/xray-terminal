@@ -16,4 +16,3 @@ export function GET(req: NextRequest): NextResponse<Scan> {
   };
   return NextResponse.json(scan);
 }
-

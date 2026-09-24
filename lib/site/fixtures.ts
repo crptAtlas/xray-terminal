@@ -202,4 +202,3 @@ export function cardDataFor(grade: Grade, time = "2026-09-16 16:29 UTC"): CardDa
     groups: G.groups.map((x) => ({ supply: x[0], range: x[2], mid: x[3], wallets: x[1] })),
   };
 }
-

@@ -58,4 +58,3 @@ test("demo output is marked DEMO", async () => {
   assert.match(out, /^DEMO/);
   assert.match(out, /source demo fixtures/);
 });
-

@@ -40,4 +40,3 @@ for (let from = 0n; from <= latest; from += STEP) {
 }
 process.stderr.write("\n");
 cache.close();
-

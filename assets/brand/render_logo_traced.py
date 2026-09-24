@@ -161,4 +161,3 @@ if __name__ == "__main__":
     paste_cage(ImageDraw.Draw(bare), g, 2, 2)
     up(outline(bare), 9).save(OUT / "cage-still.png")
     print("ok")
-

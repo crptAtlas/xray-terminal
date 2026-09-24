@@ -80,4 +80,3 @@ export async function doctor(): Promise<{ checks: Check[]; ok: boolean }> {
   console.log(`source rpc   ${rpcStats().requests} requests`);
   return { checks, ok };
 }
-

@@ -57,4 +57,3 @@ test("group stats add up", () => {
   assert.equal(g.minPct, 10);
   assert.equal(g.maxPct, 14);
 });
-

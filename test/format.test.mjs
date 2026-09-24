@@ -143,4 +143,3 @@ test("fmt helpers", () => {
   assert.equal(fmtUsd(43_210), "$43k");
   assert.equal(fmtAge(3 * 86_400_000 + 5 * 3_600_000), "3d 5h");
 });
-

@@ -35,4 +35,3 @@ frames[0].save(
     optimize=False,
 )
 print(f"assets/brand/banner.gif ({len(frames)} frames)")
-

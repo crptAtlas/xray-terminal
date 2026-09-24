@@ -27,4 +27,3 @@ export async function renderCardPng(d: CardData): Promise<Buffer> {
   drawCard(ctx as never, d, { sprite, logo });
   return c.toBuffer("image/png");
 }
-

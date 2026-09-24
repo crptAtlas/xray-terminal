@@ -151,4 +151,3 @@ test("arbitrage chain: identical amounts are matched by log position, not first 
   assert.equal(bBuy.eth, 500n, "the B a wallet received is priced by its own hop");
   assert.equal(bSell.eth, 77n, "the B it sold onward is priced by the next hop");
 });
-

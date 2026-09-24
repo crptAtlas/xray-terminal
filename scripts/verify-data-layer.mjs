@@ -51,4 +51,3 @@ for (const t of sample) {
 }
 cache.close();
 console.log("bitquery requests spent:", bq.stats());
-

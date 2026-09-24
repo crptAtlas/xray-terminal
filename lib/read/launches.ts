@@ -89,4 +89,3 @@ export async function resolveTicker(
 export function looksLikeAddress(q: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(q);
 }
-

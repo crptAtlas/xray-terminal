@@ -101,4 +101,3 @@ export async function* check(
   onStage({ agent: "tracer", status: "done", detail: `${profiles.size} wallets traced` });
   yield { phase: 2, profiles, aggregates: aggregate(snapshot.holders, profiles) };
 }
-

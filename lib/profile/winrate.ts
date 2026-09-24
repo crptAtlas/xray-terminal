@@ -8,4 +8,3 @@ export function winrate(trades: number, wins: number): number | null {
   if (trades < 2) return null;
   return (wins / (trades + 1)) * 100;
 }
-

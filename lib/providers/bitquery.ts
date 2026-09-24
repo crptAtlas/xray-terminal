@@ -453,4 +453,3 @@ export class BitqueryProvider implements Provider {
     return { label: "rpc + bitquery", requests: this.requests + rpcReqs };
   }
 }
-

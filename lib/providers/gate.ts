@@ -191,4 +191,3 @@ export function makeGateForTest(fetchImpl: typeof fetch, endpoints: Endpoint[]) 
     stats: () => ({ requests: st.requests }),
   };
 }
-
