@@ -26,3 +26,4 @@ export function AgentGif({ src, style, alt = "" }: { src: string; style?: React.
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={real} alt={alt} style={style} />;
 }
+

@@ -10,3 +10,4 @@ export const poolManagerAbi = parseAbi([
 export const SWAP_TOPIC = toEventSelector(
   "Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)",
 );
+

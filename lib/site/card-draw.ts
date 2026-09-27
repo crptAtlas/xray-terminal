@@ -190,3 +190,4 @@ export function drawCard(ctx: Ctx2D, d: CardData, images: CardImages): void {
   x.font = '400 22px "JetBrains Mono"';
   x.fillText(d.time, 72, 992);
 }
+

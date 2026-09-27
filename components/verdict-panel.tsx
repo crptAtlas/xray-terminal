@@ -96,3 +96,4 @@ export function VerdictPanel() {
     </div>
   );
 }
+

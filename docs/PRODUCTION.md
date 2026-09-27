@@ -92,3 +92,4 @@ the home page runs the full walk-and-talk animation, `/holders` is
 built (fixture result until the live wiring) and reduced-motion falls back to
 still frames. What remains needs the owner: the items in the table
 above.
+

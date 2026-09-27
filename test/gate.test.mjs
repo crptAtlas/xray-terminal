@@ -58,3 +58,4 @@ test("json-rpc level errors are thrown to the caller, not retried", async () => 
   await assert.rejects(() => gate.request("eth_getLogs", [{}]), /more than 10000/);
   assert.equal(calls, 1);
 });
+

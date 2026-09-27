@@ -61,3 +61,4 @@ export async function copyCard(d) {
 export async function downloadCard(d, name) {
   const blob = await cardBlob(d); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+

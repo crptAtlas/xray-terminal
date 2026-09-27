@@ -56,3 +56,4 @@ export async function downloadCard(d: CardData, name: string): Promise<void> {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+

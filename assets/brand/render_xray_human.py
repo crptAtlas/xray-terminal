@@ -317,3 +317,4 @@ if __name__ == "__main__":
     for n, fn in [("healthy", draw_healthy), ("cracked", draw_cracked), ("shattered", draw_shattered)]:
         up(fn(), 10).save(OUT / f"sprite-h-{n}.png")
     print("ok")
+

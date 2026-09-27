@@ -21,3 +21,4 @@ test("hidden below two trades", () => {
   assert.equal(winrate(0, 0), null);
   assert.equal(winrate(1, 1), null);
 });
+

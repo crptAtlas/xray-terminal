@@ -23,3 +23,4 @@ test("whale is wealth: 50k usd total balance, any tokens", () => {
 test("both badges together", () => {
   assert.deepEqual(badges({ ...base, balanceUsd: 80_000 }), ["smart", "whale"]);
 });
+

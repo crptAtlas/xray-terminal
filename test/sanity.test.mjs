@@ -20,3 +20,4 @@ test("index fast path and node path agree on the same trades", async () => {
   assert.equal(got[0].eth, 5n);
   c.close();
 });
+

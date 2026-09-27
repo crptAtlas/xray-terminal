@@ -159,3 +159,4 @@ test("walletsTradedSince finds wallets with rows past a block", () => {
   assert.deepEqual([...got], ["0xfresh"]);
   c.close();
 });
+

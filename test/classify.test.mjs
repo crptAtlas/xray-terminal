@@ -87,3 +87,4 @@ test("market-to-market movement (graduation sweep) is ignored", () => {
   assert.equal(trades.length, 0);
   assert.equal(transfersIn.length, 0);
 });
+

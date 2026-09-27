@@ -62,3 +62,4 @@ export interface Provider {
   liquidityEth(token: TokenMeta): Promise<bigint>;
   stats(): { label: string; requests: number };
 }
+
