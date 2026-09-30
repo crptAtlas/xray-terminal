@@ -1,3 +1,4 @@
+import { LINKS } from "../lib/links.ts";
 import Link from "next/link";
 
 const navLink: React.CSSProperties = {
@@ -87,12 +88,17 @@ export function Header() {
         <Link href="/holders" style={navLink}>
           holders
         </Link>
-        <a href="https://x.com" target="_blank" rel="noopener" style={navLink}>
+        <a href={LINKS.x} target="_blank" rel="noopener" style={navLink}>
           X
         </a>
-        <a href="https://github.com/crptAtlas/xray-terminal" target="_blank" rel="noopener" style={navLink}>
+        <a href={LINKS.github} target="_blank" rel="noopener" style={navLink}>
           github
         </a>
+        {LINKS.telegram && (
+          <a href={LINKS.telegram} target="_blank" rel="noopener" style={navLink}>
+            telegram
+          </a>
+        )}
       </nav>
     </header>
   );

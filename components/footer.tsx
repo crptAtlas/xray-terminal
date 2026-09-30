@@ -1,3 +1,5 @@
+import { LINKS } from "../lib/links.ts";
+
 export function Footer() {
   return (
     <footer
@@ -16,15 +18,17 @@ export function Footer() {
       <span style={{ display: "inline-flex", gap: 12, alignItems: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/assets/lightbox.png" alt="" style={{ width: 24, height: 24, display: "block" }} />
-        <a href="https://x.com" style={{ color: "var(--text-dim)" }}>
+        <a href={LINKS.x} target="_blank" rel="noopener" style={{ color: "var(--text-dim)" }}>
           x
         </a>
-        <a href="https://github.com/crptAtlas/xray-terminal" style={{ color: "var(--text-dim)" }}>
+        <a href={LINKS.github} target="_blank" rel="noopener" style={{ color: "var(--text-dim)" }}>
           github
         </a>
-        <a href="https://t.me" style={{ color: "var(--text-dim)" }}>
-          telegram
-        </a>
+        {LINKS.telegram && (
+          <a href={LINKS.telegram} target="_blank" rel="noopener" style={{ color: "var(--text-dim)" }}>
+            telegram
+          </a>
+        )}
         <span>· read-only, holds no keys</span>
       </span>
       <span>Xray-terminal - who is in profit, who is underwater and can they trade at all · Robinhood Chain</span>
