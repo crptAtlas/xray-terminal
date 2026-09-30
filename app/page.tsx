@@ -7,6 +7,12 @@ import { VerdictPanel } from "../components/verdict-panel";
 // The agent walk-and-talk animation arrives with M4; the stations and the
 // engine log are already live.
 
+// Launch switch. Both the contract address and the pool chart stay off
+// the page until the token exists: showing a placeholder contract on a
+// live site invites someone to send money to it. To bring them back,
+// set this to true, put the real address in components/ca-block.tsx
+// (OFFICIAL_CA) and the pool embed url in CHART_URL below.
+const TOKEN_LAUNCHED = false;
 const CHART_URL: string = ""; // pool embed url goes here at launch
 
 const label: React.CSSProperties = {
@@ -188,46 +194,48 @@ export default function Home() {
         </div>
       </section>
 
-      <CaBlock />
+      {TOKEN_LAUNCHED && <CaBlock />}
 
       {/* chart */}
-      <section style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
-            <div className="font-tiny" style={{ fontSize: 32, lineHeight: 1, color: "var(--bone-bright)", textShadow: "0 0 14px rgba(120,220,255,.5)" }}>
-              $XRAY <span style={{ color: "var(--accent)" }}>CHART</span>
+      {TOKEN_LAUNCHED && (
+        <section style={{ border: "1px solid var(--border)", background: "var(--bg-panel)", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, padding: "20px 24px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+              <div className="font-tiny" style={{ fontSize: 32, lineHeight: 1, color: "var(--bone-bright)", textShadow: "0 0 14px rgba(120,220,255,.5)" }}>
+                $XRAY <span style={{ color: "var(--accent)" }}>CHART</span>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>live · via GeckoTerminal · read-only</div>
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>live · via GeckoTerminal · read-only</div>
+            {CHART_URL && (
+              <a href={CHART_URL.split("?")[0]} target="_blank" rel="noopener" style={{ fontSize: 12 }}>
+                open on GeckoTerminal →
+              </a>
+            )}
           </div>
-          {CHART_URL && (
-            <a href={CHART_URL.split("?")[0]} target="_blank" rel="noopener" style={{ fontSize: 12 }}>
-              open on GeckoTerminal →
-            </a>
-          )}
-        </div>
-        <div style={{ height: 440, background: "var(--bg-deep)", borderTop: "1px solid var(--border)", position: "relative" }}>
-          {CHART_URL ? (
-            <iframe src={CHART_URL} title="$XRAY chart" loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", display: "block" }} />
-          ) : (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                background:
-                  "repeating-linear-gradient(0deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px),repeating-linear-gradient(90deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px)",
-              }}
-            >
-              <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-dark)" }}>LIVE CHART LOADS HERE AT LAUNCH</div>
-              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>pool embed url goes into app/page.tsx → CHART_URL</div>
-            </div>
-          )}
-        </div>
-      </section>
+          <div style={{ height: 440, background: "var(--bg-deep)", borderTop: "1px solid var(--border)", position: "relative" }}>
+            {CHART_URL ? (
+              <iframe src={CHART_URL} title="$XRAY chart" loading="lazy" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", display: "block" }} />
+            ) : (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  background:
+                    "repeating-linear-gradient(0deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px),repeating-linear-gradient(90deg,rgba(22,50,74,.25) 0 1px,transparent 1px 44px)",
+                }}
+              >
+                <div className="font-tiny" style={{ fontSize: 24, lineHeight: 1, color: "var(--bone-dark)" }}>LIVE CHART LOADS HERE AT LAUNCH</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)" }}>pool embed url goes into app/page.tsx → CHART_URL</div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -55,11 +55,18 @@ SQLite/libSQL. Not a launch blocker; addresses work without any cache.
 
 ## What the owner needs to provide
 
+Until the token exists both the contract block and the chart are off the
+page behind one switch, `TOKEN_LAUNCHED` in `app/page.tsx`. That is
+deliberate rather than tidy: the contract block ships with a placeholder
+address, and a placeholder contract on a live site is an invitation to
+send money to the wrong place. Turning it back on is one line plus the
+two real values.
+
 | # | Item | Unlocks | Where it goes |
 |---|---|---|---|
 | 1 | ~~data API key~~ NOT NEEDED: the whole engine runs on the public RPC plus the local trade index - phase 1, profiles, wallet page, full history | everything | - |
-| 2 | Domain (e.g. buy the one you want, point it at Vercel) | real URL instead of xray-xi-puce.vercel.app, OG links | Vercel → Domains |
-| 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | `components/ca-block.tsx`, `CHART_URL` in `app/page.tsx` |
+| 2 | ~~Domain~~ DONE: xray-terminal.com, TLS by certbot, nginx site in `deploy/nginx-xray.conf` | real URL, working OG links | - |
+| 3 | Official $XRAY CA + pool address | OFFICIAL CA section, GeckoTerminal chart embed | flip `TOKEN_LAUNCHED` in `app/page.tsx`, real address into `OFFICIAL_CA` in `components/ca-block.tsx`, pool embed into `CHART_URL` |
 | 4 | X / Telegram / public GitHub links | header and footer links | `components/header.tsx`, `components/footer.tsx` |
 | 5 | (optional) Telegram bot token from @BotFather | the Telegram bot | bot host env |
 | 6 | (optional) a small VPS or hosted SQLite | persistent cache, instant repeats for everyone | replaces Vercel functions for /api |
