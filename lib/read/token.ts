@@ -57,7 +57,13 @@ export async function tokenSnapshot(
 ): Promise<TokenSnapshot> {
   onStage({ agent: "scanner", status: "start" });
   const known = cache.tokenState(address.toLowerCase());
-  const meta = await provider.tokenMeta(address, known?.createdBlock ? { createdBlock: known.createdBlock } : undefined);
+  // The launch index knows when every Pons token launched and the
+  // follower keeps it at the chain head, so this is a lookup. Without
+  // the hint tokenMeta finds the block by reading the factory's entire
+  // log history: twenty seven seconds measured on a token a visitor had
+  // just asked for, with nothing on screen for any of them.
+  const createdBlock = known?.createdBlock ?? cache.launchBlock(address);
+  const meta = await provider.tokenMeta(address, createdBlock ? { createdBlock } : undefined);
 
   // Fast path: the chain-wide index already holds every trade of this
   // token, so the scan reads them locally instead of pulling the token's

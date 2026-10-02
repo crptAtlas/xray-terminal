@@ -33,6 +33,9 @@ export interface LiveBand {
  * against a payload nobody can render, not a view of the top. */
 const MAX_ROWS = 2000;
 
+/** How many wallets get their cross-Pons record read in one scan. */
+const PROFILE_LIMIT = 1000;
+
 export interface LiveHolderRow {
   addr: string;
   addrFull: string;
@@ -343,7 +346,13 @@ export function runScan(
       let snapHolders: HolderRow[] = [];
       for await (const phase of check(provider, cache, key as `0x${string}`, {
         profiles: true,
-        profileLimit: MAX_ROWS, // every row the table shows carries a record
+        // Holders are sorted by supply, so this reads the wallets that
+        // actually move the headline first: it is the current holders
+        // the average is weighted over, and a wallet that already left
+        // the token contributes nothing to it. Reading all two thousand
+        // rows cost ten extra seconds and changed no number on the page
+        // - measured on four tokens visitors had just scanned.
+        profileLimit: PROFILE_LIMIT,
         profileDeadlineMs: Number(process.env.XRAY_PROFILE_DEADLINE_MS ?? 90_000),
         onStage: (e) => {
           touchScan(); // hold back any background digger while we read

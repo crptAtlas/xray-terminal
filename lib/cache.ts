@@ -297,6 +297,19 @@ export class Cache {
     tx(list);
   }
 
+  /**
+   * The block a Pons token launched at, straight from the launch index.
+   * Without it tokenMeta hunts the block by scanning the factory's whole
+   * log history, which on a chain this long is half a minute during
+   * which the page shows nothing at all.
+   */
+  launchBlock(token: string): bigint | null {
+    const row = this.db.prepare("SELECT block FROM launches WHERE token = ?").get(token.toLowerCase()) as
+      | { block: string }
+      | undefined;
+    return row ? BigInt(row.block) : null;
+  }
+
   launchesTip(): bigint {
     const row = this.db.prepare("SELECT value FROM meta WHERE key = 'launches_tip'").get() as
       | { value: string }
