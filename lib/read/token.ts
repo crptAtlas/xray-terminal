@@ -76,12 +76,18 @@ export async function tokenSnapshot(
   // a rolling window.
   const foldFloor = cache.positionsFloor();
   const floor = foldFloor ?? { curve: curveSpan?.floor ?? 0n, v4: v4Span?.floor ?? 0n };
+  // A token still on its curve has no pool trades at all, so what the v4
+  // lane does or does not reach says nothing about it. Demanding v4
+  // coverage anyway sent nine old tokens in ten down the node path,
+  // which reads the token's entire log history: a hundred and forty
+  // seconds, measured, to come back with one trade.
+  const needsV4 = meta.phase.kind !== "curve";
   const indexCovers =
     !process.env.XRAY_NO_INDEX_SCAN &&
     !!curveSpan &&
     !!v4Span &&
     floor.curve <= meta.createdBlock &&
-    floor.v4 <= meta.createdBlock &&
+    (!needsV4 || floor.v4 <= meta.createdBlock) &&
     curveSpan.tip > meta.createdBlock;
 
   let trades: Trade[];
